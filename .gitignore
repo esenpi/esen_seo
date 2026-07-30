@@ -1,0 +1,48 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code — Launch-Configs und Workspace-Dateien sind persönlich.
+.vscode/
+*.code-workspace
+
+# Flutter/Dart/Pub related
+# Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
+/pubspec.lock
+**/doc/api/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+coverage/
+
+# Local-only files (not part of the repository)
+*.local.md
+
+# Sicherheitskritisch — Zugangsdaten und Signierschlüssel dürfen
+# niemals ins Repo (präventiv, auch wenn aktuell keine existieren).
+.env
+.env.*
+*.pem
+*.p12
+*.jks
+*.keystore
+key.properties
+**/service-account*.json
+**/google-services.json
+**/GoogleService-Info.plist
+secrets/

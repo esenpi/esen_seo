@@ -1,0 +1,9 @@
+*.local.md
+*.code-workspace
+build/
+.dart_tool/
+.idea/
+portfolio/
+*.iml
+*.ipr
+*.iws
