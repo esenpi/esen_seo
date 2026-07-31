@@ -1,3 +1,31 @@
+## 0.4.0
+
+The prerendered page becomes the first frame.
+
+* New `SeoRenderMode.visibleShell` for
+  `prerenderSite(renderMode: …)`: the prerendered semantic HTML is no
+  longer only an invisible mirror but a visible, styled page — readable
+  before the Flutter engine has even started loading. The shell covers
+  the engine's boot phase, fades out (150 ms) once the first frame is
+  rendered, and then falls back to being the invisible crawler mirror.
+  If the engine never loads, users simply keep a readable page. The
+  default mode is unchanged.
+* CSS delivery for the shell: `prerenderSite(stylesheet: …)` inlines
+  critical CSS into the `<head>` of every prerendered file (with safe
+  `</style>` escaping), and `seoDefaultStylesheet` ships a ~1 KB
+  classless baseline with dark-mode support. `class` and `style` pass
+  through `.seo()` attributes as styling hooks.
+* `prerenderSite` now refuses to run on an already prerendered
+  `index.html` instead of silently duplicating the canonical link,
+  JSON-LD blocks and content container on a second run.
+* Fixes: duplicate sitemap.xml/llms.txt entries when `additionalPaths`
+  overlap routes; `submitIndexNow` gained a `timeout` (default 10 s)
+  and rejects a `siteBase` without scheme instead of submitting an
+  empty host; markdown special characters in titles, link labels and
+  image alt texts no longer break llms.txt links; the first DOM
+  injection also runs for apps that mirror no widgets (required for
+  the shell handoff).
+
 ## 0.3.0
 
 Richer structured data, a smarter sitemap, and first-class support for
