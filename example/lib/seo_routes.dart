@@ -80,6 +80,8 @@ final seoRoutes = [
   ),
   SeoRoute(
     path: '/docs',
+    // Erscheint als <lastmod> in der sitemap.xml.
+    lastModified: DateTime.utc(2026, 7, 31),
     meta: (_) => SeoMeta(
       title: 'Documentation — esen_seo',
       description: 'How to add real SEO to a Flutter Web app: widget '
@@ -138,7 +140,8 @@ final seoRoutes = [
         SeoNode(tag: 'h2', text: '5. Structured data (JSON-LD)'),
         SeoNode(
           tag: 'p',
-          text: 'Typed Schema.org builders for Article, Product, '
+          text: 'Typed Schema.org builders for Article, Product (with '
+              'AggregateRating), Review, Event, LocalBusiness, '
               'Organization, WebSite, BreadcrumbList and FAQPage — plus a '
               'generic constructor for every other type.',
         ),
@@ -158,7 +161,8 @@ final seoRoutes = [
         SeoNode(
           tag: 'p',
           text: 'A shelf middleware serves crawlers real HTML documents, '
-              'plus sitemap.xml, robots.txt, real 404s and 301 redirects.',
+              'plus sitemap.xml, robots.txt, llms.txt, real 404s and 301 '
+              'redirects.',
         ),
       ]),
       SeoNode(tag: 'section', children: [
@@ -171,7 +175,16 @@ final seoRoutes = [
         ),
       ]),
       SeoNode(tag: 'section', children: [
-        SeoNode(tag: 'h2', text: '9. Safe & strict mode'),
+        SeoNode(tag: 'h2', text: '9. llms.txt & IndexNow'),
+        SeoNode(
+          tag: 'p',
+          text: 'llms.txt and llms-full.txt make the site legible to AI '
+              'assistants; submitIndexNow() pings search engines about '
+              'changed URLs within minutes instead of days.',
+        ),
+      ]),
+      SeoNode(tag: 'section', children: [
+        SeoNode(tag: 'h2', text: '10. Safe & strict mode'),
         SeoNode(
           tag: 'p',
           text: 'SeoMode.safe never breaks; SeoMode.strict warns about '
@@ -179,7 +192,7 @@ final seoRoutes = [
         ),
       ]),
       SeoNode(tag: 'section', children: [
-        SeoNode(tag: 'h2', text: '10. Verify your SEO'),
+        SeoNode(tag: 'h2', text: '11. Verify your SEO'),
         SeoNode(
           tag: 'p',
           text: 'Check #esen-seo-content in DevTools, curl the server '

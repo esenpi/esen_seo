@@ -30,6 +30,8 @@ library;
 
 export 'core.dart';
 export 'src/server/bot_detector.dart';
+export 'src/server/indexnow.dart';
+export 'src/server/llms_txt.dart';
 export 'src/server/prerender.dart';
 export 'src/server/redirects.dart';
 export 'src/server/seo_middleware.dart';

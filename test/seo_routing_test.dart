@@ -204,5 +204,65 @@ void main() {
           seoRobotsTxt(siteBase: 'https://x.dev', includeSitemap: false);
       expect(txt, isNot(contains('Sitemap:')));
     });
+
+    test('routes with lastModified get a date-only lastmod', () {
+      final xml = seoSitemapXml(
+        routes: [
+          SeoRoute(
+            path: '/blog',
+            meta: (_) => const SeoMeta(),
+            lastModified: DateTime.utc(2026, 7, 31, 14, 30),
+          ),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(xml, contains('<lastmod>2026-07-31</lastmod>'));
+      expect(xml, isNot(contains('14:30')));
+    });
+
+    test('alternates become xhtml:link entries with the namespace', () {
+      final xml = seoSitemapXml(
+        routes: [
+          SeoRoute(
+            path: '/preise',
+            meta: (_) => const SeoMeta(alternates: {
+              'de': 'https://x.dev/preise',
+              'en': 'https://x.dev/en/pricing',
+            }),
+          ),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(xml, contains('xmlns:xhtml="http://www.w3.org/1999/xhtml"'));
+      expect(
+        xml,
+        contains(
+          '<xhtml:link rel="alternate" hreflang="en" '
+          'href="https://x.dev/en/pricing"/>',
+        ),
+      );
+    });
+
+    test('plain routes keep the compact form without xhtml namespace', () {
+      final xml = seoSitemapXml(routes: _routes(), siteBase: 'https://x.dev');
+      expect(xml, isNot(contains('xmlns:xhtml')));
+      expect(xml, contains('<url><loc>https://x.dev/demo</loc></url>'));
+    });
+
+    test('additional paths inherit lastmod from their :param route', () {
+      final xml = seoSitemapXml(
+        routes: [
+          SeoRoute(
+            path: '/blog/:slug',
+            meta: (_) => const SeoMeta(),
+            lastModified: DateTime.utc(2026, 7, 31),
+          ),
+        ],
+        siteBase: 'https://x.dev',
+        additionalPaths: ['/blog/erster-post'],
+      );
+      expect(xml, contains('<loc>https://x.dev/blog/erster-post</loc>'));
+      expect(xml, contains('<lastmod>2026-07-31</lastmod>'));
+    });
   });
 }

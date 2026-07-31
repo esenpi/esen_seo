@@ -5,6 +5,7 @@ import 'package:shelf/shelf.dart';
 import '../meta/seo_meta.dart';
 import '../routing/seo_route.dart';
 import 'bot_detector.dart';
+import 'llms_txt.dart';
 import 'seo_page.dart';
 import 'sitemap.dart';
 
@@ -30,12 +31,16 @@ typedef SeoPageResolver = FutureOr<SeoPage?> Function(Request request);
 /// With [routes] set, the middleware additionally:
 ///
 /// - derives canonical URLs from [siteBase] for routes without one,
-/// - serves `/sitemap.xml` and `/robots.txt` (to every client, not just
-///   bots) generated from the table,
+/// - serves `/sitemap.xml`, `/robots.txt`, `/llms.txt` and
+///   `/llms-full.txt` (to every client, not just bots) generated from
+///   the table,
 /// - answers unknown page paths with a real **HTTP 404** for bots
 ///   instead of the Flutter app — avoiding the classic SPA soft-404
 ///   problem. Paths whose last segment contains a dot (assets like
 ///   `main.dart.js`) always fall through to the wrapped handler.
+///
+/// With [indexNowKey] set, the IndexNow key file `/<key>.txt` is served
+/// too, so `submitIndexNow` pings verify without extra hosting setup.
 ///
 /// For special cases beyond the table, [resolve] is consulted when no
 /// route matches.
@@ -45,6 +50,8 @@ Middleware seoBotMiddleware({
   String? siteBase,
   bool serveSitemap = true,
   bool serveRobotsTxt = true,
+  bool serveLlmsTxt = true,
+  String? indexNowKey,
   List<String> additionalSitemapPaths = const [],
   bool unknownRoutesAs404 = true,
   BotDetector detector = const BotDetector(),
@@ -54,10 +61,12 @@ Middleware seoBotMiddleware({
     'seoBotMiddleware needs `routes` and/or `resolve`.',
   );
   return (Handler inner) {
-    // Sitemap und robots.txt sind pro Konfiguration statisch —
+    // Sitemap, robots.txt und llms.txt sind pro Konfiguration statisch —
     // einmal bauen, danach aus dem Cache ausliefern.
     String? sitemapCache;
     String? robotsCache;
+    String? llmsCache;
+    String? llmsFullCache;
     return (Request request) async {
       final path = normalizeSeoPath(request.url.path);
 
@@ -82,6 +91,34 @@ Middleware seoBotMiddleware({
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }
+        if (serveLlmsTxt && routes != null && path == '/llms.txt') {
+          llmsCache ??= seoLlmsTxt(
+            routes: routes,
+            siteBase: siteBase,
+            additionalPaths: additionalSitemapPaths,
+          );
+          return Response.ok(
+            llmsCache,
+            headers: {'content-type': 'text/plain; charset=utf-8'},
+          );
+        }
+        if (serveLlmsTxt && routes != null && path == '/llms-full.txt') {
+          llmsFullCache ??= await seoLlmsFullTxt(
+            routes: routes,
+            siteBase: siteBase,
+            additionalPaths: additionalSitemapPaths,
+          );
+          return Response.ok(
+            llmsFullCache,
+            headers: {'content-type': 'text/plain; charset=utf-8'},
+          );
+        }
+      }
+      if (indexNowKey != null && path == '/$indexNowKey.txt') {
+        return Response.ok(
+          indexNowKey,
+          headers: {'content-type': 'text/plain; charset=utf-8'},
+        );
       }
 
       if (!detector.isBot(request.headers['user-agent'])) {

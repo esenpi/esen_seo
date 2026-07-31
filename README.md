@@ -31,19 +31,23 @@ Image.network(url).seo(alt: 'Our team')  // → <img src="..." alt="Our team"/>
 - **Meta tags, OpenGraph, Twitter Cards**: one `EsenSeo.setMeta()` call
   per page, with sensible fallbacks (`og:title` ← `title`, …).
 - **Schema.org JSON-LD** for rich results: typed builders for `Article`,
-  `Product`, `Organization`, `WebSite`, `BreadcrumbList` and `FAQPage`,
-  plus a generic escape hatch for every other type.
+  `Product` (incl. `AggregateRating`), `Review`, `Event`,
+  `LocalBusiness`, `Organization`, `WebSite`, `BreadcrumbList` and
+  `FAQPage`, plus a generic escape hatch for every other type.
 - **Bot-aware SSR server**: a shelf middleware detects crawlers by
   User-Agent and serves them a real HTML document — pure Dart, runs
   with `dart run`, no browser involved.
 - **URL routing as a single source of truth**: define your routes once
   in a pure-Dart table — the app applies meta tags automatically on
   navigation, the server renders the same pages for bots and generates
-  `sitemap.xml`, `robots.txt`, canonical URLs and real HTTP 404s from
-  the same table.
+  `sitemap.xml` (with `lastmod` and hreflang alternates), `robots.txt`,
+  canonical URLs and real HTTP 404s from the same table.
 - **Static prerendering**: bake the route table into the web build as
   static HTML files — full SEO on Firebase Hosting, GitHub Pages or any
   CDN, no server needed.
+- **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
+  generated from the route table, and IndexNow pings so search engines
+  pick up changes in minutes instead of days.
 
 ## Quick start
 
@@ -161,6 +165,18 @@ SeoMeta(
 )
 ```
 
+Anything beyond the built-in fields goes into `extraMeta` — plain
+`<meta name="…" content="…">` tags:
+
+```dart
+SeoMeta(
+  extraMeta: {
+    'google-site-verification': 'AbC123…',
+    'theme-color': '#0a0f1e',
+  },
+)
+```
+
 ## SSR server for bots
 
 Crawlers that do not execute JavaScript (social link previews, many
@@ -259,8 +275,15 @@ This automatically gives you:
 
 - server-rendered pages for every route (with path parameters),
 - **canonical URLs** derived from `siteBase` + route path,
-- **`/sitemap.xml`** and **`/robots.txt`** generated from the table,
+- **`/sitemap.xml`**, **`/robots.txt`**, **`/llms.txt`** and
+  **`/llms-full.txt`** generated from the table,
 - **real HTTP 404s** for unknown page paths — no SPA soft-404 problem.
+
+The sitemap carries everything a route declares: set
+`SeoRoute(lastModified: …)` and search engines see a `<lastmod>` date;
+routes whose `SeoMeta.alternates` list language variants get
+`<xhtml:link rel="alternate" hreflang="…">` entries — Google's
+recommended way to announce translations at scale.
 
 For URL hygiene, add the redirect middleware in front — duplicate
 content under several URLs splits ranking signals:
@@ -300,8 +323,51 @@ meta tags, JSON-LD and the semantic HTML body — visible in the page
 source for everyone, no bot detection needed. The running app finds the
 prerendered container by id and simply takes it over (hydration, no
 duplicates). Deep links work on static hosts because the files actually
-exist; `sitemap.xml` and `robots.txt` are written too. For `:param`
-routes, pass the concrete paths via `additionalPaths`.
+exist; `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt` and a
+`404.html` (served with a real 404 status by Firebase Hosting, GitHub
+Pages & Co. — no SPA soft-404) are written too. For `:param` routes,
+pass the concrete paths via `additionalPaths`.
+
+## AI crawlers & instant indexing
+
+More and more traffic comes from AI assistants that read
+[llms.txt](https://llmstxt.org) — a markdown manifest of your site.
+esen_seo generates it from the same route table (served by the
+middleware, written by `prerenderSite`, or standalone):
+
+```dart
+seoLlmsTxt(routes: seoRoutes, siteBase: siteBase)
+// # Esen Software
+// > Flutter apps with real SEO.
+//
+// ## Pages
+//
+// - [Home](https://esen.software/): Flutter apps with real SEO.
+// - [Docs](https://esen.software/docs): How esen_seo works.
+```
+
+`llms-full.txt` goes one step further: the complete page content —
+your routes' server-side bodies converted to markdown — in one file,
+so an AI assistant reads the whole site in a single request
+(`seoLlmsFullTxt(...)`, served and written automatically as well).
+
+And instead of waiting for the next crawl, push changed pages actively
+via [IndexNow](https://www.indexnow.org) (Bing, Seznam, Naver, Yandex —
+Google still crawls via sitemap):
+
+```dart
+// after a deploy or content update:
+await submitIndexNow(
+  siteBase: siteBase,
+  key: 'a1b2c3d4e5f6a7b8',            // self-chosen, 8–128 hex chars
+  paths: ['/', '/blog/neuer-post'],
+);
+```
+
+The protocol requires the key to be readable at
+`https://your-site/<key>.txt` — `seoBotMiddleware(indexNowKey: …)`
+serves it and `prerenderSite(indexNowKey: …)` writes it, so there is no
+extra hosting setup.
 
 Trade-off: prerendered pages are a build-time snapshot — for
 frequently changing content use the SSR server above instead.

@@ -156,6 +156,30 @@ void main() {
       );
     });
 
+    test('renders extraMeta as name/content tags', () {
+      const meta = SeoMeta(
+        title: 'Titel',
+        extraMeta: {
+          'google-site-verification': 'AbC123',
+          'theme-color': '#0a0f1e',
+        },
+      );
+      final html = meta.toHtml();
+      expect(
+        html,
+        contains('<meta name="google-site-verification" content="AbC123"/>'),
+      );
+      expect(html, contains('<meta name="theme-color" content="#0a0f1e"/>'));
+    });
+
+    test('copyWith keeps extraMeta', () {
+      const meta = SeoMeta(extraMeta: {'theme-color': '#fff'});
+      expect(
+        meta.copyWith(title: 'Neu').extraMeta,
+        {'theme-color': '#fff'},
+      );
+    });
+
     test('escapes content values', () {
       const meta = SeoMeta(description: 'A & B "C"');
       expect(

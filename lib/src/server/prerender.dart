@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
 import '../routing/seo_route.dart';
+import 'llms_txt.dart';
 import 'sitemap.dart';
 
 /// Bakes the SEO route table into the built Flutter web app as static
@@ -26,8 +28,11 @@ import 'sitemap.dart';
 /// like `/demo` work on static hosts too, since a real
 /// `/demo/index.html` exists.
 ///
-/// Also writes `sitemap.xml` and `robots.txt`. Returns the written file
-/// paths.
+/// Also writes `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`
+/// and a `404.html` (Firebase Hosting, GitHub Pages & Co. serve it with
+/// a real 404 status for unknown paths — no SPA soft-404) — plus the
+/// IndexNow key file `<key>.txt` when [indexNowKey] is set. Returns the
+/// written file paths.
 ///
 /// ```dart
 /// // bin/prerender.dart — nach jedem `flutter build web` ausführen:
@@ -45,6 +50,9 @@ Future<List<String>> prerenderSite({
   List<String> additionalPaths = const [],
   bool writeSitemap = true,
   bool writeRobotsTxt = true,
+  bool writeLlmsTxt = true,
+  bool write404Page = true,
+  String? indexNowKey,
 }) async {
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
@@ -89,6 +97,38 @@ Future<List<String>> prerenderSite({
     );
     written.add(file.path);
   }
+  if (writeLlmsTxt) {
+    final file = File('$buildDir/llms.txt');
+    await file.writeAsString(seoLlmsTxt(
+      routes: routes,
+      siteBase: siteBase,
+      additionalPaths: additionalPaths,
+    ));
+    written.add(file.path);
+
+    final fullFile = File('$buildDir/llms-full.txt');
+    await fullFile.writeAsString(await seoLlmsFullTxt(
+      routes: routes,
+      siteBase: siteBase,
+      additionalPaths: additionalPaths,
+    ));
+    written.add(fullFile.path);
+  }
+  if (write404Page) {
+    final file = File('$buildDir/404.html');
+    await file.writeAsString(_applyTemplate(
+      template,
+      const SeoMeta(title: '404 — Page not found', robots: 'noindex'),
+      '<h1>404 — Page not found</h1>',
+      'en',
+    ));
+    written.add(file.path);
+  }
+  if (indexNowKey != null) {
+    final file = File('$buildDir/$indexNowKey.txt');
+    await file.writeAsString(indexNowKey);
+    written.add(file.path);
+  }
   return written;
 }
 
@@ -104,7 +144,15 @@ Future<String> _renderPage(
 ) async {
   final meta = match.buildMeta(canonicalBase: siteBase);
   final bodyHtml = const HtmlRenderer().render(await match.buildBody());
+  return _applyTemplate(template, meta, bodyHtml, match.route.lang);
+}
 
+String _applyTemplate(
+  String template,
+  SeoMeta meta,
+  String bodyHtml,
+  String lang,
+) {
   var html = template;
   // Template-Duplikate entfernen — die Route liefert die echten Werte.
   html = html.replaceFirst(_templateTitle, '');
@@ -112,7 +160,7 @@ Future<String> _renderPage(
   // lang setzen, sofern das Template keines definiert.
   html = html.replaceFirst(
     '<html>',
-    '<html lang="${HtmlRenderer.escapeAttribute(match.route.lang)}">',
+    '<html lang="${HtmlRenderer.escapeAttribute(lang)}">',
   );
 
   html = html.replaceFirst('</head>', '${meta.toHtml()}\n</head>');

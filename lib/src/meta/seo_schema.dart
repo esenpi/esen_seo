@@ -89,7 +89,9 @@ class SeoSchema {
           },
       });
 
-  /// A `Product` with an optional price offer.
+  /// A `Product` with an optional price offer and star rating
+  /// ([ratingValue]/[ratingCount] render the aggregate-rating stars in
+  /// search results).
   factory SeoSchema.product({
     required String name,
     String? description,
@@ -98,6 +100,10 @@ class SeoSchema {
     double? price,
     String? priceCurrency,
     String? url,
+    double? ratingValue,
+    int? ratingCount,
+    int? reviewCount,
+    double bestRating = 5,
   }) =>
       SeoSchema('Product', {
         'name': name,
@@ -111,6 +117,96 @@ class SeoSchema {
             'price': price.toStringAsFixed(2),
             if (priceCurrency != null) 'priceCurrency': priceCurrency,
           },
+        if (ratingValue != null)
+          'aggregateRating': {
+            '@type': 'AggregateRating',
+            'ratingValue': ratingValue,
+            'bestRating': bestRating,
+            if (ratingCount != null) 'ratingCount': ratingCount,
+            if (reviewCount != null) 'reviewCount': reviewCount,
+          },
+      });
+
+  /// A `Review` of a product, place or other thing.
+  factory SeoSchema.review({
+    required String itemName,
+    required double rating,
+    String? author,
+    String? body,
+    double bestRating = 5,
+    DateTime? datePublished,
+  }) =>
+      SeoSchema('Review', {
+        'itemReviewed': {'@type': 'Thing', 'name': itemName},
+        'reviewRating': {
+          '@type': 'Rating',
+          'ratingValue': rating,
+          'bestRating': bestRating,
+        },
+        if (author != null) 'author': {'@type': 'Person', 'name': author},
+        'reviewBody': body,
+        'datePublished': datePublished?.toIso8601String(),
+      });
+
+  /// An `Event` — concerts, meetups, webinars.
+  factory SeoSchema.event({
+    required String name,
+    required DateTime startDate,
+    DateTime? endDate,
+    String? description,
+    String? image,
+    String? locationName,
+    String? locationAddress,
+    String? url,
+  }) =>
+      SeoSchema('Event', {
+        'name': name,
+        'startDate': startDate.toIso8601String(),
+        'endDate': endDate?.toIso8601String(),
+        'description': description,
+        'image': image,
+        if (locationName != null || locationAddress != null)
+          'location': {
+            '@type': 'Place',
+            if (locationName != null) 'name': locationName,
+            if (locationAddress != null) 'address': locationAddress,
+          },
+        'url': url,
+      });
+
+  /// A `LocalBusiness` — shops, restaurants, agencies with a physical
+  /// presence.
+  factory SeoSchema.localBusiness({
+    required String name,
+    String? description,
+    String? image,
+    String? telephone,
+    String? streetAddress,
+    String? postalCode,
+    String? addressLocality,
+    String? addressCountry,
+    String? priceRange,
+    String? url,
+    List<String> openingHours = const [],
+  }) =>
+      SeoSchema('LocalBusiness', {
+        'name': name,
+        'description': description,
+        'image': image,
+        'telephone': telephone,
+        if (streetAddress != null ||
+            postalCode != null ||
+            addressLocality != null)
+          'address': {
+            '@type': 'PostalAddress',
+            if (streetAddress != null) 'streetAddress': streetAddress,
+            if (postalCode != null) 'postalCode': postalCode,
+            if (addressLocality != null) 'addressLocality': addressLocality,
+            if (addressCountry != null) 'addressCountry': addressCountry,
+          },
+        'priceRange': priceRange,
+        'url': url,
+        if (openingHours.isNotEmpty) 'openingHours': openingHours,
       });
 
   /// A `BreadcrumbList` — the page's position in the site hierarchy.

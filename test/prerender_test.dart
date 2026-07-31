@@ -90,8 +90,40 @@ void main() {
         contains('Sitemap: https://x.dev/sitemap.xml'),
       );
 
-      // /, /demo, /blog/hallo + sitemap + robots:
-      expect(written, hasLength(5));
+      // AI-Crawler-Manifeste:
+      expect(
+        File('${buildDir.path}/llms.txt').readAsStringSync(),
+        contains('- [Demo](https://x.dev/demo)'),
+      );
+      final llmsFull =
+          File('${buildDir.path}/llms-full.txt').readAsStringSync();
+      expect(llmsFull, contains('## Home\nhttps://x.dev/'));
+      expect(llmsFull, contains('# Willkommen'));
+
+      // 404-Seite für Statik-Hosts (Firebase & Co. liefern sie mit
+      // echtem 404-Status aus):
+      final notFound = File('${buildDir.path}/404.html').readAsStringSync();
+      expect(notFound, contains('<title>404 — Page not found</title>'));
+      expect(notFound, contains('<meta name="robots" content="noindex"/>'));
+      expect(notFound, contains('<h1>404 — Page not found</h1>'));
+      // Die Flutter-App bootet auch auf der 404-Seite:
+      expect(notFound, contains('flutter_bootstrap.js'));
+
+      // /, /demo, /blog/hallo + sitemap + robots + llms + llms-full + 404:
+      expect(written, hasLength(8));
+    });
+
+    test('writes the IndexNow key file when a key is set', () async {
+      await prerenderSite(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        indexNowKey: 'abc123def456',
+      );
+      expect(
+        File('${buildDir.path}/abc123def456.txt').readAsStringSync(),
+        'abc123def456',
+      );
     });
 
     test('throws a clear error when the build is missing', () async {

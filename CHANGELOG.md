@@ -1,3 +1,31 @@
+## 0.3.0
+
+Richer structured data, a smarter sitemap, and first-class support for
+AI crawlers and instant indexing.
+
+* New Schema.org builders: `SeoSchema.review`, `SeoSchema.event`,
+  `SeoSchema.localBusiness` — and `SeoSchema.product` now takes
+  `ratingValue`/`ratingCount`/`reviewCount` for `AggregateRating` stars.
+* `SeoMeta.extraMeta`: arbitrary `<meta name="…" content="…">` tags
+  (site verification, theme-color, …) without leaving the typed API.
+* Sitemap upgrades: `SeoRoute(lastModified: …)` renders a `<lastmod>`
+  date, and routes with `SeoMeta.alternates` get
+  `<xhtml:link rel="alternate" hreflang="…">` entries per URL —
+  `additionalPaths` inherit both from their matching `:param` route.
+* `llms.txt` and `llms-full.txt` (https://llmstxt.org) generated from
+  the route table via `seoLlmsTxt(...)` / `seoLlmsFullTxt(...)` —
+  served automatically by `seoBotMiddleware` and written by
+  `prerenderSite`. The full variant inlines each route's server-side
+  body as markdown, so AI assistants read the whole site in one
+  request.
+* `prerenderSite` writes a `404.html` — Firebase Hosting, GitHub Pages
+  & Co. serve it with a real 404 status for unknown paths, closing the
+  SPA soft-404 gap on static hosting too.
+* IndexNow support: `submitIndexNow(...)` pings search engines about
+  changed URLs; the required key file `/<key>.txt` is served by
+  `seoBotMiddleware(indexNowKey: …)` and written by
+  `prerenderSite(indexNowKey: …)`.
+
 ## 0.2.0
 
 Router-package support.

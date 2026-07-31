@@ -47,6 +47,7 @@ class SeoRoute {
     this.body,
     this.lang = 'en',
     this.includeInSitemap = true,
+    this.lastModified,
   }) : path = normalizeSeoPath(path);
 
   /// The URL path pattern, e.g. `/` or `/blog/:slug`.
@@ -67,6 +68,11 @@ class SeoRoute {
   /// Routes with `:param` segments are always skipped (their concrete
   /// URLs cannot be enumerated from the pattern).
   final bool includeInSitemap;
+
+  /// When the page content was last changed — rendered as `<lastmod>`
+  /// in the generated sitemap.xml (search engines use it to prioritize
+  /// recrawls).
+  final DateTime? lastModified;
 
   /// Die Pattern-Segmente, einmal beim Anlegen der Route berechnet.
   late final List<String> _segments = path.split('/');

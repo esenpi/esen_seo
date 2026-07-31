@@ -29,6 +29,7 @@ class SeoMeta {
     this.twitter,
     this.schemas = const [],
     this.alternates = const {},
+    this.extraMeta = const {},
   });
 
   /// The document title, rendered as `<title>` and `og:title` fallback.
@@ -79,6 +80,17 @@ class SeoMeta {
   /// add an `x-default` entry for the fallback variant.
   final Map<String, String> alternates;
 
+  /// Additional `<meta name="…" content="…">` tags, e.g. for site
+  /// verification or theming:
+  ///
+  /// ```dart
+  /// extraMeta: {
+  ///   'google-site-verification': 'AbC123…',
+  ///   'theme-color': '#0a0f1e',
+  /// }
+  /// ```
+  final Map<String, String> extraMeta;
+
   /// Returns a copy with the given fields replaced.
   /// Unset fields keep their current value (they cannot be nulled out).
   SeoMeta copyWith({
@@ -92,6 +104,7 @@ class SeoMeta {
     TwitterCardMeta? twitter,
     List<SeoSchema>? schemas,
     Map<String, String>? alternates,
+    Map<String, String>? extraMeta,
   }) =>
       SeoMeta(
         title: title ?? this.title,
@@ -104,6 +117,7 @@ class SeoMeta {
         twitter: twitter ?? this.twitter,
         schemas: schemas ?? this.schemas,
         alternates: alternates ?? this.alternates,
+        extraMeta: extraMeta ?? this.extraMeta,
       );
 
   /// The `<head>` fragment for these values, e.g. for server-side rendering.
@@ -169,6 +183,8 @@ class SeoMeta {
       name('twitter:site', tw?.site);
       name('twitter:creator', tw?.creator);
     }
+
+    extraMeta.forEach(name);
 
     for (final schema in schemas) {
       nodes.add(schema.toNode());

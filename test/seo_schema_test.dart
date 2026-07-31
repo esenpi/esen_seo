@@ -48,6 +48,86 @@ void main() {
       });
     });
 
+    test('product factory nests the aggregate rating', () {
+      final schema = SeoSchema.product(
+        name: 'Rotes Rennrad',
+        ratingValue: 4.6,
+        ratingCount: 128,
+      );
+      expect(schema.toJson()['aggregateRating'], {
+        '@type': 'AggregateRating',
+        'ratingValue': 4.6,
+        'bestRating': 5,
+        'ratingCount': 128,
+      });
+      // Ohne Bewertungen auch kein aggregateRating-Block:
+      expect(
+        SeoSchema.product(name: 'X').toJson().containsKey('aggregateRating'),
+        isFalse,
+      );
+    });
+
+    test('review factory nests item and rating', () {
+      final schema = SeoSchema.review(
+        itemName: 'Rotes Rennrad',
+        rating: 5,
+        author: 'Yahya Esen',
+        body: 'Läuft wie geschmiert.',
+      );
+      final json = schema.toJson();
+      expect(json['@type'], 'Review');
+      expect(json['itemReviewed'], {'@type': 'Thing', 'name': 'Rotes Rennrad'});
+      expect(json['reviewRating'],
+          {'@type': 'Rating', 'ratingValue': 5, 'bestRating': 5});
+      expect(json['author'], {'@type': 'Person', 'name': 'Yahya Esen'});
+      expect(json['reviewBody'], 'Läuft wie geschmiert.');
+    });
+
+    test('event factory nests the place', () {
+      final schema = SeoSchema.event(
+        name: 'Flutter Meetup München',
+        startDate: DateTime.utc(2026, 9, 1, 19),
+        locationName: 'Werksviertel',
+        locationAddress: 'Atelierstraße 1, 81671 München',
+      );
+      final json = schema.toJson();
+      expect(json['@type'], 'Event');
+      expect(json['startDate'], '2026-09-01T19:00:00.000Z');
+      expect(json['location'], {
+        '@type': 'Place',
+        'name': 'Werksviertel',
+        'address': 'Atelierstraße 1, 81671 München',
+      });
+      expect(json.containsKey('endDate'), isFalse);
+    });
+
+    test('localBusiness factory nests the postal address', () {
+      final schema = SeoSchema.localBusiness(
+        name: 'Esen Software',
+        telephone: '+49 89 123456',
+        streetAddress: 'Musterweg 1',
+        postalCode: '81735',
+        addressLocality: 'München',
+        addressCountry: 'DE',
+        openingHours: ['Mo-Fr 09:00-18:00'],
+      );
+      final json = schema.toJson();
+      expect(json['@type'], 'LocalBusiness');
+      expect(json['address'], {
+        '@type': 'PostalAddress',
+        'streetAddress': 'Musterweg 1',
+        'postalCode': '81735',
+        'addressLocality': 'München',
+        'addressCountry': 'DE',
+      });
+      expect(json['openingHours'], ['Mo-Fr 09:00-18:00']);
+      // Ohne Adressfelder auch kein address-Block:
+      expect(
+        SeoSchema.localBusiness(name: 'X').toJson().containsKey('address'),
+        isFalse,
+      );
+    });
+
     test('breadcrumbs get 1-based positions', () {
       final schema = SeoSchema.breadcrumbs([
         (name: 'Start', url: 'https://example.com/'),

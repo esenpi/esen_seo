@@ -200,14 +200,22 @@ SeoMeta(
           children: [
             const Para(
               'Schema.org data unlocks rich results — product prices, '
-              'star ratings, FAQs and breadcrumbs directly in Google. '
-              'Typed builders cover the common types; everything else '
-              'goes through the generic constructor.',
+              'star ratings, events, local-business info, FAQs and '
+              'breadcrumbs directly in Google. Typed builders cover the '
+              'common types; everything else goes through the generic '
+              'constructor.',
             ),
             CodeBlock(r'''
 SeoMeta(
   schemas: [
     SeoSchema.article(headline: 'Real SEO for Flutter Web', author: 'Yahya Esen'),
+    SeoSchema.product(name: 'Red road bike', price: 799.0,
+        priceCurrency: 'EUR', ratingValue: 4.6, ratingCount: 128),
+    SeoSchema.review(itemName: 'Red road bike', rating: 5, author: 'Alex'),
+    SeoSchema.event(name: 'Flutter Meetup Munich',
+        startDate: DateTime.utc(2026, 9, 1, 19), locationName: 'Werksviertel'),
+    SeoSchema.localBusiness(name: 'Esen Software',
+        addressLocality: 'München', addressCountry: 'DE'),
     SeoSchema.breadcrumbs([
       (name: 'Home', url: 'https://esen.software/'),
       (name: 'Blog', url: 'https://esen.software/blog'),
@@ -219,6 +227,13 @@ SeoMeta(
   ],
 )'''
                 .trim()),
+            const Para(
+              'Anything beyond the built-in meta fields goes into '
+              'extraMeta — e.g. Search Console site verification:',
+            ),
+            const CodeBlock(
+              "SeoMeta(extraMeta: {'google-site-verification': 'AbC123…'})",
+            ),
           ],
         ),
         (
@@ -296,7 +311,8 @@ final handler = const Pipeline()
 await io.serve(handler, InternetAddress.anyIPv4, 8080);'''
                 .trim()),
             const Bullets([
-              'sitemap.xml and robots.txt are generated from the table',
+              'sitemap.xml (with lastmod + hreflang), robots.txt and '
+                  'llms.txt are generated from the table',
               'unknown paths get a real HTTP 404 (no SPA soft-404)',
               'path parameters like /blog/:slug resolve automatically',
             ]),
@@ -325,13 +341,45 @@ Future<void> main() async {
               '# → deploy build/web to any static host',
             ),
             const Para(
+              'sitemap.xml, robots.txt, llms.txt, llms-full.txt and a '
+              '404.html are written too — Firebase Hosting and GitHub '
+              'Pages serve the 404.html with a real 404 status. '
               'Trade-off: prerendered pages are a build-time snapshot. '
               'For frequently changing content, use the SSR server.',
             ),
           ],
         ),
         (
-          title: '9. Safe & strict mode',
+          title: '9. llms.txt & IndexNow',
+          children: [
+            const Para(
+              'AI assistants read llms.txt — a markdown manifest of '
+              'your site; llms-full.txt additionally inlines the full '
+              'page content as markdown. esen_seo generates both from '
+              'the route table: the middleware serves them, '
+              'prerenderSite writes them. And instead of waiting days '
+              'for the next crawl, IndexNow pings search engines '
+              '(Bing, Seznam, Naver, Yandex) about changed URLs '
+              'within minutes.',
+            ),
+            CodeBlock(r'''
+// after a deploy or content update:
+await submitIndexNow(
+  siteBase: siteBase,
+  key: 'a1b2c3d4e5f6a7b8',   // self-chosen, 8–128 hex chars
+  paths: ['/', '/blog/new-post'],
+);
+
+// the required key file /<key>.txt is handled for you:
+seoBotMiddleware(routes: seoRoutes, siteBase: siteBase,
+    indexNowKey: 'a1b2c3d4e5f6a7b8')
+prerenderSite(routes: seoRoutes, siteBase: siteBase,
+    indexNowKey: 'a1b2c3d4e5f6a7b8')'''
+                .trim()),
+          ],
+        ),
+        (
+          title: '10. Safe & strict mode',
           children: [
             const Para(
               'SeoMode.safe (default) renders everything and never '
@@ -343,7 +391,7 @@ Future<void> main() async {
           ],
         ),
         (
-          title: '10. Verify your SEO',
+          title: '11. Verify your SEO',
           children: [
             const Para('Foolproof checklist — in this order:'),
             const Bullets([
@@ -351,7 +399,8 @@ Future<void> main() async {
                   '<body> mirrors this page as semantic HTML',
               'curl -A "Googlebot/2.1" http://localhost:8080 — the SSR '
                   'answer with full HTML in the source',
-              'curl http://localhost:8080/sitemap.xml and /robots.txt',
+              'curl http://localhost:8080/sitemap.xml, /robots.txt '
+                  'and /llms.txt',
               'After prerendering: View Source (Ctrl+U) shows the '
                   'content directly',
               'Paste your URL into Google\'s Rich Results Test to '
