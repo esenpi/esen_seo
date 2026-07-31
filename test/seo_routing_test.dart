@@ -185,6 +185,20 @@ void main() {
       expect(xml, contains('<loc>https://x.dev/blog/erster-post</loc>'));
     });
 
+    test('additional paths that duplicate a route appear only once', () {
+      final xml = seoSitemapXml(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        additionalPaths: ['/demo', 'demo/', '/blog/erster-post'],
+      );
+      // '/demo' existiert schon als Route, 'demo/' normalisiert dorthin:
+      expect('<loc>https://x.dev/demo</loc>'.allMatches(xml), hasLength(1));
+      expect(
+        '<loc>https://x.dev/blog/erster-post</loc>'.allMatches(xml),
+        hasLength(1),
+      );
+    });
+
     test('routes can opt out of the sitemap', () {
       final xml = seoSitemapXml(
         routes: [

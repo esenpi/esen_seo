@@ -25,19 +25,32 @@ import '../routing/seo_route.dart';
 ///
 /// Returns `true` when the endpoint accepted the submission (HTTP
 /// 200/202). Network errors surface as exceptions — decide at the call
-/// site whether a failed ping may fail the deploy.
+/// site whether a failed ping may fail the deploy. A hanging endpoint
+/// aborts with a `TimeoutException` after [timeout] instead of stalling
+/// the deploy script forever.
+///
+/// [siteBase] must be an absolute URL including the scheme
+/// (`https://example.com`) — otherwise throws an [ArgumentError].
 Future<bool> submitIndexNow({
   required String siteBase,
   required String key,
   required List<String> paths,
   Uri? endpoint,
   String? keyLocation,
+  Duration timeout = const Duration(seconds: 10),
 }) async {
-  if (paths.isEmpty) return true;
   final base = siteBase.endsWith('/')
       ? siteBase.substring(0, siteBase.length - 1)
       : siteBase;
   final host = Uri.parse(base).host;
+  if (host.isEmpty) {
+    throw ArgumentError.value(
+      siteBase,
+      'siteBase',
+      'must be an absolute URL including the scheme, e.g. https://example.com',
+    );
+  }
+  if (paths.isEmpty) return true;
   final urls = [
     for (final path in paths.map(normalizeSeoPath))
       path == '/' ? '$base/' : '$base$path',
@@ -50,17 +63,19 @@ Future<bool> submitIndexNow({
     'urlList': urls,
   });
 
-  final client = HttpClient();
+  final client = HttpClient()..connectionTimeout = timeout;
   try {
     final request = await client
-        .postUrl(endpoint ?? Uri.parse('https://api.indexnow.org/indexnow'));
+        .postUrl(endpoint ?? Uri.parse('https://api.indexnow.org/indexnow'))
+        .timeout(timeout);
     request.headers.contentType =
         ContentType('application', 'json', charset: 'utf-8');
     request.write(body);
-    final response = await request.close();
-    await response.drain<void>();
+    final response = await request.close().timeout(timeout);
+    await response.drain<void>().timeout(timeout);
     return response.statusCode == 200 || response.statusCode == 202;
   } finally {
-    client.close();
+    // force: ein hängender Socket darf den Prozess nicht offenhalten.
+    client.close(force: true);
   }
 }

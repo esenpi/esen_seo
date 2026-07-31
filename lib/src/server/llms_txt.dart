@@ -43,11 +43,13 @@ String seoLlmsTxt({
     buffer.writeln('> ${_singleLine(siteDescription)}');
   }
 
-  final paths = <String>[
+  // Set-Literal statt Liste: additionalPaths, die schon als Route
+  // existieren (oder doppelt übergeben werden), erscheinen nur einmal.
+  final paths = <String>{
     for (final route in routes)
       if (route.includeInSitemap && !route.hasParams) route.path,
     ...additionalPaths.map(normalizeSeoPath),
-  ];
+  };
 
   buffer
     ..writeln()
@@ -56,10 +58,10 @@ String seoLlmsTxt({
   for (final path in paths) {
     final url = path == '/' ? '$base/' : '$base$path';
     final meta = matchSeoRoute(routes, path)?.buildMeta();
-    final pageTitle = _singleLine(meta?.title ?? path);
+    final pageTitle = _linkLabel(_singleLine(meta?.title ?? path));
     final pageDescription = meta?.description;
     buffer
-      ..write('- [$pageTitle]($url)')
+      ..write('- [$pageTitle](${_linkTarget(url)})')
       ..writeln(pageDescription == null || pageDescription.isEmpty
           ? ''
           : ': ${_singleLine(pageDescription)}');
@@ -97,11 +99,12 @@ Future<String> seoLlmsFullTxt({
     buffer.writeln('> ${_singleLine(siteDescription)}');
   }
 
-  final paths = <String>[
+  // Set-Literal statt Liste — Duplikate wie in [seoLlmsTxt] nur einmal.
+  final paths = <String>{
     for (final route in routes)
       if (route.includeInSitemap && !route.hasParams) route.path,
     ...additionalPaths.map(normalizeSeoPath),
-  ];
+  };
 
   for (final path in paths) {
     final match = matchSeoRoute(routes, path);
@@ -170,7 +173,8 @@ void _writeBlock(SeoNode node, List<String> blocks, String base) {
     case 'img':
       final src = node.attributes['src'];
       if (src != null) {
-        blocks.add('![${node.attributes['alt'] ?? ''}](${_href(src, base)})');
+        blocks.add('![${_linkLabel(node.attributes['alt'] ?? '')}]'
+            '(${_linkTarget(_href(src, base))})');
       }
     case 'hr':
       blocks.add('---');
@@ -201,12 +205,15 @@ String _inline(SeoNode node, String base) {
       case 'a':
         final href = n.attributes['href'];
         final label = _inlineOf(n, base);
-        buffer.write(href == null ? label : '[$label](${_href(href, base)})');
+        buffer.write(href == null
+            ? label
+            : '[${_linkLabel(label)}](${_linkTarget(_href(href, base))})');
         return;
       case 'img':
         final src = n.attributes['src'];
         if (src != null) {
-          buffer.write('![${n.attributes['alt'] ?? ''}](${_href(src, base)})');
+          buffer.write('![${_linkLabel(n.attributes['alt'] ?? '')}]'
+              '(${_linkTarget(_href(src, base))})');
         }
         return;
       case 'strong':
@@ -239,6 +246,15 @@ String _inlineOf(SeoNode node, String base) =>
 /// without a base-URL context.
 String _href(String url, String base) =>
     url.startsWith('/') ? '$base$url' : url;
+
+/// Escapes square brackets so titles, labels and alt texts cannot break
+/// the `[label](url)` link syntax.
+String _linkLabel(String value) =>
+    value.replaceAll('[', r'\[').replaceAll(']', r'\]');
+
+/// Wraps URLs containing `)` in angle brackets (CommonMark) so the link
+/// target does not end early.
+String _linkTarget(String url) => url.contains(')') ? '<$url>' : url;
 
 String _singleLine(String value) =>
     value.replaceAll(RegExp(r'\s+'), ' ').trim();

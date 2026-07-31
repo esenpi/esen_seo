@@ -23,12 +23,15 @@ String seoSitemapXml({
   final base = siteBase.endsWith('/')
       ? siteBase.substring(0, siteBase.length - 1)
       : siteBase;
+  // Doppelte Pfade (z.B. additionalPaths, die schon als Route existieren)
+  // dürfen nur einmal in die Sitemap — Set.add meldet Duplikate.
+  final seen = <String>{};
   final entries = <_SitemapEntry>[
     for (final route in routes)
-      if (route.includeInSitemap && !route.hasParams)
+      if (route.includeInSitemap && !route.hasParams && seen.add(route.path))
         _SitemapEntry(route.path, route, null),
     for (final path in additionalPaths.map(normalizeSeoPath))
-      _entryForPath(routes, path),
+      if (seen.add(path)) _entryForPath(routes, path),
   ];
 
   final hasAlternates = entries.any((e) => e.alternates.isNotEmpty);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -90,6 +91,40 @@ void main() {
       );
     });
 
+    test('additional paths that duplicate a route appear only once', () {
+      final txt = seoLlmsTxt(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        additionalPaths: ['/docs', '/blog/erster-post', '/blog/erster-post'],
+      );
+      // '/docs' existiert schon als Route, der Blog-Pfad kommt doppelt:
+      expect('](https://x.dev/docs)'.allMatches(txt), hasLength(1));
+      expect(
+        '](https://x.dev/blog/erster-post)'.allMatches(txt),
+        hasLength(1),
+      );
+    });
+
+    test('escapes brackets in titles and wraps parenthesized URLs', () {
+      final txt = seoLlmsTxt(
+        routes: [
+          SeoRoute(
+            path: '/angebot',
+            meta: (_) => const SeoMeta(title: 'Angebot [Sommer-Sale]'),
+          ),
+        ],
+        siteBase: 'https://x.dev',
+        additionalPaths: ['/a(1)'],
+      );
+      // Eckige Klammern im Titel dürfen den Markdown-Link nicht brechen:
+      expect(
+        txt,
+        contains(r'- [Angebot \[Sommer-Sale\]](https://x.dev/angebot)'),
+      );
+      // URLs mit ')' bekommen spitze Klammern (CommonMark):
+      expect(txt, contains('(<https://x.dev/a(1)>)'));
+    });
+
     test('explicit title/description override the root meta', () {
       final txt = seoLlmsTxt(
         routes: _routes(),
@@ -130,6 +165,40 @@ void main() {
       );
       expect(txt, contains('## Docs\nhttps://x.dev/docs'));
       expect(txt, contains('> So funktioniert esen_seo.'));
+    });
+
+    test('additional paths that duplicate a route appear only once', () async {
+      final txt = await seoLlmsFullTxt(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        additionalPaths: ['/docs', '/docs'],
+      );
+      expect('## Docs\nhttps://x.dev/docs'.allMatches(txt), hasLength(1));
+    });
+
+    test('escapes link labels and image alt texts', () async {
+      final txt = await seoLlmsFullTxt(
+        routes: [
+          SeoRoute(
+            path: '/',
+            meta: (_) => const SeoMeta(title: 'Home'),
+            body: (_) => [
+              SeoNode(
+                tag: 'a',
+                text: 'Mehr [Details]',
+                attributes: {'href': '/a(1)'},
+              ),
+              SeoNode(
+                tag: 'img',
+                attributes: {'src': '/b(2).png', 'alt': 'Bild [neu]'},
+              ),
+            ],
+          ),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(txt, contains(r'[Mehr \[Details\]](<https://x.dev/a(1)>)'));
+      expect(txt, contains(r'![Bild \[neu\]](<https://x.dev/b(2).png>)'));
     });
   });
 
@@ -227,6 +296,43 @@ void main() {
           endpoint: Uri.parse('http://127.0.0.1:1/unreachable'),
         ),
         isTrue,
+      );
+    });
+
+    test('times out instead of hanging on a stalled endpoint', () async {
+      final server = await shelf_io.serve(
+        (_) async {
+          await Future<void>.delayed(const Duration(seconds: 5));
+          return Response.ok('');
+        },
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      // force: der Handler hängt beim Teardown noch im Delay.
+      addTearDown(() => server.close(force: true));
+
+      await expectLater(
+        submitIndexNow(
+          siteBase: 'https://x.dev',
+          key: 'abc123def456',
+          paths: ['/'],
+          endpoint: Uri.parse('http://127.0.0.1:${server.port}/indexnow'),
+          timeout: const Duration(milliseconds: 200),
+        ),
+        throwsA(isA<TimeoutException>()),
+      );
+    });
+
+    test('rejects a siteBase without a scheme before any network I/O', () {
+      // Ohne Schema wäre der Host im Payload leer — stille Fehl-Submission.
+      // Kein endpoint: der Fehler muss vor jedem Netzwerkzugriff fliegen.
+      expect(
+        () => submitIndexNow(
+          siteBase: 'example.com',
+          key: 'abc123def456',
+          paths: ['/'],
+        ),
+        throwsArgumentError,
       );
     });
   });
