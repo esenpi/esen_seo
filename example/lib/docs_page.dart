@@ -251,7 +251,9 @@ final seoRoutes = [
             const Para(
               'In the app, register the observer — meta tags then '
               'update automatically on every navigation, and canonical '
-              'URLs are derived from siteBase:',
+              'URLs are derived from siteBase. The same observer works '
+              'with go_router, beamer or any Router package: it follows '
+              'the browser URL when routes carry no name.',
             ),
             CodeBlock(r'''
 MaterialApp(
@@ -259,6 +261,14 @@ MaterialApp(
     SeoRouteObserver(routes: seoRoutes, canonicalBase: siteBase),
   ],
   routes: {...},
+)
+
+// or with go_router — same observer:
+GoRouter(
+  observers: [
+    SeoRouteObserver(routes: seoRoutes, canonicalBase: siteBase),
+  ],
+  routes: [...],
 )'''
                 .trim()),
           ],

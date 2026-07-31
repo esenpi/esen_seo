@@ -233,6 +233,22 @@ MaterialApp(
 );
 ```
 
+Using **go_router**? Same observer, no extra package:
+
+```dart
+GoRouter(
+  observers: [
+    SeoRouteObserver(routes: seoRoutes, canonicalBase: siteBase),
+  ],
+  routes: [...],
+);
+```
+
+The observer matches URL-like route names directly and otherwise
+follows the **browser URL** — so it works with go_router, beamer,
+auto_route or any other Router-based package. (For go_router
+`ShellRoute`s, add the observer to the shell's `observers` as well.)
+
 **On the server** — the same table drives the bot responses:
 
 ```dart

@@ -1,3 +1,15 @@
+## 0.2.0
+
+Router-package support.
+
+* `SeoRouteObserver` now works with go_router, beamer, auto_route and
+  any other Router-based package — no extra dependency: routes with
+  URL-like names are matched directly, everything else falls back to
+  the browser URL (path or hash strategy) after the frame.
+* New `locationProvider` parameter on `SeoRouteObserver` to override
+  where the current location is read from (tests, custom routers).
+* Integration-tested against go_router.
+
 ## 0.1.0
 
 Meta tags, JSON-LD, typed tags and the SSR server.
