@@ -3,6 +3,7 @@ import 'dart:io';
 import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
+import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_route.dart';
 import 'llms_txt.dart';
 import 'sitemap.dart';
@@ -18,9 +19,15 @@ import 'sitemap.dart';
 /// - the route's title, meta tags, OpenGraph and JSON-LD in the
 ///   `<head>` — the template's `<title>` and `<meta name="description">`
 ///   are replaced,
-/// - the semantic HTML body inside the hidden `#esen-seo-content`
-///   container — the running app finds that container by id and simply
-///   takes it over (hydration).
+/// - the semantic HTML body inside the `#esen-seo-content` container —
+///   the running app finds that container by id and simply takes it
+///   over (hydration).
+///
+/// With [renderMode] set to [SeoRenderMode.visibleShell] that container
+/// is no longer hidden: the prerendered HTML becomes the **first frame**
+/// the user actually sees, styled by [stylesheet], and Flutter takes the
+/// screen over as soon as it has rendered. Pass [seoDefaultStylesheet]
+/// for a presentable baseline or your own CSS to match your app.
 ///
 /// Because the content is baked into the files, **no bot detection is
 /// needed**: crawlers, link previews and users all receive the same
@@ -53,6 +60,8 @@ Future<List<String>> prerenderSite({
   bool writeLlmsTxt = true,
   bool write404Page = true,
   String? indexNowKey,
+  SeoRenderMode renderMode = SeoRenderMode.seoOnly,
+  String? stylesheet,
 }) async {
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
@@ -61,6 +70,16 @@ Future<List<String>> prerenderSite({
     );
   }
   final template = await templateFile.readAsString();
+  // Der Root-Pfad überschreibt index.html — ein zweiter Lauf würde die
+  // eigene Ausgabe als Template lesen und alles doppelt einbauen.
+  if (template.contains('id="$seoContainerId"')) {
+    throw StateError(
+      '$buildDir/index.html is already prerendered — run '
+      '`flutter build web` again for a clean template. Prerendering an '
+      'already prerendered file would duplicate the canonical link, the '
+      'JSON-LD blocks and the content container.',
+    );
+  }
 
   final paths = <String>[
     for (final route in routes)
@@ -72,7 +91,13 @@ Future<List<String>> prerenderSite({
   for (final path in paths) {
     final match = matchSeoRoute(routes, path);
     if (match == null) continue;
-    final html = await _renderPage(template, match, siteBase);
+    final html = await _renderPage(
+      template,
+      match,
+      siteBase,
+      renderMode,
+      stylesheet,
+    );
     final file = File(
       path == '/' ? '$buildDir/index.html' : '$buildDir$path/index.html',
     );
@@ -121,6 +146,8 @@ Future<List<String>> prerenderSite({
       const SeoMeta(title: '404 — Page not found', robots: 'noindex'),
       '<h1>404 — Page not found</h1>',
       'en',
+      renderMode,
+      stylesheet,
     ));
     written.add(file.path);
   }
@@ -141,10 +168,19 @@ Future<String> _renderPage(
   String template,
   SeoRouteMatch match,
   String siteBase,
+  SeoRenderMode renderMode,
+  String? stylesheet,
 ) async {
   final meta = match.buildMeta(canonicalBase: siteBase);
   final bodyHtml = const HtmlRenderer().render(await match.buildBody());
-  return _applyTemplate(template, meta, bodyHtml, match.route.lang);
+  return _applyTemplate(
+    template,
+    meta,
+    bodyHtml,
+    match.route.lang,
+    renderMode,
+    stylesheet,
+  );
 }
 
 String _applyTemplate(
@@ -152,6 +188,8 @@ String _applyTemplate(
   SeoMeta meta,
   String bodyHtml,
   String lang,
+  SeoRenderMode renderMode,
+  String? stylesheet,
 ) {
   var html = template;
   // Template-Duplikate entfernen — die Route liefert die echten Werte.
@@ -163,9 +201,16 @@ String _applyTemplate(
     '<html lang="${HtmlRenderer.escapeAttribute(lang)}">',
   );
 
-  html = html.replaceFirst('</head>', '${meta.toHtml()}\n</head>');
+  // Kritisches CSS gehört inline in den Head: Der Shell soll malen,
+  // bevor irgendein zusätzlicher Request gelaufen ist.
+  final head = StringBuffer(meta.toHtml());
+  if (stylesheet != null && stylesheet.trim().isNotEmpty) {
+    head.write(seoStyleTagHtml(stylesheet));
+  }
+
+  html = html.replaceFirst('</head>', '$head\n</head>');
   return html.replaceFirstMapped(
     _bodyOpenTag,
-    (m) => '${m[0]}\n${seoContainerHtml(bodyHtml)}',
+    (m) => '${m[0]}\n${seoContainerHtml(bodyHtml, mode: renderMode)}',
   );
 }

@@ -1,9 +1,18 @@
+import 'dart:async';
+
 import 'package:web/web.dart' as web;
 
 import 'seo_container.dart';
 import 'seo_node.dart';
 
 const String _metaMarker = 'data-esen-seo';
+
+/// True while the visible shell is fading out — during that window its
+/// content must stay put, or the user would watch it change mid-fade.
+bool _shellFading = false;
+
+/// The most recent tree, applied once the fade has finished.
+List<SeoNode>? _pendingNodes;
 
 /// Writes the semantic HTML tree into the browser DOM, next to the
 /// Flutter canvas.
@@ -16,8 +25,20 @@ void injectSeoNodes(List<SeoNode> nodes) {
 
   // Findet auch einen vom Prerenderer gebackenen Container wieder und
   // übernimmt ihn (Hydration).
-  var container = document.getElementById(seoContainerId);
-  if (container == null) {
+  final existing = document.getElementById(seoContainerId);
+  if (existing != null && existing.hasAttribute(seoShellAttribute)) {
+    _startShellHandoff(existing, nodes);
+    return;
+  }
+  if (existing != null && _shellFading) {
+    // Der Shell ist noch am Ausblenden — den neuesten Stand merken und
+    // erst danach einsetzen.
+    _pendingNodes = nodes;
+    return;
+  }
+
+  final web.Element container;
+  if (existing == null) {
     container = document.createElement('div');
     container.id = seoContainerId;
     // The Flutter canvas stays the visible UI; the semantic tree must not
@@ -26,12 +47,56 @@ void injectSeoNodes(List<SeoNode> nodes) {
     container.setAttribute('aria-hidden', 'true');
     container.setAttribute('style', seoContainerStyle);
     document.body?.appendChild(container);
+  } else {
+    container = existing;
   }
 
+  _fillContainer(document, container, nodes);
+}
+
+void _fillContainer(
+  web.Document document,
+  web.Element container,
+  List<SeoNode> nodes,
+) {
   container.textContent = '';
   for (final node in nodes) {
     container.appendChild(_buildDomNode(document, node));
   }
+}
+
+/// Hands the screen from a visible prerendered shell over to Flutter.
+///
+/// Runs the moment the first frame has been built, which is when this
+/// injector is called for the first time. Flutter has painted *below*
+/// the shell by then, so fading the shell out reveals a finished app
+/// instead of a hard cut.
+///
+/// The container keeps its id and content for the whole fade — the
+/// stylesheet is written against `#esen-seo-content`, and swapping the
+/// content mid-fade would be visible. Only when the shell is gone does
+/// it drop back to the invisible mirror of [SeoRenderMode.seoOnly] and
+/// take the semantic tree.
+void _startShellHandoff(web.Element container, List<SeoNode> nodes) {
+  container.removeAttribute(seoShellAttribute);
+  _shellFading = true;
+  _pendingNodes = nodes;
+  // Nur die Opazität ändern — die Transition steckt schon im Style.
+  container.setAttribute(
+    'style',
+    '${seoShellStyle}opacity:0;pointer-events:none;',
+  );
+
+  Timer(const Duration(milliseconds: seoShellFadeMs), () {
+    _shellFading = false;
+    container.setAttribute('aria-hidden', 'true');
+    container.setAttribute('style', seoContainerStyle);
+    final pending = _pendingNodes;
+    _pendingNodes = null;
+    if (pending != null) {
+      _fillContainer(web.document, container, pending);
+    }
+  });
 }
 
 /// Writes the meta nodes from `SeoMeta.toNodes` into the document `<head>`.

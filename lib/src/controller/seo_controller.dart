@@ -92,6 +92,7 @@ class SeoController {
   String _lastHeadHtml = '';
   SeoMeta? _meta;
   bool _regenerationScheduled = false;
+  bool _hasInjected = false;
 
   /// The most recently generated HTML fragment.
   String get lastHtml => _lastHtml;
@@ -101,6 +102,10 @@ class SeoController {
 
   /// The metadata from the last [setMeta] call, e.g. for the SSR server.
   SeoMeta? get meta => _meta;
+
+  /// Whether [refresh] has injected into the DOM at least once.
+  @visibleForTesting
+  bool get debugHasInjected => _hasInjected;
 
   /// Selects the [SeoMode] and schedules a first render.
   void init({SeoMode mode = SeoMode.safe}) {
@@ -125,6 +130,7 @@ class SeoController {
     _lastHeadHtml = '';
     _meta = null;
     _regenerationScheduled = false;
+    _hasInjected = false;
   }
 
   /// Schedules a regeneration for the end of the current frame.
@@ -153,10 +159,14 @@ class SeoController {
 
     final nodes = collectNodes(root);
     final html = const HtmlRenderer().render(nodes);
-    if (html == _lastHtml) return;
+    // Die erste Injection muss auch bei leerem Baum laufen — sie startet
+    // den visibleShell-Handoff. Erst danach darf unverändertes HTML
+    // übersprungen werden.
+    if (_hasInjected && html == _lastHtml) return;
 
     _lastHtml = html;
     injector.injectSeoNodes(nodes);
+    _hasInjected = true;
   }
 
   /// Mirrors the element tree below [root] as a list of [SeoNode]s.

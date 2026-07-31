@@ -45,6 +45,9 @@ Image.network(url).seo(alt: 'Our team')  // → <img src="..." alt="Our team"/>
 - **Static prerendering**: bake the route table into the web build as
   static HTML files — full SEO on Firebase Hosting, GitHub Pages or any
   CDN, no server needed.
+- **Visible shell (optional)**: let the prerendered HTML *be* the first
+  frame — styled, readable content before the Flutter engine has
+  loaded, with Flutter taking the screen over on its first frame.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -327,6 +330,54 @@ exist; `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt` and a
 `404.html` (served with a real 404 status by Firebase Hosting, GitHub
 Pages & Co. — no SPA soft-404) are written too. For `:param` routes,
 pass the concrete paths via `additionalPaths`.
+
+## Visible shell — the prerendered page as the first frame
+
+By default the semantic HTML is an invisible mirror next to the Flutter
+canvas: crawlers read it, users never see it. With
+`SeoRenderMode.visibleShell` the same HTML becomes the **first frame**
+instead — a real, styled page the user can read while the Flutter engine
+is still downloading:
+
+```dart
+await prerenderSite(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  renderMode: SeoRenderMode.visibleShell,
+  stylesheet: seoDefaultStylesheet,   // oder dein eigenes CSS
+);
+```
+
+The handoff needs no configuration: the prerendered container marks
+itself, and the moment Flutter has rendered its first frame the shell
+fades out over 150 ms and drops back to being the invisible mirror.
+While it is up the shell covers the viewport, so the Flutter engine's
+empty surface stays hidden during boot — the user sees content, then
+the finished app, and never the loading in between. If the engine never
+loads (slow network, JS error), the user simply keeps a readable page.
+
+Styling is yours to control. `class` and `style` pass through `.seo()`
+like any other attribute, so the shell can carry your own CSS:
+
+```dart
+Text('Willkommen').seo(SeoTextTag.h1, {'class': 'hero-title'});
+Column(children: [...]).seo(SeoContainerTag.section, {'class': 'card'});
+```
+
+The CSS is inlined into the `<head>` of every prerendered file — an
+external stylesheet would cost a round trip and give away exactly the
+head start the shell is for. `seoDefaultStylesheet` is a ~1 KB
+classless baseline scoped to the container; pass your own CSS to match
+your app's look. Give it an opaque `background` — otherwise Flutter's
+still-empty surface shows through while it boots.
+
+**Honest limits:** this is a handoff, not React-style hydration —
+Flutter renders to canvas, so it can never adopt the DOM. The shell
+will resemble your app, not match it pixel for pixel (we know the
+semantic tree, not the widget geometry). Before the engine is up, real
+`<a href>` links work but buttons and forms do not. And the mode only
+applies to prerendered pages — `flutter run` has no prerendered HTML to
+show, and `EsenSeo.init()` must run in the app so the handoff happens.
 
 ## AI crawlers & instant indexing
 
