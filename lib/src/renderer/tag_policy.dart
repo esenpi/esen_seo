@@ -240,8 +240,20 @@ final RegExp _dangerousStyle = RegExp(
 /// others: `position` alone was patched four times — `fixed`, then
 /// `sticky`, then `-webkit-sticky` and `var()`, then `absolute`, then
 /// `inherit` — and something got through each time. Positioning,
-/// stacking and transforms are simply not on this list, so an element
-/// in the mirror cannot be lifted out of the flow to cover the page.
+/// stacking and transforms are simply not on this list, so no
+/// declaration can lift an element out of the container and paint
+/// outside its clip.
+///
+/// That is a narrower promise than it first appears, and the wider one
+/// would be false: *inside* the visible shell, ordinary flow properties
+/// still cover things. A later sibling with `margin-top:-100vh` lies
+/// over an earlier one — measured at 30 of 36 sampled viewport points,
+/// with the real headline still visible underneath and its clicks going
+/// to the covering element. `box-shadow:0 0 0 100vmax #fff` repaints the
+/// viewport from a one-pixel box. Neither is patchable: `margin` and
+/// `box-shadow` are what documents are made of. So this list keeps the
+/// mirror inside its container; it does not police what the container's
+/// own content does to itself.
 ///
 /// What remains is what a document needs: type, colour, spacing,
 /// borders, backgrounds and the flex/grid boxes the widget library

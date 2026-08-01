@@ -29,6 +29,10 @@ import 'sitemap.dart';
 /// screen over as soon as it has rendered. Pass [seoDefaultStylesheet]
 /// for a presentable baseline or your own CSS to match your app.
 ///
+/// That mode **requires the app to call `EsenSeo.init()`** — without it
+/// nothing ever schedules the handoff and the shell stays on top of the
+/// running app for good. See [SeoRenderMode.visibleShell].
+///
 /// Because the content is baked into the files, **no bot detection is
 /// needed**: crawlers, link previews and users all receive the same
 /// file, and the semantic HTML is right in the page source. Deep links

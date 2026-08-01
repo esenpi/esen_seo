@@ -22,8 +22,17 @@ enum SeoRenderMode {
   /// over and falls back to being the invisible mirror ([seoOnly]).
   ///
   /// Only meaningful for prerendered pages — during `flutter run` there
-  /// is no prerendered HTML to show. Requires `EsenSeo.init()` in the
-  /// app so the handoff actually runs.
+  /// is no prerendered HTML to show.
+  ///
+  /// **`EsenSeo.init()` is required**, not merely recommended. The
+  /// handoff is triggered by the first mirror refresh, and the only
+  /// things that schedule one are `init()` and a mounting `.seo()`
+  /// widget. An app that calls neither leaves the shell exactly where it
+  /// is: a full-viewport, opaque, clickable layer at `z-index:9999` over
+  /// a Flutter app that has long since painted — and nothing times it
+  /// out, because a shell that stays put is the correct behaviour when
+  /// the engine never arrives. The package cannot tell the two apart
+  /// from the outside, so this one call is the difference.
   visibleShell,
 }
 
@@ -58,8 +67,23 @@ const String seoInertAttribute = 'inert';
 /// Keeps the container invisible and non-interactive: the Flutter
 /// canvas stays the visible UI, screen readers use Flutter's own
 /// semantics tree.
+///
+/// `width:0;height:0` alone does not make a box invisible — it only
+/// empties its *content* box. Padding, borders, outlines and shadows
+/// are drawn outside it, and a stylesheet that reaches
+/// `#esen-seo-content` supplies them: [seoDefaultStylesheet] sets
+/// `padding:2rem 1.25rem;background:#fff`, which turns the "zero-sized"
+/// mirror into a 40×64 px white rectangle in the top-left corner —
+/// permanently, and on every visible shell as well, because the handoff
+/// restores exactly this style while the stylesheet stays in the head.
+///
+/// So the geometry is pinned here rather than assumed. Inline beats any
+/// author rule short of `!important`, and everything that could give the
+/// box a painted surface is set to nothing.
 const String seoContainerStyle =
     'position:absolute;top:0;left:0;width:0;height:0;'
+    'min-width:0;min-height:0;max-width:0;max-height:0;'
+    'padding:0;border:0;outline:0;box-shadow:none;'
     'overflow:hidden;pointer-events:none;';
 
 /// How long the shell takes to fade out once Flutter has painted.
