@@ -81,10 +81,31 @@ Future<List<String>> prerenderSite({
     );
   }
 
+  // Den Key prüfen, bevor irgendetwas geschrieben wird: er gehört zur
+  // Liste der belegten Dateinamen, und ein Abbruch nach dem halben Build
+  // hinterlässt ein Verzeichnis, in dem manche Seiten neu und manche alt
+  // sind.
+  if (indexNowKey != null && !_validIndexNowKey.hasMatch(indexNowKey)) {
+    throw ArgumentError.value(
+      indexNowKey,
+      'indexNowKey',
+      'must be 8–128 characters, letters, digits and dashes only — the '
+          'key becomes a file name',
+    );
+  }
+  final reserved = <String>{
+    ..._reservedOutputNames,
+    // Der Key ist erst zur Laufzeit bekannt, belegt aber genauso einen
+    // Dateinamen wie robots.txt.
+    if (indexNowKey != null) '/${indexNowKey.toLowerCase()}.txt',
+  };
+
   final paths = <String>[
     for (final route in routes)
-      if (!route.hasParams) _checkedPath(route.path),
-    ...additionalPaths.map(normalizeSeoPath).map(_checkedPath),
+      if (!route.hasParams) _checkedPath(route.path, reserved),
+    ...additionalPaths
+        .map(normalizeSeoPath)
+        .map((path) => _checkedPath(path, reserved)),
   ];
 
   final written = <String>[];
@@ -152,14 +173,8 @@ Future<List<String>> prerenderSite({
     written.add(file.path);
   }
   if (indexNowKey != null) {
-    if (!_validIndexNowKey.hasMatch(indexNowKey)) {
-      throw ArgumentError.value(
-        indexNowKey,
-        'indexNowKey',
-        'must be 8–128 characters, letters, digits and dashes only — the '
-            'key becomes a file name',
-      );
-    }
+    // Format und Kollisionsfreiheit sind oben geprüft, vor dem ersten
+    // Schreibvorgang.
     final file = File('$buildDir/$indexNowKey.txt');
     await file.writeAsString(indexNowKey);
     written.add(file.path);
@@ -175,7 +190,7 @@ final RegExp _validIndexNowKey = RegExp(r'^[A-Za-z0-9-]{8,128}$');
 /// backslash, or a Windows drive letter) would let a route — and with a
 /// CMS behind it, someone else's content — write outside the build
 /// directory entirely.
-String _checkedPath(String path) {
+String _checkedPath(String path, Set<String> reserved) {
   final segments = path.split('/');
   final unsafe = segments.any((segment) =>
       segment == '..' ||
@@ -211,8 +226,8 @@ String _checkedPath(String path) {
   }
   // Auch ein Präfix kollidiert: /robots.txt/foo legt erst das
   // Verzeichnis robots.txt an, danach scheitert die echte Datei.
-  final collides = _reservedOutputNames.any(
-    (reserved) => lower == reserved || lower.startsWith('$reserved/'),
+  final collides = reserved.any(
+    (name) => lower == name || lower.startsWith('$name/'),
   );
   if (collides) {
     throw ArgumentError.value(

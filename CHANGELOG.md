@@ -52,7 +52,10 @@ depended on which path the data took.
   would create a directory where `robots.txt` has to go — and not
   contain a segment named `index.html`, which is the file every page is
   written to, so `/a` and `/a/index.html/b` would fight over the same
-  name and the build would die on whichever came second.
+  name and the build would die on whichever came second. The IndexNow
+  key reserves its file name the same way, and is validated before the
+  first page is written rather than after the last — an invalid key used
+  to abort the run half-way, leaving new pages beside an old sitemap.
 * Bot responses (and the app responses beside them) carry
   `Vary: User-Agent`. Without it a CDN caches whichever variant it saw
   first and serves the bot HTML to visitors, or the empty Flutter shell
