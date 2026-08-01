@@ -209,6 +209,21 @@ final RegExp _dangerousStyle = RegExp(
 /// What remains is what a document needs: type, colour, spacing,
 /// borders, backgrounds and the flex/grid boxes the widget library
 /// draws its charts with.
+///
+/// Where this list stops — and why it does not go further: it keeps
+/// content from *escaping* the mirror, not from *looking* dishonest
+/// inside it. An empty `<a>` sized `width:100vw;height:100vh` paints
+/// nothing and still takes the click, and both properties are ones
+/// every document needs. Dropping `opacity` (which nothing in the
+/// library uses) would not change that by a single pixel, so it stays:
+/// a guard that closes no class is worse than none, because it reads
+/// like one that does. In `SeoRenderMode.seoOnly` the point is moot —
+/// the container is clipped to zero size, `pointer-events:none` and
+/// `inert`, and neither of those two properties is on this list, so a
+/// child cannot switch them back on. In `visibleShell` the shell *is*
+/// the visible page, and vetting what goes into it is the
+/// application's job. See the README's "What the renderer guarantees"
+/// section, which states this boundary for users of the package.
 const Set<String> _allowedStyleProperties = {
   // Text
   'color', 'font', 'font-family', 'font-size', 'font-style', 'font-weight',
