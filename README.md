@@ -298,9 +298,9 @@ Future<void> main() async {
   final handler = const Pipeline()
       .addMiddleware(seoBotMiddleware(resolve: (request) {
         if (request.url.path == '') {
-          return SeoPage(
+          return SeoPage.fromNodes(
             meta: SeoMeta(title: 'Yahya Esen — Flutter Developer in Munich'),
-            bodyHtml: '<h1>Flutter apps that rank on Google</h1>',
+            body: [SeoNode(tag: 'h1', text: 'Flutter apps that rank on Google')],
           );
         }
         return null; // unknown route → serve the Flutter app
@@ -313,7 +313,11 @@ Future<void> main() async {
 ```
 
 `SeoMeta`, `SeoSchema`, `SeoNode` and `HtmlRenderer` are shared between
-the Flutter side and the server, so both render identical HTML. See
+the Flutter side and the server, so both render identical HTML. Build
+pages from `SeoNode`s as above — they pass the tag and attribute policy.
+The `SeoPage(bodyHtml: …)` constructor writes its string into the
+document verbatim and exists for HTML you wrote yourself; never assemble
+it from content you do not control. See
 [example/bin/server.dart](example/bin/server.dart) for a runnable setup.
 
 ## URL routing — one table for app and server

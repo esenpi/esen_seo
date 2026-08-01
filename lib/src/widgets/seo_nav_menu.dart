@@ -96,8 +96,19 @@ class _SeoNavMenuState extends State<SeoNavMenu>
   void didUpdateWidget(SeoNavMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Einträge, die es nicht mehr gibt, dürfen nicht als offen gelten.
-    final labels = {for (final item in widget.items) item.label};
-    _open.removeWhere((label) => !labels.contains(label));
+    final paths = <String>{};
+    void collect(SeoNavItem item, String parent) {
+      final path = '$parent/${item.label}';
+      paths.add(path);
+      for (final child in item.children) {
+        collect(child, path);
+      }
+    }
+
+    for (final item in widget.items) {
+      collect(item, '');
+    }
+    _open.removeWhere((path) => !paths.contains(path));
   }
 
   @override
@@ -117,9 +128,18 @@ class _SeoNavMenuState extends State<SeoNavMenu>
           );
   }
 
-  Widget _buildTopLevel(int index) {
-    final item = widget.items[index];
-    final open = _open.contains(item.label);
+  Widget _buildTopLevel(int index) => _buildBranch(widget.items[index], '');
+
+  /// Renders an entry and, when it is open, its children — recursively,
+  /// so the visible menu goes as deep as the declared tree. The mirror
+  /// already did; if the screen stopped at two levels, the grandchildren
+  /// would exist in the HTML but be unreachable in the app.
+  ///
+  /// The open set is keyed by the path of labels, not the label alone,
+  /// so two entries named "Mehr" at different depths stay independent.
+  Widget _buildBranch(SeoNavItem item, String parentPath) {
+    final path = '$parentPath/${item.label}';
+    final open = _open.contains(path);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,7 +150,7 @@ class _SeoNavMenuState extends State<SeoNavMenu>
           onToggle: item.children.isEmpty
               ? null
               : () => setState(() {
-                    open ? _open.remove(item.label) : _open.add(item.label);
+                    open ? _open.remove(path) : _open.add(path);
                   }),
         ),
         if (open)
@@ -140,7 +160,7 @@ class _SeoNavMenuState extends State<SeoNavMenu>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final child in item.children) _entryLabel(child),
+                for (final child in item.children) _buildBranch(child, path),
               ],
             ),
           ),

@@ -125,18 +125,23 @@ Middleware seoBotMiddleware({
       }
 
       if (!detector.isBot(request.headers['user-agent'])) {
-        return inner(request);
+        return _appResponse(inner, request);
       }
 
       if (routes != null) {
         final match = matchSeoRoute(routes, path);
         if (match != null) {
-          final page = SeoPage.fromNodes(
-            meta: match.buildMeta(canonicalBase: siteBase),
-            body: await match.buildBody(),
-            lang: match.route.lang,
-          );
-          return _htmlResponse(page);
+          final body = await match.buildBody();
+          // Eine Route ohne body-Builder hat für Bots nichts zu zeigen.
+          // Eine leere 200-Seite auszuliefern wäre schlechter als die
+          // Flutter-App: Google sähe eine echte, leere Seite.
+          if (body.isNotEmpty) {
+            return _htmlResponse(SeoPage.fromNodes(
+              meta: match.buildMeta(canonicalBase: siteBase),
+              body: body,
+              lang: match.route.lang,
+            ));
+          }
         }
       }
 
@@ -151,7 +156,7 @@ Middleware seoBotMiddleware({
         return _htmlResponse(_notFoundPage(), status: 404);
       }
 
-      return inner(request);
+      return _appResponse(inner, request);
     };
   };
 }
@@ -163,8 +168,24 @@ Response _htmlResponse(SeoPage page, {int status = 200}) => Response(
         'content-type': 'text/html; charset=utf-8',
         // Kennzeichnet SSR-Antworten, z.B. zum Debuggen mit curl.
         'x-esen-seo': 'ssr',
+        ..._varyHeader,
       },
     );
+
+/// What this middleware answers depends on the User-Agent. Without
+/// saying so, a CDN caches whichever variant it saw first and serves it
+/// to everyone — the bot HTML to real visitors, or the empty Flutter
+/// shell to Google. Both branches must carry it, not just the SSR one.
+const Map<String, String> _varyHeader = {'vary': 'User-Agent'};
+
+/// The app response, marked as User-Agent dependent.
+Future<Response> _appResponse(Handler inner, Request request) async {
+  final response = await inner(request);
+  return response.change(headers: {
+    ...response.headersAll,
+    ..._varyHeader,
+  });
+}
 
 /// Asset requests (`/main.dart.js`, `/favicon.png`) carry a file
 /// extension in their last segment — everything else is a page path.

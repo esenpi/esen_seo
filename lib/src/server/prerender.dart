@@ -196,7 +196,13 @@ String _checkedPath(String path) {
           'segments',
     );
   }
-  if (_reservedOutputNames.contains(path.toLowerCase())) {
+  final lower = path.toLowerCase();
+  // Auch ein Präfix kollidiert: /robots.txt/foo legt erst das
+  // Verzeichnis robots.txt an, danach scheitert die echte Datei.
+  final collides = _reservedOutputNames.any(
+    (reserved) => lower == reserved || lower.startsWith('$reserved/'),
+  );
+  if (collides) {
     throw ArgumentError.value(
       path,
       'path',

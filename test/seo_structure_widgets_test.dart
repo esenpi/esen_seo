@@ -140,6 +140,41 @@ void main() {
       expect(find.text('a1'), findsNothing);
     });
 
+    testWidgets('the visible menu goes as deep as the mirror', (tester) async {
+      // Der Spiegel war schon beliebig tief; auf dem Schirm endete es
+      // bei zwei Ebenen, Enkel waren unerreichbar.
+      await pumpSeo(
+        tester,
+        const SeoNavMenu(items: [
+          SeoNavItem('A', children: [
+            SeoNavItem('B', children: [SeoNavItem('C')]),
+          ]),
+        ]),
+      );
+      await tester.tap(find.text('A'));
+      await tester.pump();
+      expect(find.text('B'), findsOneWidget);
+      await tester.tap(find.text('B'));
+      await tester.pump();
+      expect(find.text('C'), findsOneWidget);
+    });
+
+    testWidgets('same-named entries at different depths stay independent',
+        (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoNavMenu(items: [
+          SeoNavItem('Mehr', children: [
+            SeoNavItem('Mehr', children: [SeoNavItem('tief')]),
+          ]),
+        ]),
+      );
+      await tester.tap(find.text('Mehr').first);
+      await tester.pump();
+      // Nur die erste Ebene ist offen — der gleichnamige Enkel nicht.
+      expect(find.text('tief'), findsNothing);
+    });
+
     testWidgets('a removed entry does not stay open', (tester) async {
       await pumpSeo(
         tester,

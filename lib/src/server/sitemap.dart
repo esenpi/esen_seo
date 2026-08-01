@@ -5,7 +5,10 @@ import '../routing/seo_route.dart';
 /// path makes the whole document unparseable — every URL in the sitemap
 /// would be lost, not just the offending one — so they are stripped
 /// rather than escaped.
-final RegExp _xmlForbidden = RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
+final RegExp _xmlForbidden =
+    RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFE\uFFFF]'
+        r'|[\uD800-\uDBFF](?![\uDC00-\uDFFF])'
+        r'|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]');
 
 String _xmlSafeAttr(String value) =>
     HtmlRenderer.escapeAttribute(value.replaceAll(_xmlForbidden, ''));

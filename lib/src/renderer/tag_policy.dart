@@ -216,13 +216,15 @@ final RegExp _positionDeclaration =
 /// container" means "the whole page", and one absolutely positioned
 /// link covers the site with a clickable surface before Flutter boots.
 /// A value cannot be safe in one mode and unsafe in the other.
+/// `inherit` is refused for the same reason: the visible shell's own
+/// container is `position:fixed`, so a child inheriting from it becomes
+/// fixed as well. `unset` and `revert` both compute to `static` for
+/// this property and are harmless, but they are left out too — the list
+/// is short on purpose, and nobody writes them in an inline style.
 const Set<String> _allowedPositions = {
   'static',
   'relative',
   'initial',
-  'inherit',
-  'unset',
-  'revert',
 };
 
 final RegExp _cssComment = RegExp(r'/\*.*?\*/', dotAll: true);

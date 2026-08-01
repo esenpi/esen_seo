@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../controller/seo_controller.dart';
 import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
 
@@ -57,8 +58,14 @@ abstract class SeoBlock extends StatelessWidget {
   List<SeoNode> toSeoNodes();
 
   @override
-  Widget build(BuildContext context) =>
-      buildFlutter(context).seoNodes(toSeoNodes());
+  Widget build(BuildContext context) {
+    // Auf Mobile und Desktop gibt es keinen Spiegel — dann darf
+    // [toSeoNodes] gar nicht erst laufen. Bei einer langen Liste wäre
+    // das sonst pro Build eine vollständige Übersetzung, deren Ergebnis
+    // niemand ansieht.
+    if (!SeoController.enabled) return buildFlutter(context);
+    return buildFlutter(context).seoNodes(toSeoNodes());
+  }
 }
 
 /// The [SeoBlock] contract for blocks that carry state.
@@ -84,6 +91,12 @@ mixin SeoBlockState<T extends StatefulWidget> on State<T> {
   List<SeoNode> toSeoNodes();
 
   @override
-  Widget build(BuildContext context) =>
-      buildFlutter(context).seoNodes(toSeoNodes());
+  Widget build(BuildContext context) {
+    // Auf Mobile und Desktop gibt es keinen Spiegel — dann darf
+    // [toSeoNodes] gar nicht erst laufen. Bei einer langen Liste wäre
+    // das sonst pro Build eine vollständige Übersetzung, deren Ergebnis
+    // niemand ansieht.
+    if (!SeoController.enabled) return buildFlutter(context);
+    return buildFlutter(context).seoNodes(toSeoNodes());
+  }
 }

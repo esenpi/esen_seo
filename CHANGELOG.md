@@ -44,7 +44,30 @@ depended on which path the data took.
   it silently.
 * One XML-forbidden character in a route path no longer makes the whole
   `sitemap.xml` unparseable, and slugs containing `?` or `#` are
-  refused rather than written to a file no URL can reach.
+  refused rather than written to a file no URL can reach. A route path
+  may also not be a *prefix* of a generated file, since `/robots.txt/x`
+  would create a directory where `robots.txt` has to go.
+* Bot responses (and the app responses beside them) carry
+  `Vary: User-Agent`. Without it a CDN caches whichever variant it saw
+  first and serves the bot HTML to visitors, or the empty Flutter shell
+  to Google.
+* A route with no `body` builder no longer answers bots with an empty
+  200 page — an empty page indexes worse than the app itself.
+* `Google-InspectionTool`, `GoogleOther` and `StoreBot-Google` are
+  recognized, so URL Inspection and the Rich Results Test see the
+  server-rendered version.
+* `SeoPage.fromNodes` is the documented way to build a page; the
+  `bodyHtml` constructor is the deliberate exception and says so.
+
+### Fixed
+
+* `SeoNavMenu` now shows every declared level on screen. The mirror was
+  already arbitrarily deep, so grandchildren existed in the HTML but
+  could not be reached in the app; the open set is keyed by label path,
+  so same-named entries at different depths stay independent.
+* `SeoBlock` skips building its HTML on platforms without a mirror. A
+  `SeoListView` was translating every entry on every build on mobile,
+  and throwing the result away.
 * Prerendering refuses route paths that would escape the build
   directory or overwrite `robots.txt`, `sitemap.xml` and the other
   generated files; the IndexNow key must be a plain file name.

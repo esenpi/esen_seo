@@ -32,6 +32,8 @@ class BotDetector {
     'redditbot',
     // AI-Crawler
     'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web',
+    // Womit Google die URL-Prüfung und den Rich Results Test fährt:
+    'google-inspectiontool', 'googleother', 'storebot-google',
     'perplexitybot', 'google-extended', 'ccbot', 'bytespider',
     // SEO-Tools und generische Marker
     'lighthouse', 'ahrefsbot', 'semrushbot', 'screaming frog',
