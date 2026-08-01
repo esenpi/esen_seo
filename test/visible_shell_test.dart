@@ -34,13 +34,47 @@ List<SeoRoute> _routes() => [
 
 void main() {
   group('seoContainerHtml', () {
-    test('seoOnly stays byte-identical to the previous behaviour', () {
-      expect(
-        seoContainerHtml('<h1>Hi</h1>'),
-        '<div id="esen-seo-content" aria-hidden="true" inert '
-        'style="position:absolute;top:0;left:0;width:0;height:0;'
-        'overflow:hidden;pointer-events:none;"><h1>Hi</h1></div>',
-      );
+    test('seoOnly keeps its structure', () {
+      final html = seoContainerHtml('<h1>Hi</h1>');
+      expect(html, startsWith('<div id="esen-seo-content" '));
+      expect(html, contains('aria-hidden="true"'));
+      expect(html, contains('inert'));
+      expect(html, contains('width:0;height:0'));
+      expect(html, contains('overflow:hidden'));
+      expect(html, contains('pointer-events:none'));
+      expect(html, endsWith('><h1>Hi</h1></div>'));
+    });
+
+    test('the invisible container cannot be given a painted surface', () {
+      // width:0;height:0 leert nur die Content-Box. Padding, Rahmen und
+      // Schatten malen AUSSERHALB davon — und das eigene Stylesheet
+      // liefert sie: #esen-seo-content{padding:2rem 1.25rem;
+      // background:#fff} machte daraus ein weißes 40×64-px-Rechteck
+      // oben links, dauerhaft und auch nach jedem Shell-Handoff.
+      for (final property in [
+        'padding:0',
+        'border:0',
+        'outline:0',
+        'box-shadow:none',
+        'max-width:0',
+        'max-height:0',
+      ]) {
+        expect(
+          seoContainerStyle,
+          contains(property),
+          reason: 'ungepinnt: $property',
+        );
+      }
+      // Der sichtbare Shell darf davon nichts erben — er SOLL gestylt
+      // werden, das ist sein Zweck.
+      expect(seoShellStyle, isNot(contains('padding:0')));
+    });
+
+    test('the default stylesheet is the reason this matters', () {
+      // Wenn diese Regel je ihr padding verliert, ist der Pin oben
+      // überflüssig — und wenn sie es behält, ist er Pflicht.
+      expect(seoDefaultStylesheet, contains('#$seoContainerId{'));
+      expect(seoDefaultStylesheet, contains('padding:'));
     });
 
     test('visibleShell drops aria-hidden and covers the viewport', () {

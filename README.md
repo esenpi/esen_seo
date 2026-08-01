@@ -453,8 +453,15 @@ await prerenderSite(
 );
 ```
 
-The handoff needs no configuration: the prerendered container marks
-itself, and the moment Flutter has rendered its first frame the shell
+The prerendered container marks itself, so the two sides cannot drift
+apart — but **your app must call `EsenSeo.init()`**, which is what
+schedules the first mirror refresh and with it the handoff. Miss that
+one call and the shell stays on top of your running app forever. There
+is deliberately no timeout behind it: a shell that stays put is the
+right answer when the engine never arrives, and from the outside the
+package cannot tell that case from a forgotten `init()`.
+
+Once it runs, the moment Flutter has rendered its first frame the shell
 fades out over 150 ms and drops back to being the invisible mirror.
 While it is up the shell covers the viewport, so the Flutter engine's
 empty surface stays hidden during boot — the user sees content, then
@@ -604,9 +611,15 @@ It does **not** mean untrusted content is visually harmless. In
 sees while Flutter boots, and content shown to a user can mislead them.
 A property allow list cannot prevent that, and a longer one would not
 help: an empty `<a>` sized `width:100vw;height:100vh` paints nothing and
-still takes the click, using two properties every document needs. Plain
+still takes the click, using two properties every document needs. A
+later sibling with `margin-top:-100vh` lies over an earlier one, so the
+real headline stays visible while its clicks go somewhere else. Plain
 visible text linking somewhere unexpected works just as well and needs
 no CSS at all.
+
+Read the first paragraph precisely, then: the policy keeps content
+*inside* the mirror's container. It does not police what that content
+does to itself once it is there.
 
 Note also what the property list governs: **inline styles only.** A
 `class` value names a rule in *your* stylesheet, so if that stylesheet
