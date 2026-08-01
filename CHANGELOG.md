@@ -41,6 +41,16 @@ depended on which path the data took.
   comments and escapes no longer hide a property name either.
 * Media may not `autoplay`, and `referrerpolicy` may not be set to a
   value that hands the full URL to a third-party host.
+* The README now states where this guarantee **ends**. The policy makes
+  content non-executable; it does not make it honest. In
+  `visibleShell` an empty `<a>` sized `width:100vw;height:100vh` paints
+  nothing and still takes the click — two properties every document
+  needs — and a `class` value reaches whatever your own stylesheet
+  declares for that name, `position` included. No property list closes
+  that; vetting untrusted content before showing it is the
+  application's call. In the default `seoOnly` mode it cannot arise:
+  the mirror is clipped to zero size, `pointer-events:none` and
+  `inert`, and neither property can be set from inside.
 * The mirror stays a well-formed tree: a nested `<a>` becomes a `span`
   (the parser would otherwise empty the surrounding link), and void
   elements or empty tags carrying content keep it instead of dropping
