@@ -197,6 +197,18 @@ String _checkedPath(String path) {
     );
   }
   final lower = path.toLowerCase();
+  // Jede Seite landet als <pfad>/index.html. Heißt ein Segment selbst
+  // index.html, treffen sich Datei und Verzeichnis: /a schreibt die
+  // Datei a/index.html, /a/index.html/b will darin ein Verzeichnis
+  // anlegen. Was zuerst drankommt, entscheidet dann über den Absturz.
+  if (lower.split('/').contains('index.html')) {
+    throw ArgumentError.value(
+      path,
+      'path',
+      'must not contain a segment named "index.html" — that is the file '
+          'each page is written to',
+    );
+  }
   // Auch ein Präfix kollidiert: /robots.txt/foo legt erst das
   // Verzeichnis robots.txt an, danach scheitert die echte Datei.
   final collides = _reservedOutputNames.any(

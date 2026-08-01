@@ -49,7 +49,10 @@ depended on which path the data took.
   `sitemap.xml` unparseable, and slugs containing `?` or `#` are
   refused rather than written to a file no URL can reach. A route path
   may also not be a *prefix* of a generated file, since `/robots.txt/x`
-  would create a directory where `robots.txt` has to go.
+  would create a directory where `robots.txt` has to go — and not
+  contain a segment named `index.html`, which is the file every page is
+  written to, so `/a` and `/a/index.html/b` would fight over the same
+  name and the build would die on whichever came second.
 * Bot responses (and the app responses beside them) carry
   `Vary: User-Agent`. Without it a CDN caches whichever variant it saw
   first and serves the bot HTML to visitors, or the empty Flutter shell

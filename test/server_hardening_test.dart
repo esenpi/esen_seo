@@ -223,6 +223,24 @@ void main() {
       }
     });
 
+    test('a slug may not be the file every page is written to', () async {
+      // /a schreibt die Datei a/index.html, /a/index.html/b will darin
+      // ein Verzeichnis anlegen — je nach Reihenfolge stirbt der Build
+      // mit einem FileSystemException statt mit einer Erklärung.
+      for (final slug in ['/index.html', '/a/index.html/b', '/A/INDEX.HTML']) {
+        expect(
+          () => prerenderSite(
+            routes: _routes(),
+            siteBase: 'https://x.dev',
+            buildDir: buildDir.path,
+            additionalPaths: [slug],
+          ),
+          throwsArgumentError,
+          reason: 'accepted: $slug',
+        );
+      }
+    });
+
     test('robots.txt keeps its real content', () async {
       await prerenderSite(
         routes: _routes(),
