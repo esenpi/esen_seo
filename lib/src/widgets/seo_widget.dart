@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../controller/seo_controller.dart';
+import '../renderer/seo_node.dart';
 
 /// What kind of HTML element a [SeoWidget] represents.
 enum SeoElementType {
@@ -15,6 +16,10 @@ enum SeoElementType {
 
   /// An `<a>` element whose label comes from the widget subtree.
   link,
+
+  /// A widget that declares its own HTML translation as [SeoWidget.nodes].
+  /// The subtree below it is not traversed — the declared nodes replace it.
+  custom,
 }
 
 /// Internal marker widget created by the `.seo()` extensions.
@@ -30,6 +35,7 @@ class SeoWidget extends StatefulWidget {
     this.tag,
     this.content,
     this.attributes = const {},
+    this.nodes,
   });
 
   /// The original widget, passed through untouched.
@@ -46,6 +52,11 @@ class SeoWidget extends StatefulWidget {
 
   /// HTML attributes, e.g. `src`/`alt` for images or `href` for links.
   final Map<String, String> attributes;
+
+  /// The declared HTML translation for [SeoElementType.custom] widgets.
+  /// Sanitized by the controller before rendering (tag and attribute
+  /// policy apply to every node in the tree).
+  final List<SeoNode>? nodes;
 
   @override
   State<SeoWidget> createState() => _SeoWidgetState();

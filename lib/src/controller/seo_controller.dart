@@ -202,6 +202,13 @@ class SeoController {
     if (widget is SeoWidget) {
       final attributes = state.resolveAttributes(widget.attributes);
       switch (widget.type) {
+        case SeoElementType.custom:
+          // Die deklarierte Übersetzung ersetzt den kompletten Subtree —
+          // dessen Widgets würden den Inhalt sonst doppelt spiegeln.
+          return [
+            for (final node in widget.nodes ?? const <SeoNode>[])
+              _sanitizeNode(node, state),
+          ];
         case SeoElementType.text:
           return [
             _textNode(
@@ -253,6 +260,22 @@ class SeoController {
     }
 
     return _childrenOf(element, state, inLink: inLink);
+  }
+
+  /// Applies the tag and attribute policy to a declared node tree —
+  /// custom translations get exactly the same safety net as `.seo()`
+  /// calls: blocked tags fall back to `div`, blocked attributes are
+  /// dropped, and raw (unescaped) text never enters from user land.
+  SeoNode _sanitizeNode(SeoNode node, _TraversalState state) {
+    if (node.isTextOnly) return SeoNode.text(node.text ?? '');
+    return SeoNode(
+      tag: state.resolveTag(node.tag, fallback: 'div'),
+      text: node.text,
+      attributes: state.resolveAttributes(node.attributes),
+      children: [
+        for (final child in node.children) _sanitizeNode(child, state),
+      ],
+    );
   }
 
   SeoNode _textNode(

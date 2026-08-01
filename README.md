@@ -28,6 +28,9 @@ Image.network(url).seo(alt: 'Our team')  // → <img src="..." alt="Our team"/>
   the first text becomes `<h1>`, following texts `<p>`, images `<img>`
   with their `semanticLabel` as alt text. The page never breaks: blocked
   or invalid tags (`script`, `style`, …) fall back to safe elements.
+- **Custom translations**: `.seoNodes()` lets any widget declare its own
+  HTML, and the SEO widget library translates painted content — a
+  `SeoBarChart` mirrors as CSS bars plus a real `<table>` of its data.
 - **Meta tags, OpenGraph, Twitter Cards**: one `EsenSeo.setMeta()` call
   per page, with sensible fallbacks (`og:title` ← `title`, …).
 - **Schema.org JSON-LD** for rich results: typed builders for `Article`,
@@ -128,6 +131,41 @@ CLS) and fall back to the widget's own `width`/`height` when set. An
 attribute policy keeps the tree safe: event handlers (`onclick`, …),
 `javascript:` URLs and invalid names are dropped — `data-*`, `aria-*`,
 `id`, `lang`, `cite`, … pass through.
+
+## Custom widgets & charts — translate the data, not the pixels
+
+Widgets that paint their content (charts, gauges, `CustomPaint`) are a
+black box to the mirror: pixels carry no semantics. What *is*
+translatable is the data they paint from. `.seoNodes()` lets any widget
+declare its own HTML — the declared nodes replace the widget's subtree
+in the mirror, and the usual tag/attribute policy applies:
+
+```dart
+MyRatingStars(score: 4.5).seoNodes([
+  SeoNode(tag: 'p', text: 'Rated 4.5 out of 5 stars'),
+]);
+```
+
+The SEO widget library builds on this. `SeoBarChart` renders as normal
+Flutter widgets on every platform — and on the web its data appears in
+the mirror as CSS bars plus a real `<table>` crawlers can read:
+
+```dart
+SeoBarChart(
+  title: 'Revenue per year',
+  data: [
+    SeoBarChartEntry('2024', 12),
+    SeoBarChartEntry('2025', 31),
+    SeoBarChartEntry('2026', 54),
+  ],
+)
+// → <figure><figcaption>Revenue per year</figcaption>
+//     …CSS bars…
+//     <table><caption>…</caption>
+//       <tr><th>2024</th><td>12</td></tr>…</table></figure>
+```
+
+On non-web platforms both are no-ops that return the original widget.
 
 ## Meta tags & JSON-LD per page
 

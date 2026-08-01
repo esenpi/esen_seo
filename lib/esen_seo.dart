@@ -18,5 +18,7 @@ export 'src/extensions/link_seo.dart';
 export 'src/extensions/row_seo.dart';
 export 'src/extensions/seo_shortcuts.dart';
 export 'src/extensions/text_seo.dart';
+export 'src/extensions/widget_seo.dart';
 export 'src/routing/seo_route_observer.dart';
 export 'src/tags/seo_tags.dart';
+export 'src/widgets/seo_bar_chart.dart';
