@@ -16,6 +16,18 @@ Text('We build Flutter apps.').p         // → <p>We build Flutter apps.</p>
 Image.network(url).seo(alt: 'Our team')  // → <img src="..." alt="Our team"/>
 ```
 
+This is an add-on for the app you already have, not a framework to
+rebuild it in. It works in three steps: most widgets are mirrored
+automatically, a `.seo()` call adds the meaning Flutter does not know,
+and a handful of library widgets bridge the cases the mirror cannot
+see at all — a closed dropdown, a virtualized list, an inactive tab, a
+painted chart.
+
+On iOS, Android and desktop nothing changes: every call is a no-op and
+your widgets render exactly as before. The library widgets build plain
+Flutter widgets there too — nothing is translated into native views.
+The HTML only exists on the web.
+
 ## Features
 
 - **`.seo()` extensions** for `Text`, `Image`, `Column`, `Row` and
@@ -565,9 +577,17 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development. The core pipeline (extensions,
-smart defaults, meta/OpenGraph, JSON-LD, bot middleware) is covered by
-70+ unit tests. Issues and feedback are welcome on
+Young package under active development, covered by ~300 unit and widget
+tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
+JSON-LD, routing, bot middleware, prerendering), the widget library, and
+a set of tests that feed hostile input through every path to HTML.
+
+Everything the package emits passes a tag and attribute policy in the
+renderer itself, so a page assembled from untrusted content (a CMS, say)
+cannot turn into executable markup on any of the three paths — the
+Flutter mirror, the SSR middleware or the prerenderer.
+
+Issues and feedback are welcome on
 [GitHub](https://github.com/esenpi/esen_seo).
 
 ## License & contributing
