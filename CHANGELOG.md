@@ -55,6 +55,18 @@ depended on which path the data took.
   (the parser would otherwise empty the surrounding link), and void
   elements or empty tags carrying content keep it instead of dropping
   it silently.
+* An image `alt` text was the one text path into `llms-full.txt` that
+  skipped the single-line collapse, so a blank line broke out of the
+  `![…]` label and wrote its own headings into the file AI assistants
+  read as the structure of the page.
+* Content may no longer name the hooks the injector steers by — the id
+  `esen-seo-content` and the `data-esen-seo` markers. Nothing was
+  exploitable, but the reason was document order rather than a rule.
+* `autofocus`, `contenteditable`, `accesskey` and `tabindex` join
+  `autoplay` on the refused list: the mirror is there to be read. And
+  the visible shell becomes `inert` when its fade *starts*, not when it
+  ends — the mouse was already held off for those 150 ms, the keyboard
+  was not.
 * One XML-forbidden character in a route path no longer makes the whole
   `sitemap.xml` unparseable, and slugs containing `?` or `#` are
   refused rather than written to a file no URL can reach. A route path
@@ -66,6 +78,9 @@ depended on which path the data took.
   key reserves its file name the same way, and is validated before the
   first page is written rather than after the last — an invalid key used
   to abort the run half-way, leaving new pages beside an old sitemap.
+  An empty path segment is refused too: `/a//b` wrote its file as `a/b`
+  while the sitemap advertised `/a//b`, so a real `/a/b` route replaced
+  it without a word.
 * Bot responses (and the app responses beside them) carry
   `Vary: User-Agent`. Without it a CDN caches whichever variant it saw
   first and serves the bot HTML to visitors, or the empty Flutter shell
