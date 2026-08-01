@@ -52,8 +52,12 @@ class HtmlRenderer {
 
   /// Writes [node] into [buffer] — one shared buffer for the whole
   /// tree instead of one string allocation per node.
-  void _write(StringBuffer buffer, SeoNode node) {
-    if (node.isTextOnly) {
+  void _write(StringBuffer buffer, SeoNode node, {bool inAnchor = false}) {
+    // Ein leerer Tag ist ein Textknoten — aber nur ohne Kinder. Mit
+    // Kindern wäre er ein Wrapper, dessen Inhalt sonst spurlos
+    // verschwindet (der Controller fängt das ab, der Renderer muss es
+    // auch tun, weil die Server-Pfade nicht durch ihn laufen).
+    if (node.isTextOnly && node.children.isEmpty) {
       buffer.write(escapeText(node.text ?? ''));
       return;
     }
@@ -66,8 +70,19 @@ class HtmlRenderer {
       attributes[name.trim().toLowerCase()] = value;
     });
 
-    final tag = _resolveTag(node, attributes);
+    var tag = _resolveTag(node, attributes);
     if (tag == null) return; // nichts, was hier stehen dürfte
+
+    // Ein <a> in einem <a> lässt der HTML-Parser nicht stehen: Er
+    // schließt den äußeren Link und hängt dessen Beschriftung daneben —
+    // der Link des Entwicklers wäre weg. Der innere wird zum span.
+    if (tag == 'a' && inAnchor) tag = 'span';
+
+    // Ein leeres Element kann keinen Inhalt tragen; als span geht
+    // nichts verloren.
+    final hasContent =
+        node.text != null || node.rawText != null || node.children.isNotEmpty;
+    if (SeoNode.voidElements.contains(tag) && hasContent) tag = 'span';
 
     // Ein abgelehntes Element verliert mit seiner Identität auch seine
     // Attribute: `action` oder `values` gehören zu dem Element, das es
@@ -115,8 +130,9 @@ class HtmlRenderer {
     // A JSON-LD element holds a string, not markup: rendering children
     // into it would close the script early.
     if (!_isJsonLd(attributes) || node.tag != 'script') {
+      final nested = inAnchor || tag == 'a';
       for (final child in node.children) {
-        _write(buffer, child);
+        _write(buffer, child, inAnchor: nested);
       }
     }
     buffer

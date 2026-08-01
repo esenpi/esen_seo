@@ -38,6 +38,12 @@ class SeoPage {
   final SeoMeta meta;
 
   /// The semantic HTML body served to bots.
+  ///
+  /// **This string is written into the document verbatim.** It is the
+  /// one deliberate way past the renderer's tag and attribute policy,
+  /// meant for HTML you wrote yourself. Never build it from content you
+  /// do not control — use [SeoPage.fromNodes] for that, which puts the
+  /// nodes through the policy.
   final String bodyHtml;
 
   /// The `lang` attribute of the `<html>` element, e.g. `de`.

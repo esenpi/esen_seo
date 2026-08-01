@@ -1,6 +1,18 @@
 import '../renderer/html_renderer.dart';
 import '../routing/seo_route.dart';
 
+/// Characters XML 1.0 forbids outright. A single one of them in a route
+/// path makes the whole document unparseable — every URL in the sitemap
+/// would be lost, not just the offending one — so they are stripped
+/// rather than escaped.
+final RegExp _xmlForbidden = RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
+
+String _xmlSafeAttr(String value) =>
+    HtmlRenderer.escapeAttribute(value.replaceAll(_xmlForbidden, ''));
+
+String _xmlSafe(String value) =>
+    HtmlRenderer.escapeText(value.replaceAll(_xmlForbidden, ''));
+
 /// Generates a sitemap.xml from the SEO route table.
 ///
 /// Includes every route with [SeoRoute.includeInSitemap] that has no
@@ -44,21 +56,21 @@ String seoSitemapXml({
     final url = entry.path == '/' ? '$base/' : '$base${entry.path}';
     final lastmod = entry.route?.lastModified;
     if (lastmod == null && entry.alternates.isEmpty) {
-      buffer.writeln('  <url><loc>${HtmlRenderer.escapeText(url)}</loc></url>');
+      buffer.writeln('  <url><loc>${_xmlSafe(url)}</loc></url>');
       continue;
     }
     buffer
       ..writeln('  <url>')
-      ..writeln('    <loc>${HtmlRenderer.escapeText(url)}</loc>');
+      ..writeln('    <loc>${_xmlSafe(url)}</loc>');
     if (lastmod != null) {
       buffer.writeln('    <lastmod>${_lastmodDate(lastmod)}</lastmod>');
     }
     entry.alternates.forEach((hreflang, href) {
       buffer
         ..write('    <xhtml:link rel="alternate" hreflang="')
-        ..write(HtmlRenderer.escapeAttribute(hreflang))
+        ..write(_xmlSafeAttr(hreflang))
         ..write('" href="')
-        ..write(HtmlRenderer.escapeAttribute(href))
+        ..write(_xmlSafeAttr(href))
         ..writeln('"/>');
     });
     buffer.writeln('  </url>');

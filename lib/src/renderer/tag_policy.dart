@@ -160,9 +160,34 @@ bool isAllowedSeoAttribute(String name, String value) {
         .every(_isAllowedUrl);
   }
   if (_urlAttributes.contains(name)) return _isAllowedUrl(value);
+  if (name == 'referrerpolicy') {
+    return _safeReferrerPolicies.contains(value.trim().toLowerCase());
+  }
+  // Medien sollen nicht von selbst losspielen, wenn der Inhalt fremd ist.
+  if (_mediaBehaviourAttributes.contains(name)) return false;
   if (name == 'style') return _isAllowedStyle(value);
   return true;
 }
+
+/// Referrer policies that do not hand the full URL — path and query
+/// included — to a third-party host.
+const Set<String> _safeReferrerPolicies = {
+  'no-referrer',
+  'same-origin',
+  'origin',
+  'strict-origin',
+  'no-referrer-when-downgrade',
+  'origin-when-cross-origin',
+  'strict-origin-when-cross-origin',
+};
+
+/// Media attributes that start playback or prefetch on their own.
+const Set<String> _mediaBehaviourAttributes = {
+  'autoplay',
+  'loop',
+  'preload',
+  'autobuffer',
+};
 
 /// CSS constructs that execute outright (legacy IE) or load a script
 /// through a URL function.
@@ -179,15 +204,21 @@ final RegExp _positionDeclaration =
 /// The positioning a mirrored element may use.
 ///
 /// An allow list, because the alternatives keep finding ways through:
-/// `fixed` and `sticky` escape the container's clipping and can cover
-/// the running app, `-webkit-sticky` does the same in Safari while
-/// spelling itself differently, and `position:var(--x)` hides the value
-/// behind a custom property this code cannot resolve. `absolute` is
-/// fine — the container is positioned, so it clips its descendants.
+/// `fixed` and `sticky` escape the container's clipping, `-webkit-sticky`
+/// does the same in Safari while spelling itself differently, and
+/// `position:var(--x)` hides the value behind a custom property this
+/// code cannot resolve.
+///
+/// `absolute` is refused too, and the reason is worth remembering: in
+/// the invisible mirror it really is harmless, because the container is
+/// clipped to zero size. In [SeoRenderMode.visibleShell] the same
+/// container is a full-viewport, clickable overlay — so "clipped to the
+/// container" means "the whole page", and one absolutely positioned
+/// link covers the site with a clickable surface before Flutter boots.
+/// A value cannot be safe in one mode and unsafe in the other.
 const Set<String> _allowedPositions = {
   'static',
   'relative',
-  'absolute',
   'initial',
   'inherit',
   'unset',

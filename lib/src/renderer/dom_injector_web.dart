@@ -145,8 +145,13 @@ void injectMetaNodes(List<SeoNode> nodes) {
 /// Meta names and hreflang codes come from application data and end up
 /// in `querySelectorAll`. Unescaped, a `"` closes the selector early —
 /// the query then matches, and removes, entirely different elements.
-String _escapeSelectorValue(String value) =>
-    value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+String _escapeSelectorValue(String value) => value
+    // Ein Zeilenumbruch lässt sich in einem Selektor nicht escapen —
+    // querySelectorAll würde werfen und die restliche Meta-Injection
+    // stillschweigend abbrechen. Solche Zeichen fliegen raus.
+    .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '')
+    .replaceAll(r'\', r'\\')
+    .replaceAll('"', r'\"');
 
 /// Removes hardcoded index.html tags that the injected [node] supersedes,
 /// e.g. the Flutter template's `<meta name="description">` — otherwise
@@ -165,8 +170,8 @@ void _removeStaticDuplicates(web.Document document, SeoNode node) {
       node.attributes.containsKey('hreflang')) {
     // Nur hreflang-Alternates ersetzen — RSS-Links (rel=alternate mit
     // type=...) aus der index.html bleiben unangetastet.
-    selector =
-        'link[rel="alternate"][hreflang="${node.attributes['hreflang']}"]';
+    selector = 'link[rel="alternate"]'
+        '[hreflang="${_escapeSelectorValue(node.attributes['hreflang']!)}"]';
   } else if (node.tag == 'script' &&
       node.attributes['type'] == 'application/ld+json') {
     // Vom Prerenderer gebackene JSON-LD-Blöcke weichen den frischen.

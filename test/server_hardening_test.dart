@@ -110,6 +110,25 @@ void main() {
     });
   });
 
+  group('sitemap stays parseable', () {
+    test('one control character does not take the whole document down', () {
+      // XML 1.0 verbietet diese Zeichen; ein einziges macht die Datei
+      // unlesbar — dann fehlen dem Crawler ALLE URLs, nicht nur die eine.
+      final xml = seoSitemapXml(
+        routes: [
+          SeoRoute(path: '/', meta: (_) => const SeoMeta()),
+          SeoRoute(path: '/blog/ab', meta: (_) => const SeoMeta()),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      final forbidden = xml.codeUnits
+          .where((c) => c < 0x20 && c != 0x09 && c != 0x0A && c != 0x0D);
+      expect(forbidden, isEmpty);
+      expect(xml, contains('<loc>https://x.dev/</loc>'));
+      expect(xml, contains('<loc>https://x.dev/blog/ab</loc>'));
+    });
+  });
+
   group('prerenderSite reserved names', () {
     late Directory buildDir;
 

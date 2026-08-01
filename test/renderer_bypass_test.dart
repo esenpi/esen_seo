@@ -152,6 +152,11 @@ void main() {
         '--p:fixed;position:var(--p);inset:0',
         'position:STICKY',
         'POSITION : fixed',
+        // absolute war zuerst erlaubt, weil der unsichtbare Container
+        // auf 0×0 clippt. Im sichtbaren Shell IST der Container das
+        // ganze Fenster — derselbe Wert deckt dann die Seite ab und
+        // bleibt klickbar. Ein Wert kann nicht je nach Modus sicher sein.
+        'position:absolute;inset:0;z-index:99',
       ]) {
         expect(
           isAllowedSeoAttribute('style', css),
@@ -159,14 +164,18 @@ void main() {
           reason: 'accepted: $css',
         );
       }
-      // Was den Container nicht verlassen kann, bleibt erlaubt:
-      for (final css in ['position:relative', 'position:absolute;top:0']) {
-        expect(
-          isAllowedSeoAttribute('style', css),
-          isTrue,
-          reason: 'refused: $css',
-        );
+      expect(isAllowedSeoAttribute('style', 'position:relative'), isTrue);
+    });
+
+    test('media does not start playing on its own', () {
+      for (final name in ['autoplay', 'loop', 'preload']) {
+        expect(isAllowedSeoAttribute(name, ''), isFalse, reason: name);
       }
+    });
+
+    test('referrerpolicy may not leak the full URL', () {
+      expect(isAllowedSeoAttribute('referrerpolicy', 'unsafe-url'), isFalse);
+      expect(isAllowedSeoAttribute('referrerpolicy', 'no-referrer'), isTrue);
     });
 
     test('every srcset candidate is checked, not just the first', () {
@@ -205,6 +214,45 @@ void main() {
           reason: 'attribute: $name',
         );
       }
+    });
+  });
+
+  group('the mirror stays a well-formed tree', () {
+    test('a nested link becomes a span instead of destroying the outer', () {
+      // Der HTML-Parser schließt bei <a> in <a> den äußeren Link und
+      // hängt dessen Beschriftung daneben — der Link des Entwicklers
+      // wäre weg.
+      final html = body.render([
+        SeoNode(tag: 'a', attributes: {
+          'href': '/echt'
+        }, children: [
+          SeoNode(tag: 'span', text: 'Label '),
+          SeoNode(tag: 'a', attributes: {'href': '/cms'}, text: 'CMS'),
+        ]),
+      ]);
+      expect('<a '.allMatches(html), hasLength(1));
+      expect(html, contains('href="/echt"'));
+      expect(html, contains('<span>CMS</span>'));
+    });
+
+    test('a void element with content keeps the content', () {
+      // <br>Text</br> gibt es nicht — der Text ginge sonst verloren.
+      expect(
+        body.renderNode(SeoNode(tag: 'br', text: 'wichtig')),
+        '<span>wichtig</span>',
+      );
+      expect(body.renderNode(SeoNode(tag: 'br')), '<br/>');
+    });
+
+    test('an empty tag with children keeps its subtree', () {
+      expect(
+        body.render([
+          SeoNode(tag: '', text: 'Intro', children: [
+            SeoNode(tag: 'h2', text: 'Titel'),
+          ]),
+        ]),
+        contains('<h2>Titel</h2>'),
+      );
     });
   });
 

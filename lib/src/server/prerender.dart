@@ -181,7 +181,13 @@ String _checkedPath(String path) {
       segment == '..' ||
       segment == '.' ||
       segment.contains(r'\') ||
-      segment.contains(':'));
+      segment.contains(':') ||
+      // Query und Fragment gehören nicht in einen Dateinamen: Die Datei
+      // entstünde, wäre über ihre URL aber nie erreichbar.
+      segment.contains('?') ||
+      segment.contains('#') ||
+      segment.contains('*') ||
+      RegExp(r'[\x00-\x1F\x7F]').hasMatch(segment));
   if (unsafe) {
     throw ArgumentError.value(
       path,
