@@ -83,8 +83,8 @@ Future<List<String>> prerenderSite({
 
   final paths = <String>[
     for (final route in routes)
-      if (!route.hasParams) route.path,
-    ...additionalPaths.map(normalizeSeoPath),
+      if (!route.hasParams) _checkedPath(route.path),
+    ...additionalPaths.map(normalizeSeoPath).map(_checkedPath),
   ];
 
   final written = <String>[];
@@ -152,11 +152,45 @@ Future<List<String>> prerenderSite({
     written.add(file.path);
   }
   if (indexNowKey != null) {
+    if (!_validIndexNowKey.hasMatch(indexNowKey)) {
+      throw ArgumentError.value(
+        indexNowKey,
+        'indexNowKey',
+        'must be 8–128 characters, letters, digits and dashes only — the '
+            'key becomes a file name',
+      );
+    }
     final file = File('$buildDir/$indexNowKey.txt');
     await file.writeAsString(indexNowKey);
     written.add(file.path);
   }
   return written;
+}
+
+/// The IndexNow key doubles as a file name — keep it to the character
+/// set the protocol allows.
+final RegExp _validIndexNowKey = RegExp(r'^[A-Za-z0-9-]{8,128}$');
+
+/// Route paths become file paths under `buildDir`. A `..` segment (or a
+/// backslash, or a Windows drive letter) would let a route — and with a
+/// CMS behind it, someone else's content — write outside the build
+/// directory entirely.
+String _checkedPath(String path) {
+  final segments = path.split('/');
+  final unsafe = segments.any((segment) =>
+      segment == '..' ||
+      segment == '.' ||
+      segment.contains(r'\') ||
+      segment.contains(':'));
+  if (unsafe) {
+    throw ArgumentError.value(
+      path,
+      'path',
+      'must not step outside the build directory — no "..", "." or drive '
+          'segments',
+    );
+  }
+  return path;
 }
 
 final RegExp _templateTitle = RegExp(r'\s*<title>.*?</title>', dotAll: true);

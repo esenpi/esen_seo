@@ -197,6 +197,43 @@ void main() {
       );
     });
 
+    test('refuses route paths that escape the build directory', () async {
+      // Mit einem CMS hinter den Routen kämen solche Pfade aus fremder
+      // Hand — sie dürfen nicht außerhalb von build/web schreiben.
+      expect(
+        () => prerenderSite(
+          routes: [
+            SeoRoute(path: '/../entwischt', meta: (_) => const SeoMeta()),
+          ],
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => prerenderSite(
+          routes: _routes(),
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+          additionalPaths: ['/blog/../../weg'],
+        ),
+        throwsArgumentError,
+      );
+      expect(Directory('${buildDir.path}/../entwischt').existsSync(), isFalse);
+    });
+
+    test('refuses an IndexNow key that is not a plain file name', () async {
+      expect(
+        () => prerenderSite(
+          routes: _routes(),
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+          indexNowKey: '../../etc/passwd',
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('an empty stylesheet writes no style tag', () async {
       await prerenderSite(
         routes: _routes(),

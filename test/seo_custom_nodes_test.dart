@@ -50,6 +50,27 @@ void main() {
       );
     });
 
+    testWidgets('an empty tag with children falls back to div', (tester) async {
+      // Sonst verschwände der komplette Teilbaum lautlos aus dem
+      // Spiegel — das Sicherheitsnetz muss auch hier greifen.
+      await pumpSeo(
+        tester,
+        const SizedBox().seoNodes([
+          SeoNode(tag: '', children: [SeoNode(tag: 'span', text: 'drin')]),
+        ]),
+      );
+      expect(EsenSeo.currentHtml, '<div><span>drin</span></div>');
+    });
+
+    testWidgets('an empty tag without children stays a text node',
+        (tester) async {
+      await pumpSeo(
+        tester,
+        const SizedBox().seoNodes([SeoNode.text('nur Text')]),
+      );
+      expect(EsenSeo.currentHtml, 'nur Text');
+    });
+
     testWidgets('raw text never enters from user land', (tester) async {
       await pumpSeo(
         tester,

@@ -181,6 +181,21 @@ SeoBarChart(
 - **`SeoTestimonial`** — a customer quote as `<blockquote>` with its
   attribution beside it, the way the HTML spec asks for.
 
+Three of them close a different kind of hole: content Flutter never
+builds cannot be mirrored, because the mirror walks the widget tree.
+
+- **`SeoNavMenu`** — a dropdown's entries live in an overlay and do not
+  exist while the menu is closed. This one keeps the whole tree as
+  data, so every internal link is in the source: `<nav><ul><li><a>`,
+  nested as deep as you declare it.
+- **`SeoListView`** — the widest silent hole in Flutter Web:
+  `ListView.builder` builds only what is on screen, so a 200-entry blog
+  index mirrors maybe eight. Flutter still renders lazily here; the
+  mirror gets all 200.
+- **`SeoTabs`** — a `TabBarView` builds only the selected panel, so on
+  a product page two thirds of the content are invisible. All panels
+  are mirrored, each behind its own heading.
+
 `SeoFaq` and `SeoBreadcrumbs` also hand you the matching structured
 data, so the on-page content and the rich result come from one source:
 

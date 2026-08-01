@@ -267,7 +267,13 @@ class SeoController {
   /// calls: blocked tags fall back to `div`, blocked attributes are
   /// dropped, and raw (unescaped) text never enters from user land.
   SeoNode _sanitizeNode(SeoNode node, _TraversalState state) {
-    if (node.isTextOnly) return SeoNode.text(node.text ?? '');
+    // Ein leerer Tag ist ein reiner Textknoten — aber nur, wenn nichts
+    // darunter hängt. Mit Kindern wäre es ein Wrapper, dessen Inhalt
+    // sonst spurlos verschwände; der fällt auf div zurück wie jeder
+    // andere unbrauchbare Tag auch.
+    if (node.isTextOnly && node.children.isEmpty) {
+      return SeoNode.text(node.text ?? '');
+    }
     final tag = state.resolveTag(node.tag, fallback: 'div');
     // Eine deklarierte Überschrift zählt für die Smart Defaults genauso
     // wie eine getaggte — sonst vergibt die Seite ein zweites <h1>.
