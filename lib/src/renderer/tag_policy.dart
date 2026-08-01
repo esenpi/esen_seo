@@ -217,7 +217,11 @@ final RegExp _dangerousStyle = RegExp(
 /// every document needs. Dropping `opacity` (which nothing in the
 /// library uses) would not change that by a single pixel, so it stays:
 /// a guard that closes no class is worse than none, because it reads
-/// like one that does. In `SeoRenderMode.seoOnly` the point is moot —
+/// like one that does. Note too that this list governs inline styles
+/// only: a `class` value names a rule in the *application's* stylesheet
+/// and can reach whatever that rule declares, `position` included —
+/// which is another reason not to mistake this list for a barrier
+/// against layout. In `SeoRenderMode.seoOnly` the point is moot —
 /// the container is clipped to zero size, `pointer-events:none` and
 /// `inert`, and neither of those two properties is on this list, so a
 /// child cannot switch them back on. In `visibleShell` the shell *is*

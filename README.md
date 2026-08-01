@@ -608,6 +608,12 @@ still takes the click, using two properties every document needs. Plain
 visible text linking somewhere unexpected works just as well and needs
 no CSS at all.
 
+Note also what the property list governs: **inline styles only.** A
+`class` value names a rule in *your* stylesheet, so if that stylesheet
+has a rule with `position: fixed`, untrusted content can reach it by
+name and the inline allow list never sees it. `seoDefaultStylesheet` is
+classless and offers nothing to target, but your own CSS may.
+
 So the boundary is: **the package makes content non-executable; it does
 not make it honest.** In the default `seoOnly` mode this is moot — the
 mirror is clipped to zero size, `pointer-events:none` and `inert`, so
