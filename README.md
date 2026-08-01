@@ -584,7 +584,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by ~300 unit and widget
+Young package under active development, covered by 334 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
