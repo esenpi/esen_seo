@@ -215,9 +215,13 @@ class SeoSchema {
   /// SeoSchema.breadcrumbs([
   ///   (name: 'Start', url: 'https://example.com/'),
   ///   (name: 'Blog', url: 'https://example.com/blog'),
+  ///   (name: 'Flutter SEO', url: null),   // aktuelle Seite
   /// ]);
   /// ```
-  factory SeoSchema.breadcrumbs(List<({String name, String url})> items) =>
+  ///
+  /// The final entry may omit its URL: search engines fall back to the
+  /// page's own address for the last breadcrumb.
+  factory SeoSchema.breadcrumbs(List<({String name, String? url})> items) =>
       SeoSchema('BreadcrumbList', {
         'itemListElement': [
           for (var i = 0; i < items.length; i++)
@@ -225,7 +229,7 @@ class SeoSchema {
               '@type': 'ListItem',
               'position': i + 1,
               'name': items[i].name,
-              'item': items[i].url,
+              if (items[i].url != null) 'item': items[i].url,
             },
         ],
       });

@@ -268,8 +268,12 @@ class SeoController {
   /// dropped, and raw (unescaped) text never enters from user land.
   SeoNode _sanitizeNode(SeoNode node, _TraversalState state) {
     if (node.isTextOnly) return SeoNode.text(node.text ?? '');
+    final tag = state.resolveTag(node.tag, fallback: 'div');
+    // Eine deklarierte Überschrift zählt für die Smart Defaults genauso
+    // wie eine getaggte — sonst vergibt die Seite ein zweites <h1>.
+    state.noteTag(tag);
     return SeoNode(
-      tag: state.resolveTag(node.tag, fallback: 'div'),
+      tag: tag,
       text: node.text,
       attributes: state.resolveAttributes(node.attributes),
       children: [

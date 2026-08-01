@@ -37,6 +37,15 @@ const String seoContainerId = 'esen-seo-content';
 /// two sides can never drift apart.
 const String seoShellAttribute = 'data-esen-seo-shell';
 
+/// Takes the invisible mirror out of the keyboard tab order and the
+/// accessibility tree.
+///
+/// `aria-hidden` alone is not enough: the container is only clipped to
+/// zero size, so links and `<summary>` elements inside it keep their
+/// layout boxes and stay focusable — a keyboard user would tab into
+/// content nobody can see. Browsers without `inert` simply ignore it.
+const String seoInertAttribute = 'inert';
+
 /// Keeps the container invisible and non-interactive: the Flutter
 /// canvas stays the visible UI, screen readers use Flutter's own
 /// semantics tree.
@@ -77,6 +86,6 @@ String seoContainerHtml(
     return '<div id="$seoContainerId" $seoShellAttribute="visible" '
         'style="$seoShellStyle">$bodyHtml</div>';
   }
-  return '<div id="$seoContainerId" aria-hidden="true" '
+  return '<div id="$seoContainerId" aria-hidden="true" $seoInertAttribute '
       'style="$seoContainerStyle">$bodyHtml</div>';
 }

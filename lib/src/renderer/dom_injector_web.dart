@@ -45,6 +45,7 @@ void injectSeoNodes(List<SeoNode> nodes) {
     // add scrollbars or intercept clicks, and screen readers already get
     // Flutter's own semantics tree.
     container.setAttribute('aria-hidden', 'true');
+    container.setAttribute(seoInertAttribute, '');
     container.setAttribute('style', seoContainerStyle);
     document.body?.appendChild(container);
   } else {
@@ -90,6 +91,9 @@ void _startShellHandoff(web.Element container, List<SeoNode> nodes) {
   Timer(const Duration(milliseconds: seoShellFadeMs), () {
     _shellFading = false;
     container.setAttribute('aria-hidden', 'true');
+    // Ab jetzt wieder unsichtbarer Spiegel — also raus aus Tab-Reihenfolge
+    // und Accessibility-Baum.
+    container.setAttribute(seoInertAttribute, '');
     container.setAttribute('style', seoContainerStyle);
     final pending = _pendingNodes;
     _pendingNodes = null;

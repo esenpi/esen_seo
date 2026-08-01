@@ -173,6 +173,24 @@ SeoBarChart(
   for rating stars in search results.
 - **`SeoDataTable`** — specs, prices, comparisons as a real `<table>`
   with `<caption>`, `<thead>` and `<tbody>`.
+- **`SeoFaq`** — an accordion whose answers are in the page source even
+  while collapsed (`<details>`/`<summary>`, expandable without any JS).
+- **`SeoBreadcrumbs`** — a trail as `<nav><ol><li>` with real links.
+- **`SeoFigure`** — image plus caption as `<figure>`/`<figcaption>`,
+  with the dimensions that keep the layout from jumping.
+- **`SeoTestimonial`** — a customer quote as `<blockquote>` with its
+  attribution beside it, the way the HTML spec asks for.
+
+`SeoFaq` and `SeoBreadcrumbs` also hand you the matching structured
+data, so the on-page content and the rich result come from one source:
+
+```dart
+SeoMeta(schemas: [
+  SeoFaq.schemaFor(entries),
+  if (SeoBreadcrumbs.schemaFor(trail, base: siteBase) case final crumbs?)
+    crumbs,
+])
+```
 
 On non-web platforms all of them are no-ops that render the plain
 Flutter widget.

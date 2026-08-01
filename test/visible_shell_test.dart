@@ -37,7 +37,7 @@ void main() {
     test('seoOnly stays byte-identical to the previous behaviour', () {
       expect(
         seoContainerHtml('<h1>Hi</h1>'),
-        '<div id="esen-seo-content" aria-hidden="true" '
+        '<div id="esen-seo-content" aria-hidden="true" inert '
         'style="position:absolute;top:0;left:0;width:0;height:0;'
         'overflow:hidden;pointer-events:none;"><h1>Hi</h1></div>',
       );
