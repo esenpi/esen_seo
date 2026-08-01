@@ -589,10 +589,33 @@ tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
 
+### What the renderer guarantees, and what it does not
+
 Everything the package emits passes a tag and attribute policy in the
 renderer itself, so a page assembled from untrusted content (a CMS, say)
 cannot turn into executable markup on any of the three paths — the
-Flutter mirror, the SSR middleware or the prerenderer.
+Flutter mirror, the SSR middleware or the prerenderer. No `<script>`, no
+event handler, no `javascript:` URL, no positioning or stacking that
+would lift an element out of the mirror. That holds no matter where the
+`SeoNode` came from.
+
+It does **not** mean untrusted content is visually harmless. In
+`SeoRenderMode.visibleShell` the prerendered HTML is the page the user
+sees while Flutter boots, and content shown to a user can mislead them.
+A property allow list cannot prevent that, and a longer one would not
+help: an empty `<a>` sized `width:100vw;height:100vh` paints nothing and
+still takes the click, using two properties every document needs. Plain
+visible text linking somewhere unexpected works just as well and needs
+no CSS at all.
+
+So the boundary is: **the package makes content non-executable; it does
+not make it honest.** In the default `seoOnly` mode this is moot — the
+mirror is clipped to zero size, `pointer-events:none` and `inert`, so
+nothing inside it can be seen or clicked either way. If you enable the
+visible shell *and* your route bodies come from a source you do not
+control, review that content the way you would review any user-generated
+content before displaying it. That is an application decision; the
+renderer cannot make it for you.
 
 Issues and feedback are welcome on
 [GitHub](https://github.com/esenpi/esen_seo).
