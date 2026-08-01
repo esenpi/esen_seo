@@ -1,5 +1,6 @@
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_node.dart';
+import '../renderer/tag_policy.dart';
 import 'seo_schema.dart';
 
 /// Page metadata for the document `<head>`: title, description,
@@ -140,19 +141,33 @@ class SeoMeta {
     void property(String key, String? content) =>
         meta('property', key, content);
 
+    /// A meta tag whose content *is* a URL, held to the same policy the
+    /// renderer applies to `href`. Without this, a value refused in
+    /// `<link rel="canonical">` would still reach `og:url`, where the
+    /// scrapers that read it might follow it.
+    void urlProperty(String key, String? url) {
+      if (url == null || !isAllowedSeoAttribute('href', url)) return;
+      property(key, url);
+    }
+
+    String? checkedUrl(String? url) =>
+        (url != null && isAllowedSeoAttribute('href', url)) ? url : null;
+
     if (title != null) nodes.add(SeoNode(tag: 'title', text: title));
     name('description', description);
     name('keywords', keywords.isEmpty ? null : keywords.join(', '));
     name('author', author);
     name('robots', robots);
-    if (canonicalUrl != null) {
+    final canonical = checkedUrl(canonicalUrl);
+    if (canonical != null) {
       nodes.add(
         SeoNode(
-            tag: 'link',
-            attributes: {'rel': 'canonical', 'href': canonicalUrl!}),
+            tag: 'link', attributes: {'rel': 'canonical', 'href': canonical}),
       );
     }
     alternates.forEach((hreflang, href) {
+      // Eine abgelehnte URL soll kein leeres <link> hinterlassen.
+      if (checkedUrl(href) == null) return;
       nodes.add(SeoNode(tag: 'link', attributes: {
         'rel': 'alternate',
         'hreflang': hreflang,
@@ -169,8 +184,8 @@ class SeoMeta {
       property('og:type', og?.type ?? 'website');
       property('og:title', ogTitle);
       property('og:description', ogDescription);
-      property('og:url', ogUrl);
-      property('og:image', og?.image);
+      urlProperty('og:url', ogUrl);
+      urlProperty('og:image', og?.image);
       property('og:image:alt', og?.imageAlt);
       property('og:site_name', og?.siteName);
       property('og:locale', og?.locale);

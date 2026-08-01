@@ -219,6 +219,34 @@ void main() {
       expect(html, isNot(contains('http-equiv')));
     });
 
+    test('a refused URL is refused everywhere, not just in the link', () {
+      // Derselbe Wert darf nicht an einer Stelle abgelehnt und an der
+      // nächsten ausgegeben werden — og:url wird von Scrapern gelesen.
+      final html = const SeoMeta(
+        title: 'Titel',
+        canonicalUrl: 'javascript:alert(1)',
+        openGraph: OpenGraphMeta(image: 'javascript:alert(2)'),
+        alternates: {'de': 'javascript:alert(3)'},
+      ).toHtml();
+      expect(html, isNot(contains('javascript:')));
+      expect(html, isNot(contains('rel="canonical"')));
+      expect(html, isNot(contains('og:image')));
+      expect(html, isNot(contains('rel="alternate"')));
+      expect(html, contains('<title>Titel</title>'));
+    });
+
+    test('legitimate URLs in meta survive', () {
+      final html = const SeoMeta(
+        title: 'Titel',
+        canonicalUrl: 'https://x.dev/',
+        openGraph: OpenGraphMeta(image: 'https://x.dev/og.png'),
+        alternates: {'en': '/en'},
+      ).toHtml();
+      expect(html, contains('<link rel="canonical" href="https://x.dev/"/>'));
+      expect(html, contains('og:image'));
+      expect(html, contains('hreflang="en"'));
+    });
+
     test('legitimate head tags are untouched', () {
       final html = head.render([
         SeoNode(tag: 'title', text: 'Titel'),
