@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_chart_format.dart';
 
 /// One bar of a [SeoBarChart].
 class SeoBarChartEntry {
@@ -153,17 +154,17 @@ class SeoBarChart extends StatelessWidget {
             attributes: {
               'aria-hidden': 'true',
               'style': 'display:flex;align-items:flex-end;gap:8px;'
-                  'height:${_css(height)}px',
+                  'height:${cssNumber(height)}px',
             },
             children: [
               for (final entry in data)
                 SeoNode(
                   tag: 'div',
                   attributes: {
-                    'title': '${entry.label}: ${_css(entry.value)}',
+                    'title': '${entry.label}: ${cssNumber(entry.value)}',
                     'style': 'flex:1;border-radius:3px 3px 0 0;'
-                        'background:${_cssColor(color)};'
-                        'height:${_percent(entry.value, max)}%',
+                        'background:${cssColor(color)};'
+                        'height:${cssPercent(entry.value, max)}%',
                   },
                 ),
             ],
@@ -174,30 +175,12 @@ class SeoBarChart extends StatelessWidget {
               for (final entry in data)
                 SeoNode(tag: 'tr', children: [
                   SeoNode(tag: 'th', text: entry.label),
-                  SeoNode(tag: 'td', text: _css(entry.value)),
+                  SeoNode(tag: 'td', text: cssNumber(entry.value)),
                 ]),
             ]),
           ]),
         ],
       ),
     ];
-  }
-
-  static String _percent(double value, double max) {
-    if (max <= 0) return '0';
-    final fixed = (value / max * 100).clamp(0, 100).toStringAsFixed(1);
-    return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
-  }
-
-  /// Compact number formatting: `54` instead of `54.0`.
-  static String _css(double value) => value == value.roundToDouble()
-      ? value.round().toString()
-      : value.toString();
-
-  static String _cssColor(Color color) {
-    String hex(double channel) => ((channel * 255).round().clamp(0, 255))
-        .toRadixString(16)
-        .padLeft(2, '0');
-    return '#${hex(color.r)}${hex(color.g)}${hex(color.b)}';
   }
 }

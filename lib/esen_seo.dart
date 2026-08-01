@@ -22,3 +22,6 @@ export 'src/extensions/widget_seo.dart';
 export 'src/routing/seo_route_observer.dart';
 export 'src/tags/seo_tags.dart';
 export 'src/widgets/seo_bar_chart.dart';
+export 'src/widgets/seo_data_table.dart';
+export 'src/widgets/seo_pie_chart.dart';
+export 'src/widgets/seo_rating.dart';

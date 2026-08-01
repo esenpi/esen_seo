@@ -146,9 +146,9 @@ MyRatingStars(score: 4.5).seoNodes([
 ]);
 ```
 
-The SEO widget library builds on this. `SeoBarChart` renders as normal
-Flutter widgets on every platform — and on the web its data appears in
-the mirror as CSS bars plus a real `<table>` crawlers can read:
+The SEO widget library builds on this. Every library widget renders as
+normal Flutter widgets on every platform — and on the web its data
+appears in the mirror as readable HTML:
 
 ```dart
 SeoBarChart(
@@ -165,7 +165,17 @@ SeoBarChart(
 //       <tr><th>2024</th><td>12</td></tr>…</table></figure>
 ```
 
-On non-web platforms both are no-ops that return the original widget.
+- **`SeoBarChart`** — CSS bars plus a `<table>` of the values.
+- **`SeoPieChart`** — a pure-CSS pie (`conic-gradient`, no images, no
+  JS) plus a `<table>` with labels, values and shares.
+- **`SeoRating`** — stars plus the exact score as plain text
+  (`★★★★☆ 4.5/5`); pair with `SeoSchema.product`/`SeoSchema.review`
+  for rating stars in search results.
+- **`SeoDataTable`** — specs, prices, comparisons as a real `<table>`
+  with `<caption>`, `<thead>` and `<tbody>`.
+
+On non-web platforms all of them are no-ops that render the plain
+Flutter widget.
 
 ## Meta tags & JSON-LD per page
 
