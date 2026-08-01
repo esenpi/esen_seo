@@ -180,6 +180,23 @@ void main() {
       );
     });
 
+    test('prose that looks like a scheme is not mistaken for a URL', () {
+      // Eine Description „Achtung: wichtig" darf nicht als unbekanntes
+      // Schema durchfallen — ein Schutz, der Inhalt verschluckt, ist
+      // genauso kaputt wie eine Lücke.
+      for (final text in [
+        'Achtung: wichtig',
+        'Hinweis:Diese Seite nutzt Cookies',
+        'Flutter Apps mit echtem SEO.',
+      ]) {
+        expect(
+          isAllowedSeoAttribute('content', text),
+          isTrue,
+          reason: 'dropped: $text',
+        );
+      }
+    });
+
     test('ping and the other request-firing attributes are covered', () {
       for (final name in ['ping', 'background', 'longdesc', 'srcdoc']) {
         expect(

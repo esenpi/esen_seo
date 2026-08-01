@@ -122,7 +122,10 @@ const Set<String> _urlAttributes = {
   'profile',
   'usemap',
   'srcdoc',
-  'content',
+  // `content` looks URL-ish but is prose on every meta tag that
+  // matters — a description reading "Achtung: wichtig" would be read
+  // as an unknown scheme and silently dropped. Its one URL use,
+  // `http-equiv="refresh"`, is refused in the head renderer instead.
 };
 
 /// `srcset` holds a comma-separated candidate list, so checking the
