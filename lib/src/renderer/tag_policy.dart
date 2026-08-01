@@ -35,6 +35,10 @@ String? normalizeSeoTag(String tag) {
 
 final RegExp _validAttributeName = RegExp(r'^[a-z][a-z0-9-]*$');
 
+/// C0 controls and DEL — stripped or ignored by URL parsers, so they
+/// can hide an executable scheme from a plain prefix comparison.
+final RegExp _urlControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
+
 /// Attributes whose values are URLs — those must not smuggle in
 /// executable schemes.
 const Set<String> _urlAttributes = {
@@ -56,10 +60,17 @@ const Set<String> _urlAttributes = {
 /// names and executable URL schemes (`javascript:`, `data:text/html`)
 /// in URL attributes. Everything else — `id`, `lang`, `datetime`,
 /// `cite`, `class`, `data-*`, `aria-*`, … — is allowed.
+///
+/// URL values containing control characters are rejected outright. No
+/// legitimate URL carries them, and browsers strip tab, newline and
+/// carriage return while parsing a URL — so a prefix check alone would
+/// pass a scheme with a tab hidden inside it, only for the browser to
+/// reassemble it into a working script URL.
 bool isAllowedSeoAttribute(String name, String value) {
   if (!_validAttributeName.hasMatch(name)) return false;
   if (name.startsWith('on')) return false;
   if (_urlAttributes.contains(name)) {
+    if (_urlControlCharacters.hasMatch(value)) return false;
     final v = value.trim().toLowerCase();
     if (v.startsWith('javascript:') ||
         v.startsWith('vbscript:') ||
