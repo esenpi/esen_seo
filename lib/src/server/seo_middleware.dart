@@ -128,13 +128,15 @@ Middleware seoBotMiddleware({
         return _appResponse(inner, request);
       }
 
+      var routeExists = false;
       if (routes != null) {
         final match = matchSeoRoute(routes, path);
         if (match != null) {
+          routeExists = true;
           final body = await match.buildBody();
           // Eine Route ohne body-Builder hat für Bots nichts zu zeigen.
-          // Eine leere 200-Seite auszuliefern wäre schlechter als die
-          // Flutter-App: Google sähe eine echte, leere Seite.
+          // Eine leere 200-Seite wäre schlechter als die Flutter-App:
+          // Google sähe eine echte, leere Seite.
           if (body.isNotEmpty) {
             return _htmlResponse(SeoPage.fromNodes(
               meta: match.buildMeta(canonicalBase: siteBase),
@@ -152,7 +154,12 @@ Middleware seoBotMiddleware({
 
       // Soft-404 vermeiden: unbekannte seiten-artige Pfade bekommen für
       // Bots einen echten 404 statt der Flutter-App mit Status 200.
-      if (routes != null && unknownRoutesAs404 && _looksLikePage(path)) {
+      // Eine Route, die es GIBT, gehört niemals hierher — sie hat nur
+      // keinen Body, und dann ist die App die richtige Antwort.
+      if (routes != null &&
+          !routeExists &&
+          unknownRoutesAs404 &&
+          _looksLikePage(path)) {
         return _htmlResponse(_notFoundPage(), status: 404);
       }
 
@@ -179,11 +186,22 @@ Response _htmlResponse(SeoPage page, {int status = 200}) => Response(
 const Map<String, String> _varyHeader = {'vary': 'User-Agent'};
 
 /// The app response, marked as User-Agent dependent.
+///
+/// The header is merged, not replaced: an inner handler may already
+/// vary on `Origin` or `Accept-Encoding`, and dropping those would make
+/// a CDN serve the wrong compression or the wrong origin's response.
 Future<Response> _appResponse(Handler inner, Request request) async {
   final response = await inner(request);
+  final existing = response.headersAll['vary'] ?? const <String>[];
+  final values = <String>{
+    for (final entry in existing)
+      for (final part in entry.split(',')) part.trim(),
+  }..removeWhere((v) => v.isEmpty);
+  if (values.contains('*')) return response;
+  values.add('User-Agent');
   return response.change(headers: {
     ...response.headersAll,
-    ..._varyHeader,
+    'vary': values.join(', '),
   });
 }
 

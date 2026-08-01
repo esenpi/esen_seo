@@ -197,34 +197,47 @@ final RegExp _dangerousStyle = RegExp(
   caseSensitive: false,
 );
 
-/// Reads the `position` declarations out of a style value.
-final RegExp _positionDeclaration =
-    RegExp(r'(?:^|;)\s*position\s*:\s*([^;]*)', caseSensitive: false);
-
-/// The positioning a mirrored element may use.
+/// The CSS properties an inline style may set.
 ///
-/// An allow list, because the alternatives keep finding ways through:
-/// `fixed` and `sticky` escape the container's clipping, `-webkit-sticky`
-/// does the same in Safari while spelling itself differently, and
-/// `position:var(--x)` hides the value behind a custom property this
-/// code cannot resolve.
+/// The fifth allow list in this file, and for the same reason as the
+/// others: `position` alone was patched four times — `fixed`, then
+/// `sticky`, then `-webkit-sticky` and `var()`, then `absolute`, then
+/// `inherit` — and something got through each time. Positioning,
+/// stacking and transforms are simply not on this list, so an element
+/// in the mirror cannot be lifted out of the flow to cover the page.
 ///
-/// `absolute` is refused too, and the reason is worth remembering: in
-/// the invisible mirror it really is harmless, because the container is
-/// clipped to zero size. In [SeoRenderMode.visibleShell] the same
-/// container is a full-viewport, clickable overlay — so "clipped to the
-/// container" means "the whole page", and one absolutely positioned
-/// link covers the site with a clickable surface before Flutter boots.
-/// A value cannot be safe in one mode and unsafe in the other.
-/// `inherit` is refused for the same reason: the visible shell's own
-/// container is `position:fixed`, so a child inheriting from it becomes
-/// fixed as well. `unset` and `revert` both compute to `static` for
-/// this property and are harmless, but they are left out too — the list
-/// is short on purpose, and nobody writes them in an inline style.
-const Set<String> _allowedPositions = {
-  'static',
-  'relative',
-  'initial',
+/// What remains is what a document needs: type, colour, spacing,
+/// borders, backgrounds and the flex/grid boxes the widget library
+/// draws its charts with.
+const Set<String> _allowedStyleProperties = {
+  // Text
+  'color', 'font', 'font-family', 'font-size', 'font-style', 'font-weight',
+  'font-variant', 'letter-spacing', 'line-height', 'text-align',
+  'text-decoration', 'text-transform', 'text-overflow', 'white-space',
+  'word-break', 'overflow-wrap', 'hyphens', 'vertical-align', 'direction',
+  'quotes', 'tab-size',
+  // Box model
+  'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'margin-inline', 'margin-block',
+  'padding', 'padding-top', 'padding-right', 'padding-bottom',
+  'padding-left', 'padding-inline', 'padding-block',
+  'width', 'min-width', 'max-width',
+  'height', 'min-height', 'max-height',
+  'box-sizing', 'aspect-ratio',
+  // Borders and surface
+  'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
+  'border-color', 'border-style', 'border-width', 'border-radius',
+  'background', 'background-color', 'background-image', 'background-size',
+  'background-position', 'background-repeat', 'background-clip',
+  'box-shadow', 'outline', 'opacity',
+  // Layout boxes
+  'display', 'flex', 'flex-basis', 'flex-direction', 'flex-grow',
+  'flex-shrink', 'flex-wrap', 'gap', 'row-gap', 'column-gap',
+  'align-items', 'align-content', 'align-self', 'justify-items',
+  'justify-content', 'justify-self', 'order',
+  'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
+  'grid-auto-flow', 'list-style', 'list-style-type', 'list-style-position',
+  'table-layout', 'border-collapse', 'border-spacing', 'caption-side',
 };
 
 final RegExp _cssComment = RegExp(r'/\*.*?\*/', dotAll: true);
@@ -232,17 +245,19 @@ final RegExp _cssEscape = RegExp(r'\\');
 
 bool _isAllowedStyle(String value) {
   // Der CSS-Parser wirft Kommentare weg, bevor er Eigenschaften liest —
-  // `position:/**/fixed` ist für ihn `position:fixed`. Erst entfernen,
-  // dann prüfen.
+  // `back/**/ground` wäre für ihn `background`. Erst entfernen.
   final normalized = value.replaceAll(_cssComment, '');
-  // Backslash-Escapes (`\66 ixed` ist `fixed`) aufzulösen wäre ein
-  // eigener Parser; in Inline-Styles kommen sie praktisch nie vor, also
-  // gilt hier: unbekannt heißt abgelehnt.
+  // Backslash-Escapes aufzulösen wäre ein eigener Parser; in
+  // Inline-Styles kommen sie praktisch nie vor: unbekannt heißt
+  // abgelehnt.
   if (_cssEscape.hasMatch(normalized)) return false;
   if (_dangerousStyle.hasMatch(normalized)) return false;
-  for (final match in _positionDeclaration.allMatches(normalized)) {
-    final value = match.group(1)!.trim().toLowerCase();
-    if (!_allowedPositions.contains(value)) return false;
+  for (final declaration in normalized.split(';')) {
+    if (declaration.trim().isEmpty) continue;
+    final colon = declaration.indexOf(':');
+    if (colon < 0) return false;
+    final property = declaration.substring(0, colon).trim().toLowerCase();
+    if (!_allowedStyleProperties.contains(property)) return false;
   }
   return true;
 }

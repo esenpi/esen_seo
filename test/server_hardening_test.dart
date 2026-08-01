@@ -29,6 +29,7 @@ void main() {
       for (final css in [
         'position:fixed;top:0;left:0;width:100vw;height:100vh',
         'position : STICKY ; top:0',
+        'position:relative;top:-100vh;height:200vh;z-index:2147483647',
         'width:expression(alert(1))',
         'behavior:url(evil.htc)',
         'background:url("javascript:alert(1)")',
@@ -48,7 +49,6 @@ void main() {
         'flex:1;border-radius:3px 3px 0 0;background:#2563eb;height:100%',
         'width:180px;height:180px;border-radius:50%;'
             'background:conic-gradient(#2563eb 0% 46%,#f59e0b 46% 100%)',
-        'position:relative',
         'background:url(/bild.png)',
       ]) {
         expect(
@@ -107,6 +107,74 @@ void main() {
     test('a legitimate value is still honoured', () async {
       final response = await call('https');
       expect(response.headers['location'], startsWith('https://x.dev'));
+    });
+  });
+
+  group('bot middleware caching and status', () {
+    Future<Response> ask(
+      String path, {
+      required List<SeoRoute> routes,
+      bool asBot = true,
+      Map<String, String> appHeaders = const {},
+    }) async {
+      final handler = const Pipeline()
+          .addMiddleware(
+              seoBotMiddleware(routes: routes, siteBase: 'https://x.dev'))
+          .addHandler((_) => Response.ok('app', headers: appHeaders));
+      return handler(Request(
+        'GET',
+        Uri.parse('http://localhost$path'),
+        headers: {'user-agent': asBot ? 'Googlebot/2.1' : 'Mozilla/5.0'},
+      ));
+    }
+
+    test('a route without a body serves the app, never a 404', () async {
+      // Die Route existiert — sie hat nur nichts zu spiegeln. Ein 404
+      // wäre für Google schlimmer als die App auszuliefern.
+      final response = await ask(
+        '/nur-meta',
+        routes: [
+          SeoRoute(path: '/nur-meta', meta: (_) => const SeoMeta(title: 'M')),
+        ],
+      );
+      expect(response.statusCode, 200);
+      expect(await response.readAsString(), 'app');
+    });
+
+    test('an unknown page path still gets a real 404', () async {
+      final response = await ask(
+        '/gibtsnicht',
+        routes: [SeoRoute(path: '/', meta: (_) => const SeoMeta())],
+      );
+      expect(response.statusCode, 404);
+    });
+
+    test('every answer says it depends on the User-Agent', () async {
+      final routes = [
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(title: 'Home'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Hallo')],
+        ),
+      ];
+      final bot = await ask('/', routes: routes);
+      final human = await ask('/', routes: routes, asBot: false);
+      expect(bot.headers['vary'], contains('User-Agent'));
+      expect(human.headers['vary'], contains('User-Agent'));
+    });
+
+    test('an existing Vary is extended, not replaced', () async {
+      // Sonst verliert ein CDN die Kompressions- oder Origin-Variante.
+      final response = await ask(
+        '/',
+        routes: [SeoRoute(path: '/', meta: (_) => const SeoMeta())],
+        asBot: false,
+        appHeaders: {'vary': 'Accept-Encoding, Origin'},
+      );
+      final vary = response.headers['vary']!;
+      expect(vary, contains('Accept-Encoding'));
+      expect(vary, contains('Origin'));
+      expect(vary, contains('User-Agent'));
     });
   });
 

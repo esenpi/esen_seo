@@ -164,7 +164,21 @@ void main() {
           reason: 'accepted: $css',
         );
       }
-      expect(isAllowedSeoAttribute('style', 'position:relative'), isTrue);
+      // position steht gar nicht mehr auf der Eigenschaftsliste — die
+      // ganze Klasse ist damit erledigt statt Wert für Wert gepatcht.
+      expect(isAllowedSeoAttribute('style', 'position:relative'), isFalse);
+      expect(isAllowedSeoAttribute('style', 'z-index:9999'), isFalse);
+      expect(
+        isAllowedSeoAttribute(
+            'style', 'position:relative;top:-100vh;height:200vh;z-index:9'),
+        isFalse,
+      );
+    });
+
+    test('an unknown property is refused, a known one passes', () {
+      expect(isAllowedSeoAttribute('style', 'text-align:center'), isTrue);
+      expect(isAllowedSeoAttribute('style', 'transform:scale(9)'), isFalse);
+      expect(isAllowedSeoAttribute('style', '--x:fixed'), isFalse);
     });
 
     test('media does not start playing on its own', () {
