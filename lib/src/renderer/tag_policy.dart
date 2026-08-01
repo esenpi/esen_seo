@@ -158,18 +158,35 @@ bool isAllowedSeoAttribute(String name, String value) {
   return true;
 }
 
-/// CSS that would let mirrored content leave its container or execute.
-///
-/// The invisible mirror is clipped to zero size, but a fixed or sticky
-/// child escapes that clipping and can cover the running app. The
-/// legacy IE constructs execute outright. Everything else — colors,
-/// spacing, flex, gradients — passes, because the widget library styles
-/// its own output that way.
+/// CSS constructs that execute outright (legacy IE) or load a script
+/// through a URL function.
 final RegExp _dangerousStyle = RegExp(
-  r'position\s*:\s*(fixed|sticky)|expression\s*\(|behavior\s*:|'
+  r'expression\s*\(|behavior\s*:|'
   r'url\s*\(\s*["\x27]?\s*(javascript|vbscript|data)\s*:',
   caseSensitive: false,
 );
+
+/// Reads the `position` declarations out of a style value.
+final RegExp _positionDeclaration =
+    RegExp(r'(?:^|;)\s*position\s*:\s*([^;]*)', caseSensitive: false);
+
+/// The positioning a mirrored element may use.
+///
+/// An allow list, because the alternatives keep finding ways through:
+/// `fixed` and `sticky` escape the container's clipping and can cover
+/// the running app, `-webkit-sticky` does the same in Safari while
+/// spelling itself differently, and `position:var(--x)` hides the value
+/// behind a custom property this code cannot resolve. `absolute` is
+/// fine — the container is positioned, so it clips its descendants.
+const Set<String> _allowedPositions = {
+  'static',
+  'relative',
+  'absolute',
+  'initial',
+  'inherit',
+  'unset',
+  'revert',
+};
 
 final RegExp _cssComment = RegExp(r'/\*.*?\*/', dotAll: true);
 final RegExp _cssEscape = RegExp(r'\\');
@@ -183,7 +200,12 @@ bool _isAllowedStyle(String value) {
   // eigener Parser; in Inline-Styles kommen sie praktisch nie vor, also
   // gilt hier: unbekannt heißt abgelehnt.
   if (_cssEscape.hasMatch(normalized)) return false;
-  return !_dangerousStyle.hasMatch(normalized);
+  if (_dangerousStyle.hasMatch(normalized)) return false;
+  for (final match in _positionDeclaration.allMatches(normalized)) {
+    final value = match.group(1)!.trim().toLowerCase();
+    if (!_allowedPositions.contains(value)) return false;
+  }
+  return true;
 }
 
 /// Whether [value] is a URL the browser may safely act on.

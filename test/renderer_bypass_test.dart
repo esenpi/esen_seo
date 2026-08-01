@@ -144,6 +144,31 @@ void main() {
           isFalse);
     });
 
+    test('position is an allow list, not a list of banned words', () {
+      // -webkit-sticky wirkt in Safari, und hinter var(--x) kann alles
+      // stecken — beide würden eine Wortsperre passieren.
+      for (final css in [
+        'position:-webkit-sticky;top:0',
+        '--p:fixed;position:var(--p);inset:0',
+        'position:STICKY',
+        'POSITION : fixed',
+      ]) {
+        expect(
+          isAllowedSeoAttribute('style', css),
+          isFalse,
+          reason: 'accepted: $css',
+        );
+      }
+      // Was den Container nicht verlassen kann, bleibt erlaubt:
+      for (final css in ['position:relative', 'position:absolute;top:0']) {
+        expect(
+          isAllowedSeoAttribute('style', css),
+          isTrue,
+          reason: 'refused: $css',
+        );
+      }
+    });
+
     test('every srcset candidate is checked, not just the first', () {
       expect(
         isAllowedSeoAttribute('srcset', 'ok.png 1x, javascript:alert(1) 2x'),
