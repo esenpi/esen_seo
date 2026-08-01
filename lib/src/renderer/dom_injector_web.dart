@@ -4,6 +4,7 @@ import 'package:web/web.dart' as web;
 
 import 'seo_container.dart';
 import 'seo_node.dart';
+import 'tag_policy.dart';
 
 const String _metaMarker = 'data-esen-seo';
 
@@ -126,14 +127,26 @@ void injectMetaNodes(List<SeoNode> nodes) {
     }
     _removeStaticDuplicates(document, node);
     final element = document.createElement(node.tag);
-    node.attributes.forEach(
-      (name, value) => element.setAttribute(name, value),
-    );
+    node.attributes.forEach((name, value) {
+      // setAttribute('onerror', …) erzeugt einen echten Handler — die
+      // Policy gilt hier genauso wie im gerenderten HTML.
+      if (!isAllowedSeoAttribute(name.trim().toLowerCase(), value)) return;
+      element.setAttribute(name.trim().toLowerCase(), value);
+    });
     element.setAttribute(_metaMarker, 'true');
+    // textContent statt Markup — der Browser interpretiert hier nichts.
     if (node.rawText != null) element.textContent = node.rawText;
     head.appendChild(element);
   }
 }
+
+/// Escapes a value for use inside a CSS attribute selector.
+///
+/// Meta names and hreflang codes come from application data and end up
+/// in `querySelectorAll`. Unescaped, a `"` closes the selector early —
+/// the query then matches, and removes, entirely different elements.
+String _escapeSelectorValue(String value) =>
+    value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
 
 /// Removes hardcoded index.html tags that the injected [node] supersedes,
 /// e.g. the Flutter template's `<meta name="description">` — otherwise
@@ -141,9 +154,10 @@ void injectMetaNodes(List<SeoNode> nodes) {
 void _removeStaticDuplicates(web.Document document, SeoNode node) {
   final String? selector;
   if (node.tag == 'meta' && node.attributes.containsKey('name')) {
-    selector = 'meta[name="${node.attributes['name']}"]';
+    selector = 'meta[name="${_escapeSelectorValue(node.attributes['name']!)}"]';
   } else if (node.tag == 'meta' && node.attributes.containsKey('property')) {
-    selector = 'meta[property="${node.attributes['property']}"]';
+    selector =
+        'meta[property="${_escapeSelectorValue(node.attributes['property']!)}"]';
   } else if (node.tag == 'link' && node.attributes['rel'] == 'canonical') {
     selector = 'link[rel="canonical"]';
   } else if (node.tag == 'link' &&

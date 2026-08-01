@@ -118,7 +118,7 @@ class SeoController {
     _meta = meta;
     if (!enabled) return;
     final nodes = meta.toNodes();
-    _lastHeadHtml = const HtmlRenderer().render(nodes);
+    _lastHeadHtml = const HtmlRenderer.head().render(nodes);
     injector.injectMetaNodes(nodes);
   }
 

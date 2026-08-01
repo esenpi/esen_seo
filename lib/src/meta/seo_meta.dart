@@ -121,7 +121,7 @@ class SeoMeta {
       );
 
   /// The `<head>` fragment for these values, e.g. for server-side rendering.
-  String toHtml() => const HtmlRenderer().render(toNodes());
+  String toHtml() => const HtmlRenderer.head().render(toNodes());
 
   /// Builds the `<head>` elements as [SeoNode]s: `<title>`, `<meta>` and
   /// `<link>` tags in a stable order.

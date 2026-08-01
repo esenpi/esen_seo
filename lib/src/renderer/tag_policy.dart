@@ -39,6 +39,26 @@ final RegExp _validAttributeName = RegExp(r'^[a-z][a-z0-9-]*$');
 /// can hide an executable scheme from a plain prefix comparison.
 final RegExp _urlControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
 
+/// The schemes a URL attribute may carry.
+///
+/// Deliberately an allow list. A block list has to name every dangerous
+/// scheme and loses the moment one is missed or disguised — which is
+/// exactly how a tab hidden inside `javascript:` once slipped through.
+/// Anything not named here is refused, so a new trick is powerless by
+/// construction rather than by us having thought of it.
+const Set<String> _allowedUrlSchemes = {
+  'http',
+  'https',
+  'mailto',
+  'tel',
+  'sms',
+  'ftp',
+};
+
+/// Matches a leading `scheme:` per RFC 3986 — letter, then letters,
+/// digits, `+`, `-`, `.`.
+final RegExp _urlScheme = RegExp(r'^([a-z][a-z0-9+\-.]*):');
+
 /// Attributes whose values are URLs — those must not smuggle in
 /// executable schemes.
 const Set<String> _urlAttributes = {
@@ -56,27 +76,31 @@ const Set<String> _urlAttributes = {
 /// enter the SEO tree.
 ///
 /// Blocked are event handlers (`onclick`, `onerror`, … — they would
-/// execute JavaScript when injected into the DOM), invalid attribute
-/// names and executable URL schemes (`javascript:`, `data:text/html`)
-/// in URL attributes. Everything else — `id`, `lang`, `datetime`,
-/// `cite`, `class`, `data-*`, `aria-*`, … — is allowed.
+/// execute JavaScript when injected into the DOM) and invalid attribute
+/// names. Everything else — `id`, `lang`, `datetime`, `cite`, `class`,
+/// `data-*`, `aria-*`, … — is allowed.
 ///
-/// URL values containing control characters are rejected outright. No
-/// legitimate URL carries them, and browsers strip tab, newline and
-/// carriage return while parsing a URL — so a prefix check alone would
-/// pass a scheme with a tab hidden inside it, only for the browser to
-/// reassemble it into a working script URL.
+/// URL attributes are held to a stricter rule, because their value is
+/// something the browser acts on: relative URLs pass, absolute ones
+/// only with a scheme from [_allowedUrlSchemes], and any value carrying
+/// control characters is refused outright. Browsers strip tab, newline
+/// and carriage return while parsing a URL, so those characters can
+/// hide a scheme from a naive comparison — and an unknown scheme is
+/// refused anyway.
 bool isAllowedSeoAttribute(String name, String value) {
   if (!_validAttributeName.hasMatch(name)) return false;
   if (name.startsWith('on')) return false;
-  if (_urlAttributes.contains(name)) {
-    if (_urlControlCharacters.hasMatch(value)) return false;
-    final v = value.trim().toLowerCase();
-    if (v.startsWith('javascript:') ||
-        v.startsWith('vbscript:') ||
-        v.startsWith('data:text/html')) {
-      return false;
-    }
-  }
+  if (_urlAttributes.contains(name)) return _isAllowedUrl(value);
   return true;
+}
+
+/// Whether [value] is a URL the browser may safely act on.
+bool _isAllowedUrl(String value) {
+  if (_urlControlCharacters.hasMatch(value)) return false;
+  final url = value.trim().toLowerCase();
+  final scheme = _urlScheme.firstMatch(url)?.group(1);
+  // Kein Schema heißt relativ (`/blog`, `bild.png`, `#anker`,
+  // `//cdn.example.com`) — das kann nichts ausführen.
+  if (scheme == null) return true;
+  return _allowedUrlSchemes.contains(scheme);
 }

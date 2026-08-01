@@ -40,21 +40,24 @@ class SeoNode {
   /// Whether this node is a raw text node without a tag.
   bool get isTextOnly => tag.isEmpty;
 
-  /// Whether this tag renders as a self-closing element
-  /// (the complete HTML5 void-element list).
-  bool get isSelfClosing => const {
-        'area',
-        'base',
-        'br',
-        'col',
-        'embed',
-        'hr',
-        'img',
-        'input',
-        'link',
-        'meta',
-        'source',
-        'track',
-        'wbr',
-      }.contains(tag);
+  /// The complete HTML5 void-element list — elements that never have
+  /// a closing tag.
+  static const Set<String> voidElements = {
+    'area',
+    'base',
+    'br',
+    'col',
+    'embed',
+    'hr',
+    'img',
+    'input',
+    'link',
+    'meta',
+    'source',
+    'track',
+    'wbr',
+  };
+
+  /// Whether this tag renders as a self-closing element.
+  bool get isSelfClosing => voidElements.contains(tag);
 }

@@ -69,19 +69,39 @@ void main() {
   });
 
   group('Void Elements', () {
-    test('all HTML5 void elements render self-closing', () {
+    test('allowed void elements render self-closing', () {
       const renderer = HtmlRenderer();
       for (final tag in [
         'area',
-        'base',
+        'br',
         'col',
-        'embed',
+        'hr',
+        'img',
+        'input',
         'source',
         'track',
         'wbr'
       ]) {
         expect(renderer.renderNode(SeoNode(tag: tag)), '<$tag/>');
       }
+    });
+
+    test('head-only and active void elements degrade in body context', () {
+      // <base> und <embed> gehören nicht in den Body — der Renderer
+      // setzt die Policy jetzt selbst durch, nicht erst der Aufrufer.
+      const renderer = HtmlRenderer();
+      for (final tag in ['base', 'embed', 'link', 'meta']) {
+        expect(renderer.renderNode(SeoNode(tag: tag)), '<div></div>');
+      }
+    });
+
+    test('the head renderer emits them properly', () {
+      const renderer = HtmlRenderer.head();
+      expect(
+        renderer.renderNode(SeoNode(tag: 'meta', attributes: {'name': 'a'})),
+        '<meta name="a"/>',
+      );
+      expect(renderer.renderNode(SeoNode(tag: 'base')), '<base/>');
     });
   });
 }

@@ -127,10 +127,15 @@ GestureDetector(...).seo(href: '/legal', rel: 'nofollow', hreflang: 'de');
 ```
 
 Image dimensions let crawlers reserve layout space (Core Web Vitals:
-CLS) and fall back to the widget's own `width`/`height` when set. An
-attribute policy keeps the tree safe: event handlers (`onclick`, …),
-`javascript:` URLs and invalid names are dropped — `data-*`, `aria-*`,
-`id`, `lang`, `cite`, … pass through.
+CLS) and fall back to the widget's own `width`/`height` when set.
+
+An attribute policy keeps the tree safe: event handlers (`onclick`, …)
+and invalid names are dropped, while `data-*`, `aria-*`, `id`, `lang`,
+`cite`, … pass through. URL attributes are held to an **allow list** —
+relative URLs plus `http`, `https`, `mailto`, `tel`, `sms` and `ftp`.
+Anything else is refused, so `javascript:` and friends cannot get
+through even in a disguise nobody has thought of yet. That matters as
+soon as link targets come from your users rather than from you.
 
 ## Custom widgets & charts — translate the data, not the pixels
 
