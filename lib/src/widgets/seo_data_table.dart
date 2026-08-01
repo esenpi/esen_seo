@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// A data table that mirrors itself as a real HTML `<table>`.
 ///
@@ -24,7 +24,7 @@ import '../renderer/seo_node.dart';
 ///
 /// Rows shorter than [columns] are padded with empty cells, longer rows
 /// are truncated — the page never breaks over data shape.
-class SeoDataTable extends StatelessWidget {
+class SeoDataTable extends SeoBlock {
   const SeoDataTable({
     super.key,
     required this.columns,
@@ -59,13 +59,11 @@ class SeoDataTable extends StatelessWidget {
       ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget buildFlutter(BuildContext context) {
     // Ohne Spalten gibt es nichts Sinnvolles zu zeigen — weder für
     // Flutter (Table wirft bei leeren Zeilen) noch für Crawler.
-    if (columns.isEmpty) {
-      return const SizedBox.shrink().seoNodes(const []);
-    }
-    return _buildTable(context).seoNodes(_toNodes());
+    if (columns.isEmpty) return const SizedBox.shrink();
+    return _buildTable(context);
   }
 
   Widget _buildTable(BuildContext context) {
@@ -113,25 +111,29 @@ class SeoDataTable extends StatelessWidget {
     );
   }
 
-  List<SeoNode> _toNodes() => [
-        SeoNode(
-          tag: 'table',
-          attributes: {'class': 'esen-seo-data-table'},
-          children: [
-            if (title != null) SeoNode(tag: 'caption', text: title),
-            SeoNode(tag: 'thead', children: [
+  @override
+  List<SeoNode> toSeoNodes() {
+    if (columns.isEmpty) return const [];
+    return [
+      SeoNode(
+        tag: 'table',
+        attributes: {'class': 'esen-seo-data-table'},
+        children: [
+          if (title != null) SeoNode(tag: 'caption', text: title),
+          SeoNode(tag: 'thead', children: [
+            SeoNode(tag: 'tr', children: [
+              for (final column in columns) SeoNode(tag: 'th', text: column),
+            ]),
+          ]),
+          SeoNode(tag: 'tbody', children: [
+            for (final row in rows)
               SeoNode(tag: 'tr', children: [
-                for (final column in columns) SeoNode(tag: 'th', text: column),
+                for (final value in _cells(row))
+                  SeoNode(tag: 'td', text: value),
               ]),
-            ]),
-            SeoNode(tag: 'tbody', children: [
-              for (final row in rows)
-                SeoNode(tag: 'tr', children: [
-                  for (final value in _cells(row))
-                    SeoNode(tag: 'td', text: value),
-                ]),
-            ]),
-          ],
-        ),
-      ];
+          ]),
+        ],
+      ),
+    ];
+  }
 }

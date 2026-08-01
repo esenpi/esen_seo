@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// An image with a caption that mirrors itself as real HTML.
 ///
@@ -25,7 +25,7 @@ import '../renderer/seo_node.dart';
 /// before the image arrives, which is what keeps the layout from
 /// jumping (Core Web Vitals: CLS). [lazy] defaults to `false`, because
 /// deferring an image above the fold delays the largest paint.
-class SeoFigure extends StatelessWidget {
+class SeoFigure extends SeoBlock {
   const SeoFigure({
     super.key,
     required this.src,
@@ -68,11 +68,7 @@ class SeoFigure extends StatelessWidget {
   int? get _height => (height != null && height! > 0) ? height : null;
 
   @override
-  Widget build(BuildContext context) {
-    return _buildFigure().seoNodes(_toNodes());
-  }
-
-  Widget _buildFigure() {
+  Widget buildFlutter(BuildContext context) {
     // [width]/[height] beschreiben das Quellbild fürs HTML — als feste
     // Flutter-Größe würden sie auf schmalen Schirmen überlaufen. Sind
     // beide bekannt, reservieren wir stattdessen das Seitenverhältnis:
@@ -105,7 +101,8 @@ class SeoFigure extends StatelessWidget {
     );
   }
 
-  List<SeoNode> _toNodes() => [
+  @override
+  List<SeoNode> toSeoNodes() => [
         SeoNode(
           tag: 'figure',
           attributes: const {'class': 'esen-seo-figure'},

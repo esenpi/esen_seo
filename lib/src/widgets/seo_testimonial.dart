@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// A customer quote that mirrors itself as real HTML.
 ///
@@ -22,7 +22,7 @@ import '../renderer/seo_node.dart';
 /// The quote is on-page content. For review stars in search results,
 /// add the matching structured data via `SeoSchema.review` — the two
 /// complement each other.
-class SeoTestimonial extends StatelessWidget {
+class SeoTestimonial extends SeoBlock {
   const SeoTestimonial({
     super.key,
     required this.quote,
@@ -65,11 +65,7 @@ class SeoTestimonial extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return _buildQuote().seoNodes(_toNodes());
-  }
-
-  Widget _buildQuote() {
+  Widget buildFlutter(BuildContext context) {
     final attribution = _attribution;
     return Container(
       padding: const EdgeInsets.only(left: 16),
@@ -99,7 +95,8 @@ class SeoTestimonial extends StatelessWidget {
     );
   }
 
-  List<SeoNode> _toNodes() {
+  @override
+  List<SeoNode> toSeoNodes() {
     final attribution = _attribution;
     return [
       SeoNode(

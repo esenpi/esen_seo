@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// One entry of a [SeoNavMenu], optionally with a submenu.
 class SeoNavItem {
@@ -85,7 +85,8 @@ class SeoNavMenu extends StatefulWidget {
   State<SeoNavMenu> createState() => _SeoNavMenuState();
 }
 
-class _SeoNavMenuState extends State<SeoNavMenu> {
+class _SeoNavMenuState extends State<SeoNavMenu>
+    with SeoBlockState<SeoNavMenu> {
   /// Which top-level entries currently show their submenu, keyed by
   /// label — an index would point at a different entry as soon as the
   /// menu changes (a prepended item would open someone else's submenu).
@@ -100,12 +101,8 @@ class _SeoNavMenuState extends State<SeoNavMenu> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (widget.items.isEmpty) {
-      return const SizedBox.shrink().seoNodes(const []);
-    }
-    return _buildMenu().seoNodes(_toNodes());
-  }
+  Widget buildFlutter(BuildContext context) =>
+      widget.items.isEmpty ? const SizedBox.shrink() : _buildMenu();
 
   Widget _buildMenu() {
     final entries = <Widget>[
@@ -208,15 +205,18 @@ class _SeoNavMenuState extends State<SeoNavMenu> {
 
   /// The HTML translation — the complete tree, regardless of what is
   /// open on screen.
-  List<SeoNode> _toNodes() => [
-        SeoNode(
-          tag: 'nav',
-          // nav takes an accessible name; several navigations per page
-          // are normal and must be distinguishable.
-          attributes: {'class': 'esen-seo-nav', 'aria-label': widget.label},
-          children: [_listNode(widget.items)],
-        ),
-      ];
+  @override
+  List<SeoNode> toSeoNodes() => widget.items.isEmpty
+      ? const []
+      : [
+          SeoNode(
+            tag: 'nav',
+            // nav takes an accessible name; several navigations per page
+            // are normal and must be distinguishable.
+            attributes: {'class': 'esen-seo-nav', 'aria-label': widget.label},
+            children: [_listNode(widget.items)],
+          ),
+        ];
 
   SeoNode _listNode(List<SeoNavItem> items) => SeoNode(
         tag: 'ul',

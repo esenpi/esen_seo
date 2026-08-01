@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 import 'seo_chart_format.dart';
 
 /// One bar of a [SeoBarChart].
@@ -38,7 +38,7 @@ class SeoBarChartEntry {
 /// This is the pattern for anything that cannot be mirrored directly:
 /// don't translate the pixels, translate the data they were painted
 /// from. For one-off cases, `.seoNodes()` does the same by hand.
-class SeoBarChart extends StatelessWidget {
+class SeoBarChart extends SeoBlock {
   const SeoBarChart({
     super.key,
     required this.data,
@@ -80,11 +80,7 @@ class SeoBarChart extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return _buildChart(context).seoNodes(_toNodes());
-  }
-
-  Widget _buildChart(BuildContext context) {
+  Widget buildFlutter(BuildContext context) {
     final max = _maxValue;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -146,7 +142,8 @@ class SeoBarChart extends StatelessWidget {
 
   /// The HTML translation: CSS bars for the eye (visible shell),
   /// a real table for crawlers and screen readers.
-  List<SeoNode> _toNodes() {
+  @override
+  List<SeoNode> toSeoNodes() {
     final max = _maxValue;
     return [
       SeoNode(

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../meta/seo_schema.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// One step of a [SeoBreadcrumbs] trail.
 class SeoBreadcrumbEntry {
@@ -48,7 +48,7 @@ class SeoBreadcrumbEntry {
 /// ```dart
 /// SeoMeta(schemas: [SeoBreadcrumbs.schemaFor(items, base: siteBase)])
 /// ```
-class SeoBreadcrumbs extends StatelessWidget {
+class SeoBreadcrumbs extends SeoBlock {
   const SeoBreadcrumbs({
     super.key,
     required this.items,
@@ -105,12 +105,8 @@ class SeoBreadcrumbs extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const SizedBox.shrink().seoNodes(const []);
-    }
-    return _buildTrail().seoNodes(_toNodes());
-  }
+  Widget buildFlutter(BuildContext context) =>
+      items.isEmpty ? const SizedBox.shrink() : _buildTrail();
 
   Widget _buildTrail() {
     final children = <Widget>[];
@@ -143,28 +139,31 @@ class SeoBreadcrumbs extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center, children: children);
   }
 
-  List<SeoNode> _toNodes() => [
-        SeoNode(
-          tag: 'nav',
-          // nav carries the navigation role, where an accessible name
-          // is allowed — unlike a bare <p> or <div>.
-          attributes: {'class': 'esen-seo-breadcrumbs', 'aria-label': label},
-          children: [
-            SeoNode(tag: 'ol', children: [
-              for (var i = 0; i < items.length; i++)
-                SeoNode(tag: 'li', children: [
-                  _stepNode(items[i], isCurrent: i == items.length - 1),
-                  if (i < items.length - 1 && separator.isNotEmpty)
-                    SeoNode(
-                      tag: 'span',
-                      text: separator,
-                      attributes: const {'aria-hidden': 'true'},
-                    ),
-                ]),
-            ]),
-          ],
-        ),
-      ];
+  @override
+  List<SeoNode> toSeoNodes() => items.isEmpty
+      ? const []
+      : [
+          SeoNode(
+            tag: 'nav',
+            // nav carries the navigation role, where an accessible name
+            // is allowed — unlike a bare <p> or <div>.
+            attributes: {'class': 'esen-seo-breadcrumbs', 'aria-label': label},
+            children: [
+              SeoNode(tag: 'ol', children: [
+                for (var i = 0; i < items.length; i++)
+                  SeoNode(tag: 'li', children: [
+                    _stepNode(items[i], isCurrent: i == items.length - 1),
+                    if (i < items.length - 1 && separator.isNotEmpty)
+                      SeoNode(
+                        tag: 'span',
+                        text: separator,
+                        attributes: const {'aria-hidden': 'true'},
+                      ),
+                  ]),
+              ]),
+            ],
+          ),
+        ];
 
   /// Only the final step is the current page — a step in the middle
   /// without a URL is simply not a link, not a second "you are here".

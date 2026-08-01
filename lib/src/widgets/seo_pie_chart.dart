@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 import 'seo_chart_format.dart';
 
 /// One segment of a [SeoPieChart].
@@ -37,7 +37,7 @@ class SeoPieChartEntry {
 ///   ],
 /// )
 /// ```
-class SeoPieChart extends StatelessWidget {
+class SeoPieChart extends SeoBlock {
   const SeoPieChart({
     super.key,
     required this.data,
@@ -95,11 +95,7 @@ class SeoPieChart extends StatelessWidget {
       data[index].color ?? _palette[index % _palette.length];
 
   @override
-  Widget build(BuildContext context) {
-    return _buildChart(context).seoNodes(_toNodes());
-  }
-
-  Widget _buildChart(BuildContext context) {
+  Widget buildFlutter(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +148,8 @@ class SeoPieChart extends StatelessWidget {
 
   /// The HTML translation: a `conic-gradient` circle for the eye,
   /// a table with labels, values and shares for crawlers.
-  List<SeoNode> _toNodes() {
+  @override
+  List<SeoNode> toSeoNodes() {
     final total = _total;
     return [
       SeoNode(

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../meta/seo_schema.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// One question/answer pair of a [SeoFaq].
 class SeoFaqEntry {
@@ -81,7 +81,7 @@ class SeoFaq extends StatefulWidget {
   State<SeoFaq> createState() => _SeoFaqState();
 }
 
-class _SeoFaqState extends State<SeoFaq> {
+class _SeoFaqState extends State<SeoFaq> with SeoBlockState<SeoFaq> {
   late final Set<int> _expanded = {
     if (widget.initiallyExpanded)
       for (var i = 0; i < widget.entries.length; i++) i,
@@ -94,12 +94,8 @@ class _SeoFaqState extends State<SeoFaq> {
   bool get _hasTitle => widget.title != null && widget.title!.trim().isNotEmpty;
 
   @override
-  Widget build(BuildContext context) {
-    if (widget.entries.isEmpty) {
-      return const SizedBox.shrink().seoNodes(const []);
-    }
-    return _buildList().seoNodes(_toNodes());
-  }
+  Widget buildFlutter(BuildContext context) =>
+      widget.entries.isEmpty ? const SizedBox.shrink() : _buildList();
 
   Widget _buildList() {
     return Column(
@@ -163,18 +159,21 @@ class _SeoFaqState extends State<SeoFaq> {
   /// The HTML translation: `<details>` keeps the answers in the source
   /// and stays expandable without any JavaScript — which also makes it
   /// work in the prerendered shell before Flutter boots.
-  List<SeoNode> _toNodes() => [
-        SeoNode(
-          tag: 'section',
-          attributes: const {'class': 'esen-seo-faq'},
-          children: [
-            if (_hasTitle) SeoNode(tag: 'h$_level', text: widget.title),
-            for (final entry in widget.entries)
-              SeoNode(tag: 'details', children: [
-                SeoNode(tag: 'summary', text: entry.question),
-                SeoNode(tag: 'p', text: entry.answer),
-              ]),
-          ],
-        ),
-      ];
+  @override
+  List<SeoNode> toSeoNodes() => widget.entries.isEmpty
+      ? const []
+      : [
+          SeoNode(
+            tag: 'section',
+            attributes: const {'class': 'esen-seo-faq'},
+            children: [
+              if (_hasTitle) SeoNode(tag: 'h$_level', text: widget.title),
+              for (final entry in widget.entries)
+                SeoNode(tag: 'details', children: [
+                  SeoNode(tag: 'summary', text: entry.question),
+                  SeoNode(tag: 'p', text: entry.answer),
+                ]),
+            ],
+          ),
+        ];
 }

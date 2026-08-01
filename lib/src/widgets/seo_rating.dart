@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 import 'seo_chart_format.dart';
 
 /// A star rating that mirrors itself as readable HTML.
@@ -20,7 +20,7 @@ import 'seo_chart_format.dart';
 /// value as structured data — `SeoSchema.product(ratingValue: …)` or
 /// `SeoSchema.review(rating: …)` via `SeoMeta.schemas`; this widget
 /// covers the on-page content.
-class SeoRating extends StatelessWidget {
+class SeoRating extends SeoBlock {
   const SeoRating({
     super.key,
     required this.value,
@@ -74,8 +74,8 @@ class SeoRating extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final row = Row(
+  Widget buildFlutter(BuildContext context) {
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
@@ -89,15 +89,17 @@ class SeoRating extends StatelessWidget {
         ),
       ],
     );
-    return row.seoNodes([
-      // Kein aria-label: Für <p> ist ein ARIA-Name laut Spezifikation
-      // verboten (Rolle „paragraph" ist name-prohibited) — der Text
-      // trägt den Wert ohnehin vollständig.
-      SeoNode(
-        tag: 'p',
-        attributes: const {'class': 'esen-seo-rating'},
-        text: _mirrorText,
-      ),
-    ]);
   }
+
+  @override
+  List<SeoNode> toSeoNodes() => [
+        // Kein aria-label: Für <p> ist ein ARIA-Name laut Spezifikation
+        // verboten (Rolle „paragraph" ist name-prohibited) — der Text
+        // trägt den Wert ohnehin vollständig.
+        SeoNode(
+          tag: 'p',
+          attributes: const {'class': 'esen-seo-rating'},
+          text: _mirrorText,
+        ),
+      ];
 }

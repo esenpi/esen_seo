@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../extensions/widget_seo.dart';
 import '../renderer/seo_node.dart';
+import 'seo_block.dart';
 
 /// Builds the HTML translation of one list item.
 typedef SeoListNodeBuilder<T> = List<SeoNode> Function(T item, int index);
@@ -36,7 +36,7 @@ typedef SeoListNodeBuilder<T> = List<SeoNode> Function(T item, int index);
 /// Wrap the entries in a list element with [listTag] (`ul`/`ol`) when
 /// the order or the count carries meaning; the default `div` keeps the
 /// markup out of the way for card grids and feeds.
-class SeoListView<T> extends StatelessWidget {
+class SeoListView<T> extends SeoBlock {
   const SeoListView({
     super.key,
     required this.items,
@@ -100,11 +100,7 @@ class SeoListView<T> extends StatelessWidget {
   String get _listTag => listTag.trim().isEmpty ? 'div' : listTag.trim();
 
   @override
-  Widget build(BuildContext context) {
-    return _buildList().seoNodes(_toNodes());
-  }
-
-  Widget _buildList() {
+  Widget buildFlutter(BuildContext context) {
     final separator = separatorBuilder;
     if (separator != null) {
       return ListView.separated(
@@ -129,7 +125,8 @@ class SeoListView<T> extends StatelessWidget {
     );
   }
 
-  List<SeoNode> _toNodes() {
+  @override
+  List<SeoNode> toSeoNodes() {
     final wrap = _itemTag;
     final children = <SeoNode>[];
     for (var i = 0; i < items.length; i++) {
