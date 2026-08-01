@@ -30,8 +30,21 @@ depended on which path the data took.
   count as URLs now.
 * `SeoNode.rawText` is escaped as content everywhere except a JSON-LD
   payload, where every `<` becomes its JSON escape.
-* `style` values may only position content in ways that stay inside the
-  clipped container; CSS comments and escapes no longer hide a value.
+* `style` values may only use `static`, `relative` and the CSS-wide
+  keywords for `position`. `absolute` is refused too: in the invisible
+  mirror it really is clipped to nothing, but in `visibleShell` the same
+  container is a full-viewport clickable overlay, so one positioned link
+  would cover the page before Flutter boots. CSS comments, escapes,
+  `-webkit-sticky` and `var()` indirection no longer hide a value.
+* Media may not `autoplay`, and `referrerpolicy` may not be set to a
+  value that hands the full URL to a third-party host.
+* The mirror stays a well-formed tree: a nested `<a>` becomes a `span`
+  (the parser would otherwise empty the surrounding link), and void
+  elements or empty tags carrying content keep it instead of dropping
+  it silently.
+* One XML-forbidden character in a route path no longer makes the whole
+  `sitemap.xml` unparseable, and slugs containing `?` or `#` are
+  refused rather than written to a file no URL can reach.
 * Prerendering refuses route paths that would escape the build
   directory or overwrite `robots.txt`, `sitemap.xml` and the other
   generated files; the IndexNow key must be a plain file name.
