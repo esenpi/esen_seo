@@ -241,6 +241,58 @@ void main() {
       }
     });
 
+    test('the IndexNow key reserves its file name too', () async {
+      // Der Key steht erst zur Laufzeit fest, belegt aber genauso einen
+      // Dateinamen wie robots.txt — und wird zuletzt geschrieben, träfe
+      // also auf ein Verzeichnis, das eine Route vorher angelegt hat.
+      for (final slug in [
+        '/abcdefgh.txt',
+        '/abcdefgh.txt/foo',
+        '/ABCDEFGH.TXT'
+      ]) {
+        expect(
+          () => prerenderSite(
+            routes: _routes(),
+            siteBase: 'https://x.dev',
+            buildDir: buildDir.path,
+            indexNowKey: 'abcdefgh',
+            additionalPaths: [slug],
+          ),
+          throwsArgumentError,
+          reason: 'accepted: $slug',
+        );
+      }
+    });
+
+    test('a bad IndexNow key fails before anything is written', () async {
+      // Sonst steht am Ende ein halb erneuertes build/web da: neue
+      // Seiten, alte Sitemap, kein Key.
+      expect(
+        () => prerenderSite(
+          routes: _routes(),
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+          indexNowKey: 'zu kurz',
+        ),
+        throwsArgumentError,
+      );
+      expect(File('${buildDir.path}/sitemap.xml').existsSync(), isFalse);
+    });
+
+    test('a valid key still writes its file', () async {
+      final written = await prerenderSite(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        indexNowKey: 'abcdefgh',
+      );
+      expect(written, contains('${buildDir.path}/abcdefgh.txt'));
+      expect(
+        File('${buildDir.path}/abcdefgh.txt').readAsStringSync(),
+        'abcdefgh',
+      );
+    });
+
     test('robots.txt keeps its real content', () async {
       await prerenderSite(
         routes: _routes(),
