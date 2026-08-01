@@ -109,7 +109,11 @@ Future<List<String>> prerenderSite({
   ];
 
   final written = <String>[];
-  for (final path in paths) {
+  // Eine Route, die zusätzlich in additionalPaths steht, ist derselbe
+  // Pfad — einmal rendern reicht. Trailing Slashes können hier keine
+  // zweite Schreibweise mehr erzeugen: normalizeSeoPath räumt sie weg,
+  // im SeoRoute-Konstruktor wie bei additionalPaths.
+  for (final path in paths.toSet()) {
     final match = matchSeoRoute(routes, path);
     if (match == null) continue;
     final html = await _renderPage(
@@ -192,17 +196,25 @@ final RegExp _validIndexNowKey = RegExp(r'^[A-Za-z0-9-]{8,128}$');
 /// directory entirely.
 String _checkedPath(String path, Set<String> reserved) {
   final segments = path.split('/');
-  final unsafe = segments.any((segment) =>
-      segment == '..' ||
-      segment == '.' ||
-      segment.contains(r'\') ||
-      segment.contains(':') ||
-      // Query und Fragment gehören nicht in einen Dateinamen: Die Datei
-      // entstünde, wäre über ihre URL aber nie erreichbar.
-      segment.contains('?') ||
-      segment.contains('#') ||
-      segment.contains('*') ||
-      RegExp(r'[\x00-\x1F\x7F]').hasMatch(segment));
+  // Ein leeres Segment INNEN (`/a//b`) verschwindet im Dateipfad: die
+  // Datei landet unter a/b, die Sitemap wirbt aber für /a//b, und eine
+  // zweite Route /a/b überschreibt sie stillschweigend. Leer sein darf
+  // nur das erste Segment (jeder Pfad beginnt mit /) und das letzte
+  // (abschließender Slash) — dazwischen ist es ein Tippfehler.
+  final interior =
+      segments.length > 2 ? segments.sublist(1, segments.length - 1) : const [];
+  final unsafe = interior.any((segment) => segment.isEmpty) ||
+      segments.any((segment) =>
+          segment == '..' ||
+          segment == '.' ||
+          segment.contains(r'\') ||
+          segment.contains(':') ||
+          // Query und Fragment gehören nicht in einen Dateinamen: Die Datei
+          // entstünde, wäre über ihre URL aber nie erreichbar.
+          segment.contains('?') ||
+          segment.contains('#') ||
+          segment.contains('*') ||
+          RegExp(r'[\x00-\x1F\x7F]').hasMatch(segment));
   if (unsafe) {
     throw ArgumentError.value(
       path,
