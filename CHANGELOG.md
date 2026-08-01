@@ -1,3 +1,39 @@
+## 0.5.1
+
+Three findings from an audit that finished after 0.5.0 went out. Two are
+defects in the visible shell; one is a claim in 0.5.0's own documentation
+that does not hold.
+
+* **The invisible mirror could paint.** `width:0;height:0` empties a
+  box's content area, but padding, borders and shadows are drawn outside
+  it — and `seoDefaultStylesheet` supplies them, since its
+  `#esen-seo-content` rule sets `padding:2rem 1.25rem;background:#fff`.
+  The result was a white ~40×64 px rectangle in the top-left corner:
+  permanently in `seoOnly` whenever a stylesheet was passed, and on
+  **every** visible shell after the handoff, which restores that same
+  inline style while the stylesheet stays in the head. The container's
+  geometry is now pinned inline — padding, border, outline, shadow and
+  the max/min box — so no author rule can give it a surface.
+* **`visibleShell` requires `EsenSeo.init()`**, and said so nowhere. The
+  handoff runs on the first mirror refresh, which only `init()` or a
+  mounting `.seo()` widget schedules. An app doing neither kept the
+  shell over a Flutter app that had long since painted. There is
+  deliberately still no timeout: a shell that stays put is correct when
+  the engine never arrives, and the package cannot tell that case from a
+  forgotten call. Now documented as a requirement in the README, on
+  `SeoRenderMode.visibleShell` and on `prerenderSite`.
+* **A corrected claim.** 0.5.0 justified the CSS property allow list
+  with "an element in the mirror cannot be lifted out of the flow to
+  cover the page". The first half is right — nothing can escape the
+  container's clip. The second is not: inside the visible shell a later
+  sibling with `margin-top:-100vh` covers an earlier one, leaving the
+  real headline visible while its clicks go elsewhere, and
+  `box-shadow:0 0 0 100vmax` repaints the viewport from a 1 px box.
+  Neither is patchable — `margin` and `box-shadow` are what documents
+  are made of. The allow list keeps content inside the container; it
+  does not police what that content does to itself. The README and the
+  policy's own comment now say that instead.
+
 ## 0.5.0
 
 Security hardening, eleven library widgets, and one contract behind them.
