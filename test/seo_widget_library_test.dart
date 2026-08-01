@@ -33,6 +33,8 @@ void main() {
 
       // Tabelle mit Label, Wert und Anteil:
       expect(html, contains('<tr><th>Flutter</th><td>46</td><td>46%</td>'));
+      // Kein doppelter Titel: figcaption ja, table-caption nein.
+      expect(html, isNot(contains('<caption>')));
       expect(
         html,
         contains('<tr><th>React Native</th><td>32</td><td>32%</td>'),
@@ -81,8 +83,7 @@ void main() {
       );
       expect(
         EsenSeo.currentHtml,
-        '<p class="esen-seo-rating" aria-label="Rated 4.5 out of 5">'
-        '★★★★☆ 4.5/5 (128 Bewertungen)</p>',
+        '<p class="esen-seo-rating">★★★★☆ 4.5/5 (128 Bewertungen)</p>',
       );
     });
 
@@ -90,8 +91,7 @@ void main() {
       await pumpSeo(tester, const SeoRating(value: 3, max: 5));
       expect(
         EsenSeo.currentHtml,
-        '<p class="esen-seo-rating" aria-label="Rated 3 out of 5">'
-        '★★★☆☆ 3/5</p>',
+        '<p class="esen-seo-rating">★★★☆☆ 3/5</p>',
       );
     });
 

@@ -64,10 +64,17 @@ class SeoBarChart extends StatelessWidget {
   /// Style of the labels under the bars.
   final TextStyle? labelStyle;
 
+  double _valueOf(SeoBarChartEntry entry) => safeChartValue(entry.value);
+
+  /// A NaN or infinite height would break Flutter's layout invariants
+  /// and leak `NaNpx` into the mirrored CSS.
+  double get _height => safeDimension(height, 220);
+
   double get _maxValue {
     var max = 0.0;
     for (final entry in data) {
-      if (entry.value > max) max = entry.value;
+      final value = _valueOf(entry);
+      if (value > max) max = value;
     }
     return max;
   }
@@ -92,7 +99,7 @@ class SeoBarChart extends StatelessWidget {
             ),
           ),
         SizedBox(
-          height: height,
+          height: _height,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -109,7 +116,7 @@ class SeoBarChart extends StatelessWidget {
                             child: FractionallySizedBox(
                               heightFactor: max <= 0
                                   ? 0
-                                  : (entry.value / max).clamp(0.0, 1.0),
+                                  : (_valueOf(entry) / max).clamp(0.0, 1.0),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
@@ -154,28 +161,29 @@ class SeoBarChart extends StatelessWidget {
             attributes: {
               'aria-hidden': 'true',
               'style': 'display:flex;align-items:flex-end;gap:8px;'
-                  'height:${cssNumber(height)}px',
+                  'height:${cssNumber(_height)}px',
             },
             children: [
               for (final entry in data)
                 SeoNode(
                   tag: 'div',
                   attributes: {
-                    'title': '${entry.label}: ${cssNumber(entry.value)}',
+                    'title': '${entry.label}: ${cssNumber(_valueOf(entry))}',
                     'style': 'flex:1;border-radius:3px 3px 0 0;'
                         'background:${cssColor(color)};'
-                        'height:${cssPercent(entry.value, max)}%',
+                        'height:${cssPercent(_valueOf(entry), max)}%',
                   },
                 ),
             ],
           ),
+          // Kein <caption>: Die <figcaption> oben beschriftet die
+          // Tabelle bereits — sonst steht der Titel doppelt im Text.
           SeoNode(tag: 'table', children: [
-            if (title != null) SeoNode(tag: 'caption', text: title),
             SeoNode(tag: 'tbody', children: [
               for (final entry in data)
                 SeoNode(tag: 'tr', children: [
                   SeoNode(tag: 'th', text: entry.label),
-                  SeoNode(tag: 'td', text: cssNumber(entry.value)),
+                  SeoNode(tag: 'td', text: cssNumber(_valueOf(entry))),
                 ]),
             ]),
           ]),

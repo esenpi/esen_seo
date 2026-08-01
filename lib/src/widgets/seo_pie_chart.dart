@@ -74,16 +74,25 @@ class SeoPieChart extends StatelessWidget {
     Color(0xFF64748B),
   ];
 
+  double _valueOf(SeoPieChartEntry entry) => safeChartValue(entry.value);
+
+  /// A NaN or infinite diameter would violate Flutter's layout
+  /// invariants and leak `NaNpx` into the mirrored CSS.
+  double get _diameter => safeDimension(diameter, 180);
+
   double get _total {
     var total = 0.0;
     for (final entry in data) {
-      total += entry.value;
+      total += _valueOf(entry);
     }
     return total;
   }
 
+  /// An empty palette must not divide by zero in the modulo below.
+  List<Color> get _palette => palette.isEmpty ? defaultPalette : palette;
+
   Color _colorAt(int index) =>
-      data[index].color ?? palette[index % palette.length];
+      data[index].color ?? _palette[index % _palette.length];
 
   @override
   Widget build(BuildContext context) {
@@ -104,9 +113,9 @@ class SeoPieChart extends StatelessWidget {
             ),
           ),
         CustomPaint(
-          size: Size.square(diameter),
+          size: Size.square(_diameter),
           painter: _PiePainter(
-            values: [for (final entry in data) entry.value],
+            values: [for (final entry in data) _valueOf(entry)],
             colors: [for (var i = 0; i < data.length; i++) _colorAt(i)],
           ),
         ),
@@ -130,7 +139,7 @@ class SeoPieChart extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${data[i].label} (${cssNumber(data[i].value)})',
+                    '${data[i].label} (${cssNumber(_valueOf(data[i]))})',
                     style: labelStyle ?? const TextStyle(fontSize: 12),
                   ),
                 ],
@@ -155,22 +164,23 @@ class SeoPieChart extends StatelessWidget {
             tag: 'div',
             attributes: {
               'aria-hidden': 'true',
-              'style': 'width:${cssNumber(diameter)}px;'
-                  'height:${cssNumber(diameter)}px;'
+              'style': 'width:${cssNumber(_diameter)}px;'
+                  'height:${cssNumber(_diameter)}px;'
                   'border-radius:50%;'
                   'background:${_conicGradient(total)}',
             },
           ),
+          // Kein <caption>: Die <figcaption> oben beschriftet die
+          // Tabelle bereits — sonst steht der Titel doppelt im Text.
           SeoNode(tag: 'table', children: [
-            if (title != null) SeoNode(tag: 'caption', text: title),
             SeoNode(tag: 'tbody', children: [
               for (final entry in data)
                 SeoNode(tag: 'tr', children: [
                   SeoNode(tag: 'th', text: entry.label),
-                  SeoNode(tag: 'td', text: cssNumber(entry.value)),
+                  SeoNode(tag: 'td', text: cssNumber(_valueOf(entry))),
                   SeoNode(
                     tag: 'td',
-                    text: '${cssPercent(entry.value, total)}%',
+                    text: '${cssPercent(_valueOf(entry), total)}%',
                   ),
                 ]),
             ]),
@@ -185,7 +195,7 @@ class SeoPieChart extends StatelessWidget {
     final stops = StringBuffer('conic-gradient(');
     var start = 0.0;
     for (var i = 0; i < data.length; i++) {
-      final end = start + data[i].value;
+      final end = start + _valueOf(data[i]);
       if (i > 0) stops.write(',');
       stops
         ..write(cssColor(_colorAt(i)))

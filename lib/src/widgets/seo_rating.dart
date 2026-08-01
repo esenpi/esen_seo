@@ -45,13 +45,33 @@ class SeoRating extends StatelessWidget {
   /// Star font size in logical pixels.
   final double size;
 
+  /// The scale, normalized so degenerate input (`max: 0`, negative)
+  /// can never throw — the page must render no matter what.
+  int get _scale => max < 1 ? 1 : max;
+
+  /// The score with NaN/infinity/negatives normalized to `0`.
+  double get _value => value.isFinite && value > 0 ? value : 0;
+
+  /// Beyond this many stars the symbols stop being readable — and a
+  /// wrong `max` (say a million) would allocate a giant string. Past
+  /// the limit only the exact score is shown, which stays correct.
+  static const int _maxStars = 20;
+
   /// Filled stars: full stars for the integer part; the exact score is
   /// always carried as text, so nothing is overstated.
-  int get _filled => value.clamp(0, max.toDouble()).floor();
+  int get _filled => _value.clamp(0, _scale.toDouble()).floor();
 
-  String get _stars => '★' * _filled + '☆' * (max - _filled);
+  String get _stars =>
+      _scale > _maxStars ? '' : '★' * _filled + '☆' * (_scale - _filled);
 
-  String get _score => '${cssNumber(value)}/$max';
+  String get _score => '${cssNumber(_value)}/$_scale';
+
+  /// Stars (when the scale allows them) plus the exact score and the
+  /// optional context — the same information the widget shows.
+  String get _mirrorText {
+    final scored = label == null ? _score : '$_score ($label)';
+    return _stars.isEmpty ? scored : '$_stars $scored';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +90,13 @@ class SeoRating extends StatelessWidget {
       ],
     );
     return row.seoNodes([
+      // Kein aria-label: Für <p> ist ein ARIA-Name laut Spezifikation
+      // verboten (Rolle „paragraph" ist name-prohibited) — der Text
+      // trägt den Wert ohnehin vollständig.
       SeoNode(
         tag: 'p',
-        attributes: {
-          'class': 'esen-seo-rating',
-          'aria-label': 'Rated ${cssNumber(value)} out of $max',
-        },
-        text: label == null ? '$_stars $_score' : '$_stars $_score ($label)',
+        attributes: const {'class': 'esen-seo-rating'},
+        text: _mirrorText,
       ),
     ]);
   }

@@ -32,7 +32,6 @@ void main() {
       expect(html, contains('height:${(12 / 54 * 100).toStringAsFixed(1)}%'));
 
       // Tabelle trägt die Semantik — echte Werte im Quelltext:
-      expect(html, contains('<caption>Umsatz pro Jahr</caption>'));
       expect(html, contains('<tr><th>2024</th><td>12</td></tr>'));
       expect(html, contains('<tr><th>2025</th><td>31.5</td></tr>'));
       expect(html, contains('<tr><th>2026</th><td>54</td></tr>'));

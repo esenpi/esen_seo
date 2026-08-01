@@ -60,6 +60,11 @@ class SeoDataTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ohne Spalten gibt es nichts Sinnvolles zu zeigen — weder für
+    // Flutter (Table wirft bei leeren Zeilen) noch für Crawler.
+    if (columns.isEmpty) {
+      return const SizedBox.shrink().seoNodes(const []);
+    }
     return _buildTable(context).seoNodes(_toNodes());
   }
 
