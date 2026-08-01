@@ -30,12 +30,15 @@ depended on which path the data took.
   count as URLs now.
 * `SeoNode.rawText` is escaped as content everywhere except a JSON-LD
   payload, where every `<` becomes its JSON escape.
-* `style` values may only use `static`, `relative` and the CSS-wide
-  keywords for `position`. `absolute` is refused too: in the invisible
-  mirror it really is clipped to nothing, but in `visibleShell` the same
-  container is a full-viewport clickable overlay, so one positioned link
-  would cover the page before Flutter boots. CSS comments, escapes,
-  `-webkit-sticky` and `var()` indirection no longer hide a value.
+* `style` is an allow list of **properties** — text, box, colour,
+  flexbox and grid — and positioning is not among them. Patching
+  `position` value by value kept losing: `fixed`, then `sticky`, then
+  `-webkit-sticky`, then `var(--x)` indirection, and finally
+  `position:relative;top:-100vh;height:200vh;z-index:2147483647`, which
+  covers the page from an allowed value. In `visibleShell` that
+  container is a full-viewport clickable overlay in front of the booting
+  app, so the whole class had to go rather than each instance. CSS
+  comments and escapes no longer hide a property name either.
 * Media may not `autoplay`, and `referrerpolicy` may not be set to a
   value that hands the full URL to a third-party host.
 * The mirror stays a well-formed tree: a nested `<a>` becomes a `span`
@@ -50,9 +53,13 @@ depended on which path the data took.
 * Bot responses (and the app responses beside them) carry
   `Vary: User-Agent`. Without it a CDN caches whichever variant it saw
   first and serves the bot HTML to visitors, or the empty Flutter shell
-  to Google.
+  to Google. An existing `Vary` from the wrapped handler is merged, not
+  overwritten — otherwise the fix would cost the app its
+  `Accept-Encoding` variant.
 * A route with no `body` builder no longer answers bots with an empty
-  200 page — an empty page indexes worse than the app itself.
+  200 page — an empty page indexes worse than the app itself. It falls
+  through to the app, not into the 404 branch: the route exists, it just
+  has nothing to mirror, and a 404 would be far worse than either.
 * `Google-InspectionTool`, `GoogleOther` and `StoreBot-Google` are
   recognized, so URL Inspection and the Rich Results Test see the
   server-rendered version.
