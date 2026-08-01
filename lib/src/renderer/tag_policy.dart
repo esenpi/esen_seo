@@ -1,9 +1,12 @@
-/// Which HTML tags the `.seo()` extensions accept.
+/// Which HTML tags and attributes may enter the rendered output.
 ///
-/// Every standard HTML tag (and custom elements like `my-widget`) is
-/// allowed. Blocked are only tags that would execute code, load active
-/// content or break the document when injected (`script`, `iframe`, …) —
-/// head-only tags like `title` and `meta` are managed through `SeoMeta`.
+/// The tags a mirrored document may contain are an allow list
+/// ([allowedSeoTags]): the structural, text, list, table and media
+/// elements a semantic mirror is made of. Anything else — including
+/// valid HTML like `<form>` or `<plaintext>`, and custom elements —
+/// degrades to a neutral container. Head-only tags such as `title` and
+/// `meta` are managed through `SeoMeta` and rendered by
+/// `HtmlRenderer.head()`.
 library;
 
 /// The elements a mirrored document body may contain.

@@ -112,18 +112,21 @@ desktop every `.seo()` call is a no-op that returns the original widget.
 
 ## Tags
 
-Any standard HTML tag works. The typed constants cover the common ones
-and autocomplete in the IDE; everything else goes through the constructor:
+The semantic HTML elements work — structure, headings, text, lists,
+tables and media. The typed constants cover the common ones and
+autocomplete in the IDE; the rest go through the constructor:
 
 ```dart
 Text('Quote').seo(SeoTextTag.blockquote);
 Text('12 July').seo(SeoTextTag.time);
 Column(children: [...]).seo(SeoContainerTag.article);
-Text('Exotic').seo(SeoTextTag('bdo'));          // custom / exotic tags
+Text('Exotic').seo(SeoTextTag('bdo'));          // less common tags
 ```
 
-Tags that could execute code or break the document (`script`, `style`,
-`iframe`, head-only tags, invalid names) are blocked at runtime and fall
+Tags are an allow list, so anything that could execute code, swallow the
+document or collect input (`script`, `style`, `iframe`, `form`,
+`plaintext`, `svg`, head-only tags, custom elements, invalid names) is
+refused at render time and falls
 back to `span`/`div` — in `SeoMode.strict` you get a debug warning.
 
 ## Attributes

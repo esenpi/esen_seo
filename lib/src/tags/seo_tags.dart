@@ -10,9 +10,10 @@
 /// Column(children: [...]).seo(SeoContainerTag.section);
 /// ```
 ///
-/// Exotic or custom-element tags stay possible through the constructor:
-/// `SeoTextTag('bdo')`, `SeoContainerTag('my-widget')`. Those go through
-/// the same runtime tag policy as before (blocked tags fall back safely).
+/// Less common tags stay possible through the constructor:
+/// `SeoTextTag('bdo')`, `SeoContainerTag('figure')`. They pass the same
+/// runtime policy as everything else — a tag outside the allow list
+/// (custom elements included) safely falls back to `span`/`div`.
 ///
 /// Both types are extension types over [String] — zero runtime cost.
 library;

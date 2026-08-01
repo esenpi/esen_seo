@@ -1,3 +1,66 @@
+## 0.5.0
+
+Security hardening, eleven library widgets, and one contract behind them.
+
+### Security — please update
+
+Three audit rounds under a "the content comes from a CMS" threat model
+found that the tag and attribute policy ran **only on the Flutter path**.
+`SeoPage`, `seoBotMiddleware` and `prerenderSite` reached HTML without
+it, so a `SeoNode` assembled from untrusted data could put a live
+`<script>` or an `onerror=` handler into prerendered pages served to
+every visitor. The same node was harmless inside the app — safety
+depended on which path the data took.
+
+* The policy now lives in `HtmlRenderer`, which **every** path ends in.
+  Tag names and attribute names are validated (both were written
+  verbatim before, so a quote in an attribute name broke out of the
+  attribute list), a refused element loses its attributes along with its
+  identity, and `SeoMeta` renders through an explicit head mode.
+* Tags are an **allow list** of content elements. A block list kept
+  losing: `<plaintext>`, `<xmp>` and `<noembed>` swallow the rest of the
+  document, `<form>` invites credential harvesting, SVG's `<animate>`
+  rewrites a link into a script URL. **Breaking:** custom elements and
+  tags outside the list now fall back to `span`/`div`.
+* URL attributes are an allow list of schemes (`http`, `https`,
+  `mailto`, `tel`, `sms`, `ftp`, plus relative URLs) and refuse control
+  characters — a tab inside `java<TAB>script:` passed the old prefix
+  check and browsers reassembled it. `srcset` and `ping` are checked
+  candidate by candidate; `ping`, `background`, `longdesc` and friends
+  count as URLs now.
+* `SeoNode.rawText` is escaped as content everywhere except a JSON-LD
+  payload, where every `<` becomes its JSON escape.
+* `style` values may only position content in ways that stay inside the
+  clipped container; CSS comments and escapes no longer hide a value.
+* Prerendering refuses route paths that would escape the build
+  directory or overwrite `robots.txt`, `sitemap.xml` and the other
+  generated files; the IndexNow key must be a plain file name.
+* A forged `x-forwarded-proto` no longer decides the redirect scheme or
+  crashes the request; the invisible mirror is `inert`, so its links are
+  out of the keyboard tab order; `/llms-full.txt` caches its future, so
+  parallel first requests render the site once.
+
+### Widget library
+
+Widgets for content the mirror cannot see, because Flutter never builds
+it or paints it instead:
+
+* `SeoNavMenu` — the whole menu tree, including closed submenus.
+* `SeoListView` — every entry of a lazily built list, not the visible
+  handful.
+* `SeoTabs` — all panels, each behind its own heading.
+* `SeoFaq` — answers in the source while collapsed, plus
+  `SeoFaq.schemaFor` for the FAQ rich result.
+* `SeoBarChart`, `SeoPieChart` — painted charts as CSS plus a data
+  table.
+* `SeoBreadcrumbs` (with `schemaFor`), `SeoDataTable`, `SeoRating`,
+  `SeoFigure`, `SeoTestimonial`.
+* `.seoNodes()` lets any widget declare its own HTML translation, and
+  `SeoBlock`/`SeoBlockState` is the contract the library follows: one
+  data model, a Flutter presentation and an HTML one.
+* `SeoSchema.breadcrumbs` accepts a URL-less final entry, which is what
+  search engines expect for the current page.
+
 ## 0.4.0
 
 The prerendered page becomes the first frame.
