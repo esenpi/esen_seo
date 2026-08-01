@@ -1,0 +1,112 @@
+name: CI
+
+# Was das README behauptet, soll eine Maschine bestätigen — die
+# Testzahl ist nur so viel wert wie der letzte grüne Lauf.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # pana bewertet die Formatierung — ein Verstoß kostet Punkte auf
+      # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test benchmark
+
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  example:
+    name: example app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: example
+        run: flutter pub get
+
+      # Die Example-App wird vom Analyzer des Pakets NICHT erfasst —
+      # sie braucht ihren eigenen Lauf, sonst merkt es niemand.
+      - name: Analyze example
+        working-directory: example
+        run: flutter analyze
+
+      # Der Web-Build ist die einzige Prüfung, die package:web-Interop
+      # und die Compile-Fähigkeit des Pfads abdeckt, den das Paket
+      # eigentlich adressiert.
+      - name: Build web
+        working-directory: example
+        run: flutter build web --release
+
+      # Und dann durch den echten Prerenderer, damit ein Fehler in der
+      # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.
+      - name: Prerender
+        working-directory: example
+        run: dart run bin/prerender.dart
+
+      - name: Assert the prerendered page actually carries the content
+        working-directory: example
+        run: |
+          set -euo pipefail
+          for needle in 'id="esen-seo-content"' '<h1' 'rel="canonical"'; do
+            grep -q "$needle" build/web/index.html \
+              || { echo "::error::missing in prerendered index.html: $needle"; exit 1; }
+          done
+          test -s build/web/sitemap.xml
+          test -s build/web/robots.txt
+          echo "prerendered output looks sane"
+
+  server:
+    name: server path without Flutter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Kein Flutter, nur das Dart-SDK: der Server-/Core-Teil soll
+      # Flutter-frei sein, und das ist die einzige Prüfung, die es
+      # beweist statt behauptet. Schlägt sie fehl, hat sich ein
+      # Flutter-Import in einen geteilten Pfad geschlichen.
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Check the server/core libraries for Flutter imports
+        run: |
+          set -euo pipefail
+          hits=$(grep -rEl "package:flutter/|dart:ui" \
+            lib/core.dart lib/server.dart lib/src/server lib/src/routing/seo_route.dart \
+            lib/src/renderer/html_renderer.dart lib/src/renderer/tag_policy.dart \
+            lib/src/renderer/seo_node.dart lib/src/renderer/seo_container.dart \
+            lib/src/meta 2>/dev/null || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Flutter import in a path that must stay pure Dart:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "server and core paths are free of Flutter imports"

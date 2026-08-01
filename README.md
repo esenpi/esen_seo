@@ -1,12 +1,14 @@
 # esen_seo
 
 Real semantic HTML for Flutter Web — no Puppeteer, no headless Chrome,
-no hidden-HTML tricks. Pure Dart.
+no second copy of your content. Pure Dart.
 
-Flutter Web paints everything onto a canvas, so crawlers see an empty
-page. esen_seo mirrors your widget tree as clean semantic HTML right in
-the DOM, manages meta tags, OpenGraph and Schema.org JSON-LD, and ships
-a shelf-based SSR server that hands bots the HTML straight in the page
+A Flutter web app is not a document. However it renders — CanvasKit,
+WebAssembly or the DOM — what reaches the page is a widget tree, not
+headings, paragraphs and links, so a crawler finds no structure to read.
+esen_seo mirrors that widget tree as clean semantic HTML right in the
+DOM, manages meta tags, OpenGraph and Schema.org JSON-LD, and ships a
+shelf-based SSR server that hands bots the HTML straight in the page
 source.
 
 ```dart
@@ -109,6 +111,15 @@ Column(
 On web, the semantic mirror is injected as `#esen-seo-content` next to
 the Flutter canvas (invisible, `aria-hidden`, zero size); on mobile and
 desktop every `.seo()` call is a no-op that returns the original widget.
+
+Yes, that mirror is hidden by default — but it is not the old trick of
+keeping a second, hand-maintained copy of the page in the markup. It is
+generated from the same widget tree the user sees, bots and visitors get
+the same content, and with the visible shell below it stops being hidden
+at all. One thing it is explicitly *not*: an accessibility feature.
+`aria-hidden` keeps screen readers out of it on purpose, because Flutter
+publishes its own semantics tree and two of them would be read twice.
+Accessibility stays a matter of Flutter's `Semantics` widgets.
 
 ## Tags
 
@@ -493,10 +504,13 @@ show, and `EsenSeo.init()` must run in the app so the handoff happens.
 
 ## AI crawlers & instant indexing
 
-More and more traffic comes from AI assistants that read
-[llms.txt](https://llmstxt.org) — a markdown manifest of your site.
-esen_seo generates it from the same route table (served by the
-middleware, written by `prerenderSite`, or standalone):
+[llms.txt](https://llmstxt.org) is a markdown manifest of your site for
+AI assistants. Be clear-eyed about it: it is a young proposal, adoption
+is uneven, and Google has said it does not use it for Search — treat it
+as a bet, not a traffic channel. What makes it worth having anyway is
+that it costs you nothing: esen_seo generates it from the route table
+you already maintain (served by the middleware, written by
+`prerenderSite`, or standalone):
 
 ```dart
 seoLlmsTxt(routes: seoRoutes, siteBase: siteBase)
@@ -591,7 +605,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 334 unit and widget
+Young package under active development, covered by 345 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
