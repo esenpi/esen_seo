@@ -71,27 +71,35 @@ void main() {
   group('Void Elements', () {
     test('allowed void elements render self-closing', () {
       const renderer = HtmlRenderer();
-      for (final tag in [
-        'area',
-        'br',
-        'col',
-        'hr',
-        'img',
-        'input',
-        'source',
-        'track',
-        'wbr'
-      ]) {
+      for (final tag in ['br', 'col', 'hr', 'img', 'source', 'track', 'wbr']) {
         expect(renderer.renderNode(SeoNode(tag: tag)), '<$tag/>');
       }
     });
 
-    test('head-only and active void elements degrade in body context', () {
-      // <base> und <embed> gehören nicht in den Body — der Renderer
-      // setzt die Policy jetzt selbst durch, nicht erst der Aufrufer.
+    test('elements that are not on the allow list degrade to div', () {
+      // Head-Tags, aktive Inhalte und Elemente, die den Rest des
+      // Dokuments verschlucken — der Renderer setzt die Policy selbst
+      // durch, nicht erst der Aufrufer.
       const renderer = HtmlRenderer();
-      for (final tag in ['base', 'embed', 'link', 'meta']) {
-        expect(renderer.renderNode(SeoNode(tag: tag)), '<div></div>');
+      for (final tag in [
+        'base',
+        'embed',
+        'link',
+        'meta',
+        'area',
+        'input',
+        'plaintext',
+        'xmp',
+        'noembed',
+        'form',
+        'svg',
+        'canvas',
+      ]) {
+        expect(
+          renderer.renderNode(SeoNode(tag: tag)),
+          '<div></div>',
+          reason: 'tag: $tag',
+        );
       }
     });
 
@@ -101,7 +109,9 @@ void main() {
         renderer.renderNode(SeoNode(tag: 'meta', attributes: {'name': 'a'})),
         '<meta name="a"/>',
       );
-      expect(renderer.renderNode(SeoNode(tag: 'base')), '<base/>');
+      // <base> würde jede relative URL der Seite umlenken — auch im
+      // Head-Modus abgelehnt.
+      expect(renderer.renderNode(SeoNode(tag: 'base')), isEmpty);
     });
   });
 }

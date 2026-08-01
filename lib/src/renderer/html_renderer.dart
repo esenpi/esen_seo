@@ -58,25 +58,42 @@ class HtmlRenderer {
       return;
     }
 
-    final tag = _resolveTag(node);
+    // Namen einmal normalisieren: Zwei Schlüssel, die sich nur in der
+    // Schreibweise unterscheiden, würden sonst zweimal ausgegeben — und
+    // HTML nimmt das erste, während unsere Prüfung das zweite ansah.
+    final attributes = <String, String>{};
+    node.attributes.forEach((name, value) {
+      attributes[name.trim().toLowerCase()] = value;
+    });
+
+    final tag = _resolveTag(node, attributes);
     if (tag == null) return; // nichts, was hier stehen dürfte
+
+    // Ein abgelehntes Element verliert mit seiner Identität auch seine
+    // Attribute: `action` oder `values` gehören zu dem Element, das es
+    // nicht sein darf, und haben auf einem <div> nichts zu suchen.
+    final refused = tag != node.tag.trim().toLowerCase();
 
     buffer
       ..write('<')
       ..write(tag);
-    node.attributes.forEach((name, value) {
-      final attribute = name.trim().toLowerCase();
-      // Namen werden hier geprüft, nicht escaped: Ein Name, der die
-      // Policy nicht besteht, hat im Dokument nichts verloren — ein
-      // escapetes `x" onmouseover="…` wäre bloß kaputtes Markup.
-      if (!isAllowedSeoAttribute(attribute, value)) return;
-      buffer
-        ..write(' ')
-        ..write(attribute)
-        ..write('="')
-        ..write(escapeAttribute(value))
-        ..write('"');
-    });
+    if (!refused) {
+      attributes.forEach((name, value) {
+        // Namen werden hier geprüft, nicht escaped: Ein Name, der die
+        // Policy nicht besteht, hat im Dokument nichts verloren — ein
+        // escapetes `x" onmouseover="…` wäre bloß kaputtes Markup.
+        if (!isAllowedSeoAttribute(name, value)) return;
+        if (target == SeoRenderTarget.head && !_allowedHeadAttribute(name)) {
+          return;
+        }
+        buffer
+          ..write(' ')
+          ..write(name)
+          ..write('="')
+          ..write(escapeAttribute(value))
+          ..write('"');
+      });
+    }
 
     if (SeoNode.voidElements.contains(tag)) {
       buffer.write('/>');
@@ -85,9 +102,22 @@ class HtmlRenderer {
 
     buffer.write('>');
     if (node.text != null) buffer.write(escapeText(node.text!));
-    if (node.rawText != null) buffer.write(escapeRawText(node.rawText!));
-    for (final child in node.children) {
-      _write(buffer, child);
+    if (node.rawText != null) {
+      // Verbatim only where it is the point: a JSON-LD payload, whose
+      // `<` is escaped so it cannot close the element or start markup.
+      // Anywhere else rawText is content, and content gets escaped —
+      // otherwise this one field bypasses tag policy, attribute policy
+      // and text escaping all at once.
+      buffer.write(_isJsonLd(attributes)
+          ? escapeJsonLd(node.rawText!)
+          : escapeText(node.rawText!));
+    }
+    // A JSON-LD element holds a string, not markup: rendering children
+    // into it would close the script early.
+    if (!_isJsonLd(attributes) || node.tag != 'script') {
+      for (final child in node.children) {
+        _write(buffer, child);
+      }
     }
     buffer
       ..write('</')
@@ -97,29 +127,50 @@ class HtmlRenderer {
 
   /// The tag this node may actually be rendered as, or `null` when it
   /// must be dropped entirely.
-  String? _resolveTag(SeoNode node) {
+  String? _resolveTag(SeoNode node, Map<String, String> attributes) {
     // JSON-LD is the one script that is content rather than code, and
     // it is legal in both head and body.
-    if (_isJsonLd(node)) return 'script';
+    if (node.tag == 'script' && _isJsonLd(attributes)) return 'script';
     if (target == SeoRenderTarget.head) {
       return _headElements.contains(node.tag) ? node.tag : null;
     }
-    // Blocked or malformed tags degrade to a neutral container instead
-    // of taking the page down with them.
+    // Anything not on the allow list degrades to a neutral container
+    // instead of taking the page down with it.
     return normalizeSeoTag(node.tag) ?? 'div';
   }
 
-  static bool _isJsonLd(SeoNode node) =>
-      node.tag == 'script' && node.attributes['type'] == 'application/ld+json';
+  /// Checked against the **normalized** attribute map, so a second key
+  /// differing only in case cannot slip a `type` past this.
+  static bool _isJsonLd(Map<String, String> attributes) =>
+      attributes['type'] == 'application/ld+json';
 
   /// The head elements `SeoMeta` builds. Everything else is refused —
   /// the head is no place for arbitrary markup.
-  static const Set<String> _headElements = {'title', 'meta', 'link', 'base'};
+  static const Set<String> _headElements = {'title', 'meta', 'link'};
+
+  /// What those head elements may carry. `http-equiv` would let a
+  /// meta tag redirect the page, and a `<base href>` would repoint
+  /// every relative URL in the document.
+  static const Set<String> _headAttributes = {
+    'name',
+    'property',
+    'content',
+    'rel',
+    'href',
+    'hreflang',
+    'type',
+    'charset',
+    'media',
+    'sizes',
+    'as',
+    'crossorigin',
+  };
+
+  static bool _allowedHeadAttribute(String name) =>
+      _headAttributes.contains(name);
 
   static final RegExp _needsTextEscape = RegExp('[&<>]');
   static final RegExp _needsAttributeEscape = RegExp('[&<>"]');
-  static final RegExp _rawTextBreakout =
-      RegExp(r'<(?=/\s*(script|style))', caseSensitive: false);
 
   /// Escapes text content so it is safe inside an HTML element.
   ///
@@ -139,13 +190,12 @@ class HtmlRenderer {
     return escapeText(value).replaceAll('"', '&quot;');
   }
 
-  /// Makes verbatim content safe to sit inside a `<script>` element.
+  /// Makes a JSON-LD payload safe to sit inside a `<script>` element.
   ///
-  /// [SeoNode.rawText] exists so JSON-LD can keep its quotes and
-  /// braces — `SeoSchema.toJsonString` already escapes `<`. Content
-  /// from anywhere else must not be able to close the element early,
-  /// so a `</script` or `</style` sequence is neutralized with the
-  /// JSON escape that survives a round trip.
-  static String escapeRawText(String value) =>
-      value.replaceAll(_rawTextBreakout, r'\u003C');
+  /// Every `<` becomes the JSON escape `\\u003C`. That is lossless for
+  /// JSON — `SeoSchema.toJsonString` already does it — and it is the
+  /// only reliable rule: guarding just `</script` leaves `<!--<script>`,
+  /// which puts the HTML tokenizer into a state where the rest of the
+  /// page is swallowed as script data.
+  static String escapeJsonLd(String value) => value.replaceAll('<', r'\u003C');
 }

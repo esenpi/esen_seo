@@ -6,16 +6,53 @@
 /// head-only tags like `title` and `meta` are managed through `SeoMeta`.
 library;
 
-/// Tags that must never enter the SEO tree.
+/// The elements a mirrored document body may contain.
+///
+/// Deliberately an allow list. A block list has to name every dangerous
+/// element and loses the moment one is missed: `<plaintext>` swallows
+/// the rest of the document, `<xmp>` and `<noembed>` do the same,
+/// `<form>` invites credential harvesting, and SVG's `<animate>` can
+/// rewrite a link into a script URL. None of those are exotic — they
+/// are simply not on this list, and that is enough.
+///
+/// The list covers what a semantic mirror is *for*: structure,
+/// headings, text, lists, tables and media.
+const Set<String> allowedSeoTags = {
+  // Sectioning and grouping
+  'div', 'span', 'section', 'article', 'aside', 'nav', 'header', 'footer',
+  'main', 'figure', 'figcaption', 'hgroup', 'address', 'details', 'summary',
+  // Headings
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  // Text level
+  'p', 'a', 'strong', 'em', 'b', 'i', 'u', 's', 'small', 'mark', 'abbr',
+  'cite', 'q', 'blockquote', 'code', 'pre', 'kbd', 'samp', 'var', 'sub',
+  'sup', 'time', 'data', 'br', 'wbr', 'hr', 'ins', 'del', 'bdi', 'bdo',
+  'ruby', 'rt', 'rp',
+  // Lists
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+  // Tables
+  'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+  'col', 'colgroup',
+  // Media and measures
+  'img', 'picture', 'source', 'audio', 'video', 'track', 'progress', 'meter',
+};
+
+/// Kept for compatibility and documentation: elements that are refused
+/// even though they are valid HTML. The allow list is what decides.
 const Set<String> blockedSeoTags = {
-  // Executes code or loads active content when inserted into the DOM.
   'script', 'style', 'iframe', 'object', 'embed', 'applet',
-  // Document structure that exists exactly once per page.
   'html', 'head', 'body',
-  // Head-only tags, managed through SeoMeta / EsenSeo.setMeta.
   'title', 'meta', 'link', 'base',
-  // No visible content model.
   'noscript', 'template', 'slot', 'frame', 'frameset',
+  // Swallow everything that follows them:
+  'plaintext', 'xmp', 'noembed', 'noframes', 'listing',
+  // Interactive: no SEO value, but a place to phish from.
+  'form', 'input', 'button', 'select', 'option', 'textarea', 'label',
+  'fieldset', 'legend', 'dialog',
+  // Foreign content the mirror cannot render safely (SVG animation can
+  // rewrite an href into a script URL, and the DOM injector cannot even
+  // create real SVG elements).
+  'svg', 'math', 'canvas', 'marquee', 'portal',
 };
 
 final RegExp _validTagName = RegExp(r'^[a-z][a-z0-9-]*$');
@@ -29,8 +66,7 @@ final RegExp _validTagName = RegExp(r'^[a-z][a-z0-9-]*$');
 String? normalizeSeoTag(String tag) {
   final normalized = tag.trim().toLowerCase();
   if (!_validTagName.hasMatch(normalized)) return null;
-  if (blockedSeoTags.contains(normalized)) return null;
-  return normalized;
+  return allowedSeoTags.contains(normalized) ? normalized : null;
 }
 
 final RegExp _validAttributeName = RegExp(r'^[a-z][a-z0-9-]*$');
@@ -65,12 +101,31 @@ const Set<String> _urlAttributes = {
   'href',
   'src',
   'srcset',
+  'imagesrcset',
   'cite',
   'action',
   'formaction',
   'poster',
   'data',
+  // Fire a request or navigate on their own:
+  'ping',
+  'background',
+  'longdesc',
+  'manifest',
+  'lowsrc',
+  'dynsrc',
+  'codebase',
+  'archive',
+  'profile',
+  'usemap',
+  'srcdoc',
+  'content',
 };
+
+/// `srcset` holds a comma-separated candidate list, so checking the
+/// whole value as one URL would let every candidate after the first
+/// through unexamined.
+const Set<String> _urlListAttributes = {'srcset', 'imagesrcset', 'ping'};
 
 /// Whether the (already lower-cased) attribute [name]/[value] pair may
 /// enter the SEO tree.
@@ -90,6 +145,14 @@ const Set<String> _urlAttributes = {
 bool isAllowedSeoAttribute(String name, String value) {
   if (!_validAttributeName.hasMatch(name)) return false;
   if (name.startsWith('on')) return false;
+  if (_urlListAttributes.contains(name)) {
+    return value
+        .split(RegExp(r'[,\s]+'))
+        .where((candidate) => candidate.isNotEmpty)
+        // Descriptors like `2x` or `640w` are not URLs.
+        .where((candidate) => !RegExp(r'^[0-9.]+[xw]$').hasMatch(candidate))
+        .every(_isAllowedUrl);
+  }
   if (_urlAttributes.contains(name)) return _isAllowedUrl(value);
   if (name == 'style') return _isAllowedStyle(value);
   return true;
@@ -108,7 +171,20 @@ final RegExp _dangerousStyle = RegExp(
   caseSensitive: false,
 );
 
-bool _isAllowedStyle(String value) => !_dangerousStyle.hasMatch(value);
+final RegExp _cssComment = RegExp(r'/\*.*?\*/', dotAll: true);
+final RegExp _cssEscape = RegExp(r'\\');
+
+bool _isAllowedStyle(String value) {
+  // Der CSS-Parser wirft Kommentare weg, bevor er Eigenschaften liest —
+  // `position:/**/fixed` ist für ihn `position:fixed`. Erst entfernen,
+  // dann prüfen.
+  final normalized = value.replaceAll(_cssComment, '');
+  // Backslash-Escapes (`\66 ixed` ist `fixed`) aufzulösen wäre ein
+  // eigener Parser; in Inline-Styles kommen sie praktisch nie vor, also
+  // gilt hier: unbekannt heißt abgelehnt.
+  if (_cssEscape.hasMatch(normalized)) return false;
+  return !_dangerousStyle.hasMatch(normalized);
+}
 
 /// Whether [value] is a URL the browser may safely act on.
 bool _isAllowedUrl(String value) {
