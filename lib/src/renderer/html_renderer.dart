@@ -110,8 +110,7 @@ class HtmlRenderer {
   }
 
   static bool _isJsonLd(SeoNode node) =>
-      node.tag == 'script' &&
-      node.attributes['type'] == 'application/ld+json';
+      node.tag == 'script' && node.attributes['type'] == 'application/ld+json';
 
   /// The head elements `SeoMeta` builds. Everything else is refused —
   /// the head is no place for arbitrary markup.

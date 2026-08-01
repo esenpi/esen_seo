@@ -197,9 +197,10 @@ web.Node _buildDomNode(web.Document document, SeoNode node) {
   if (node.isTextOnly) return document.createTextNode(node.text ?? '');
 
   final element = document.createElement(node.tag);
-  node.attributes.forEach(
-    (name, value) => element.setAttribute(name, value),
-  );
+  node.attributes.forEach((name, value) {
+    if (!isAllowedSeoAttribute(name.trim().toLowerCase(), value)) return;
+    element.setAttribute(name.trim().toLowerCase(), value);
+  });
   if (node.text != null) {
     element.appendChild(document.createTextNode(node.text!));
   }

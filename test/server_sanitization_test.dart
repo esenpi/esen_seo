@@ -52,7 +52,8 @@ String _executablePart(String html) => html
       RegExp(r'<script type="application/ld\+json">.*?</script>', dotAll: true),
       '',
     )
-    .replaceAll(RegExp(r'<script src="flutter_bootstrap\.js"[^>]*></script>'), '');
+    .replaceAll(
+        RegExp(r'<script src="flutter_bootstrap\.js"[^>]*></script>'), '');
 
 void _expectHarmless(String html, String where) {
   final rest = _executablePart(html);

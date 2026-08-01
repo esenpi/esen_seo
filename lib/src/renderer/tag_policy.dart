@@ -91,8 +91,24 @@ bool isAllowedSeoAttribute(String name, String value) {
   if (!_validAttributeName.hasMatch(name)) return false;
   if (name.startsWith('on')) return false;
   if (_urlAttributes.contains(name)) return _isAllowedUrl(value);
+  if (name == 'style') return _isAllowedStyle(value);
   return true;
 }
+
+/// CSS that would let mirrored content leave its container or execute.
+///
+/// The invisible mirror is clipped to zero size, but a fixed or sticky
+/// child escapes that clipping and can cover the running app. The
+/// legacy IE constructs execute outright. Everything else — colors,
+/// spacing, flex, gradients — passes, because the widget library styles
+/// its own output that way.
+final RegExp _dangerousStyle = RegExp(
+  r'position\s*:\s*(fixed|sticky)|expression\s*\(|behavior\s*:|'
+  r'url\s*\(\s*["\x27]?\s*(javascript|vbscript|data)\s*:',
+  caseSensitive: false,
+);
+
+bool _isAllowedStyle(String value) => !_dangerousStyle.hasMatch(value);
 
 /// Whether [value] is a URL the browser may safely act on.
 bool _isAllowedUrl(String value) {

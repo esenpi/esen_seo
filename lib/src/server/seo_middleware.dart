@@ -66,7 +66,7 @@ Middleware seoBotMiddleware({
     String? sitemapCache;
     String? robotsCache;
     String? llmsCache;
-    String? llmsFullCache;
+    Future<String>? llmsFullCache;
     return (Request request) async {
       final path = normalizeSeoPath(request.url.path);
 
@@ -103,13 +103,16 @@ Middleware seoBotMiddleware({
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms-full.txt') {
-          llmsFullCache ??= await seoLlmsFullTxt(
+          // Das Future cachen, nicht den Wert: Zwischen Prüfung und
+          // Zuweisung liegt ein await, sonst rendert jede parallele
+          // Anfrage die komplette Seite ein weiteres Mal.
+          llmsFullCache ??= seoLlmsFullTxt(
             routes: routes,
             siteBase: siteBase,
             additionalPaths: additionalSitemapPaths,
           );
           return Response.ok(
-            llmsFullCache,
+            await llmsFullCache,
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }

@@ -1,4 +1,5 @@
 import '../renderer/seo_node.dart';
+import '../renderer/tag_policy.dart';
 import '../routing/seo_route.dart';
 
 /// Generates an llms.txt from the SEO route table.
@@ -173,8 +174,11 @@ void _writeBlock(SeoNode node, List<String> blocks, String base) {
     case 'img':
       final src = node.attributes['src'];
       if (src != null) {
-        blocks.add('![${_linkLabel(node.attributes['alt'] ?? '')}]'
-            '(${_linkTarget(_href(src, base))})');
+        final target = _href(src, base);
+        if (target != null) {
+          blocks.add('![${_linkLabel(node.attributes['alt'] ?? '')}]'
+              '(${_linkTarget(target)})');
+        }
       }
     case 'hr':
       blocks.add('---');
@@ -203,17 +207,20 @@ String _inline(SeoNode node, String base) {
       case 'style':
         return;
       case 'a':
-        final href = n.attributes['href'];
         final label = _inlineOf(n, base);
-        buffer.write(href == null
+        final target = n.attributes['href'] == null
+            ? null
+            : _href(n.attributes['href']!, base);
+        buffer.write(target == null
             ? label
-            : '[${_linkLabel(label)}](${_linkTarget(_href(href, base))})');
+            : '[${_linkLabel(label)}](${_linkTarget(target)})');
         return;
       case 'img':
         final src = n.attributes['src'];
-        if (src != null) {
+        final target = src == null ? null : _href(src, base);
+        if (target != null) {
           buffer.write('![${_linkLabel(n.attributes['alt'] ?? '')}]'
-              '(${_linkTarget(_href(src, base))})');
+              '(${_linkTarget(target)})');
         }
         return;
       case 'strong':
@@ -243,9 +250,13 @@ String _inlineOf(SeoNode node, String base) =>
     _inline(SeoNode(tag: '', text: node.text, children: node.children), base);
 
 /// Site-relative URLs become absolute — AI consumers read the file
-/// without a base-URL context.
-String _href(String url, String base) =>
-    url.startsWith('/') ? '$base$url' : url;
+/// without a base-URL context. Returns `null` for anything the URL
+/// policy refuses: llms.txt is read by agents that may follow its
+/// links, so an executable scheme has no business being in there.
+String? _href(String url, String base) {
+  if (!isAllowedSeoAttribute('href', url)) return null;
+  return url.startsWith('/') ? '$base$url' : url;
+}
 
 /// Escapes square brackets so titles, labels and alt texts cannot break
 /// the `[label](url)` link syntax.

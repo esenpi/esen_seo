@@ -43,7 +43,14 @@ Middleware seoRedirectMiddleware({
         return Response.movedPermanently(mapped);
       }
 
-      var scheme = request.headers['x-forwarded-proto'] ?? uri.scheme;
+      // Der Header kommt vom Proxy, ist aber fälschbar — und ein
+      // ungültiger Wert landete sonst in Uri(scheme:), was die Anfrage
+      // mit einem 500 abbricht.
+      final forwarded =
+          request.headers['x-forwarded-proto']?.trim().toLowerCase();
+      var scheme = (forwarded == 'http' || forwarded == 'https')
+          ? forwarded!
+          : uri.scheme;
       var host = uri.host;
       var path = mapped ?? uri.path;
       var changed = mapped != null;

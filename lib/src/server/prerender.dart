@@ -190,8 +190,28 @@ String _checkedPath(String path) {
           'segments',
     );
   }
+  if (_reservedOutputNames.contains(path.toLowerCase())) {
+    throw ArgumentError.value(
+      path,
+      'path',
+      'collides with a file the prerenderer generates — pick another '
+          'route path',
+    );
+  }
   return path;
 }
+
+/// Paths whose output file the prerenderer writes itself. A route (or a
+/// CMS slug) of the same name would overwrite `robots.txt` or the
+/// sitemap with page HTML.
+const Set<String> _reservedOutputNames = {
+  '/robots.txt',
+  '/sitemap.xml',
+  '/llms.txt',
+  '/llms-full.txt',
+  '/404.html',
+  '/index.html',
+};
 
 final RegExp _templateTitle = RegExp(r'\s*<title>.*?</title>', dotAll: true);
 final RegExp _templateDescription =
