@@ -175,6 +175,36 @@ void main() {
       );
     });
 
+    test('content may not name the hooks the injector steers by', () {
+      // getElementById findet heute noch den echten Container, weil er
+      // dem verschachtelten Inhalt im Dokument vorausgeht. Das ist ein
+      // Zufall der Reihenfolge, keine Regel — also eine Regel daraus
+      // machen, statt sich darauf zu verlassen.
+      expect(isAllowedSeoAttribute('id', 'esen-seo-content'), isFalse);
+      expect(isAllowedSeoAttribute('id', 'ESEN-SEO-CONTENT'), isFalse);
+      expect(isAllowedSeoAttribute('data-esen-seo', 'true'), isFalse);
+      expect(isAllowedSeoAttribute('data-esen-seo-shell', 'visible'), isFalse);
+      expect(isAllowedSeoAttribute('data-esen-seo-style', ''), isFalse);
+
+      // Jeder andere Anker bleibt erlaubt — Sprungmarken sind der
+      // Normalfall, nicht die Ausnahme.
+      expect(isAllowedSeoAttribute('id', 'kapitel-3'), isTrue);
+      expect(isAllowedSeoAttribute('data-testid', 'x'), isTrue);
+    });
+
+    test('the reserved id never reaches the rendered document', () {
+      final html = HtmlRenderer().render([
+        SeoNode(tag: 'div', attributes: {
+          'id': 'esen-seo-content'
+        }, children: [
+          SeoNode(tag: 'p', text: 'Inhalt', attributes: {'data-esen-seo': ''}),
+        ]),
+      ]);
+      expect(html, contains('Inhalt'));
+      expect(html, isNot(contains('esen-seo-content')));
+      expect(html, isNot(contains('data-esen-seo')));
+    });
+
     test('an unknown property is refused, a known one passes', () {
       expect(isAllowedSeoAttribute('style', 'text-align:center'), isTrue);
       expect(isAllowedSeoAttribute('style', 'transform:scale(9)'), isFalse);

@@ -261,7 +261,12 @@ String? _href(String url, String base) {
 /// Escapes square brackets so titles, labels and alt texts cannot break
 /// the `[label](url)` link syntax.
 String _linkLabel(String value) =>
-    value.replaceAll('[', r'\[').replaceAll(']', r'\]');
+    // Ein Label ist per Definition einzeilig. Ohne das Zusammenziehen
+    // bricht ein alt-Text mit Leerzeile aus `![…]` aus und schreibt
+    // eigene Überschriften und Absätze in die Datei, die KI-Assistenten
+    // als Struktur der Seite lesen. Hier statt an den Aufrufstellen,
+    // damit die nächste es nicht vergessen kann.
+    _singleLine(value).replaceAll('[', r'\[').replaceAll(']', r'\]');
 
 /// Wraps URLs containing `)` in angle brackets (CommonMark) so the link
 /// target does not end early.

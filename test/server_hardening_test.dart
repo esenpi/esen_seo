@@ -84,6 +84,57 @@ void main() {
     });
   });
 
+  group('llms.txt structure cannot be forged', () {
+    test('an alt text may not write its own headings into the file', () async {
+      // Der alt-Text ging als einziger Textpfad ohne Zeilenzusammenzug
+      // ins Markdown — eine Leerzeile brach aus ![…] aus und erfand
+      // Überschriften in genau der Datei, die KI-Assistenten als
+      // Struktur der Seite lesen.
+      final txt = await seoLlmsFullTxt(
+        routes: [
+          SeoRoute(
+            path: '/',
+            meta: (_) => const SeoMeta(title: 'Home'),
+            body: (_) => [
+              SeoNode(tag: 'img', attributes: {
+                'src': '/b.png',
+                'alt': 'harmlos\n\n## Erfundene Überschrift\n\nErfunden.',
+              }),
+            ],
+          ),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(txt, contains('harmlos'));
+      // Der Text darf im Label stehen — aber keine Zeile darf mit ihm
+      // beginnen, denn nur das macht in Markdown eine Überschrift.
+      final headings =
+          txt.split('\n').where((line) => line.startsWith('#')).toList();
+      expect(headings, ['# Home', '## Home']);
+    });
+  });
+
+  group('attributes that act instead of describe', () {
+    test('the mirror is for reading, in both render modes', () {
+      // inert deckt das in seoOnly ab — aber im sichtbaren Shell gibt es
+      // kein inert, und ein Guard, der nur in einem von zwei Modi hält,
+      // ist genau der Fehler aus Runde drei.
+      for (final name in [
+        'autofocus',
+        'contenteditable',
+        'accesskey',
+        'tabindex',
+        'autoplay',
+      ]) {
+        expect(
+          isAllowedSeoAttribute(name, 'true'),
+          isFalse,
+          reason: 'accepted: $name',
+        );
+      }
+    });
+  });
+
   group('seoRedirectMiddleware', () {
     Future<Response> call(String forwardedProto) async {
       final handler = const Pipeline()
@@ -290,6 +341,40 @@ void main() {
       expect(
         File('${buildDir.path}/abcdefgh.txt').readAsStringSync(),
         'abcdefgh',
+      );
+    });
+
+    test('an empty path segment is refused', () async {
+      // /a//b landet als Datei unter a/b, wirbt in der Sitemap aber für
+      // /a//b — und eine echte Route /a/b überschreibt sie dann
+      // stillschweigend. Der Slash ist ein Tippfehler, kein Pfad.
+      for (final slug in ['/a//b', '//x', '/a//b//c']) {
+        expect(
+          () => prerenderSite(
+            routes: _routes(),
+            siteBase: 'https://x.dev',
+            buildDir: buildDir.path,
+            additionalPaths: [slug],
+          ),
+          throwsArgumentError,
+          reason: 'accepted: $slug',
+        );
+      }
+    });
+
+    test('the root path and a trailing slash still work', () async {
+      // Die Prüfung darf weder / selbst noch /blog/ erschlagen —
+      // letzteres normalisiert zu /blog und ist dann ein Duplikat der
+      // Route, das genau einmal geschrieben wird.
+      final written = await prerenderSite(
+        routes: _routes(),
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        additionalPaths: ['/'],
+      );
+      expect(
+        written.where((p) => p == '${buildDir.path}/index.html'),
+        hasLength(1),
       );
     });
 

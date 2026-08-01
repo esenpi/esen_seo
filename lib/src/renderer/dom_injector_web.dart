@@ -6,8 +6,6 @@ import 'seo_container.dart';
 import 'seo_node.dart';
 import 'tag_policy.dart';
 
-const String _metaMarker = 'data-esen-seo';
-
 /// True while the visible shell is fading out — during that window its
 /// content must stay put, or the user would watch it change mid-fade.
 bool _shellFading = false;
@@ -83,6 +81,13 @@ void _startShellHandoff(web.Element container, List<SeoNode> nodes) {
   container.removeAttribute(seoShellAttribute);
   _shellFading = true;
   _pendingNodes = nodes;
+  // Sofort, nicht erst nach der Blende: ab hier ist Flutter die Seite,
+  // und der verblassende Shell liegt noch volle 150 ms darüber. Die
+  // Maus hält `pointer-events:none` unten schon ab, die Tastatur nicht —
+  // ohne `inert` könnte man in diesem Fenster in Inhalt tabben, der
+  // gerade verschwindet.
+  container.setAttribute(seoInertAttribute, '');
+  container.setAttribute('aria-hidden', 'true');
   // Nur die Opazität ändern — die Transition steckt schon im Style.
   container.setAttribute(
     'style',
@@ -114,7 +119,7 @@ void injectMetaNodes(List<SeoNode> nodes) {
   final head = document.head;
   if (head == null) return;
 
-  final stale = document.querySelectorAll('[$_metaMarker]');
+  final stale = document.querySelectorAll('[$seoMetaMarker]');
   for (var i = stale.length - 1; i >= 0; i--) {
     final element = stale.item(i);
     if (element != null) element.parentNode?.removeChild(element);
@@ -133,7 +138,7 @@ void injectMetaNodes(List<SeoNode> nodes) {
       if (!isAllowedSeoAttribute(name.trim().toLowerCase(), value)) return;
       element.setAttribute(name.trim().toLowerCase(), value);
     });
-    element.setAttribute(_metaMarker, 'true');
+    element.setAttribute(seoMetaMarker, 'true');
     // textContent statt Markup — der Browser interpretiert hier nichts.
     if (node.rawText != null) element.textContent = node.rawText;
     head.appendChild(element);
@@ -183,7 +188,7 @@ void _removeStaticDuplicates(web.Document document, SeoNode node) {
 
   // Nur unmanagte Tags entfernen — bereits injizierte eigene (markierte)
   // Elemente desselben Typs bleiben stehen (z.B. mehrere JSON-LD-Blöcke).
-  final stale = document.querySelectorAll('$selector:not([$_metaMarker])');
+  final stale = document.querySelectorAll('$selector:not([$seoMetaMarker])');
   for (var i = stale.length - 1; i >= 0; i--) {
     final element = stale.item(i);
     if (element != null) element.parentNode?.removeChild(element);

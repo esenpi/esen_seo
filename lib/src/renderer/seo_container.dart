@@ -37,6 +37,15 @@ const String seoContainerId = 'esen-seo-content';
 /// two sides can never drift apart.
 const String seoShellAttribute = 'data-esen-seo-shell';
 
+/// Marks the head elements the injector manages, so a repeated pass
+/// replaces its own tags and leaves everything hardcoded in
+/// `index.html` alone.
+///
+/// Lives here rather than in the injector because the attribute policy
+/// has to refuse it: content that may wear the marker is content the
+/// injector would later mistake for its own and remove.
+const String seoMetaMarker = 'data-esen-seo';
+
 /// Takes the invisible mirror out of the keyboard tab order and the
 /// accessibility tree.
 ///

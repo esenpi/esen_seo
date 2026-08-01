@@ -9,6 +9,8 @@
 /// `HtmlRenderer.head()`.
 library;
 
+import 'seo_container.dart' show seoContainerId, seoMetaMarker;
+
 /// The elements a mirrored document body may contain.
 ///
 /// Deliberately an allow list. A block list has to name every dangerous
@@ -151,6 +153,7 @@ const Set<String> _urlListAttributes = {'srcset', 'imagesrcset', 'ping'};
 bool isAllowedSeoAttribute(String name, String value) {
   if (!_validAttributeName.hasMatch(name)) return false;
   if (name.startsWith('on')) return false;
+  if (_isReservedHook(name, value)) return false;
   if (_urlListAttributes.contains(name)) {
     return value
         .split(RegExp(r'[,\s]+'))
@@ -169,6 +172,28 @@ bool isAllowedSeoAttribute(String name, String value) {
   return true;
 }
 
+/// Whether an attribute would write into the DOM namespace the package
+/// steers itself by.
+///
+/// The injector finds its container with `getElementById`, marks the
+/// head tags it manages with `data-esen-seo` and removes every element
+/// carrying that marker on the next pass, and decides the handoff by
+/// `data-esen-seo-shell`. Content that may name those hooks is content
+/// that can be mistaken for the machinery.
+///
+/// Today none of it is exploitable — the container always precedes the
+/// content nested inside it, so `getElementById` keeps finding the real
+/// one, and a body node wearing the marker only deletes itself. But
+/// that is an accident of document order, not a rule, and it would stop
+/// holding the first time the injector queries differently. Nothing
+/// legitimate needs these names, so they are simply not available.
+bool _isReservedHook(String name, String value) {
+  if (name == 'id') return value.trim().toLowerCase() == seoContainerId;
+  // Deckt data-esen-seo selbst und die abgeleiteten Marker ab
+  // (-shell, -style) — inklusive der, die noch dazukommen.
+  return name == seoMetaMarker || name.startsWith('$seoMetaMarker-');
+}
+
 /// Referrer policies that do not hand the full URL — path and query
 /// included — to a third-party host.
 const Set<String> _safeReferrerPolicies = {
@@ -181,12 +206,24 @@ const Set<String> _safeReferrerPolicies = {
   'strict-origin-when-cross-origin',
 };
 
-/// Media attributes that start playback or prefetch on their own.
+/// Attributes that make the mirror act instead of describe.
+///
+/// The mirror exists to be read. Media that starts by itself, an
+/// element that grabs the focus on load, a box the visitor can type
+/// into — none of that carries meaning for a crawler, and all of it
+/// does something in `visibleShell`, where the mirror is briefly the
+/// live page. `inert` covers most of it in `seoOnly`, but a guard that
+/// only holds in one of two modes is the mistake this release spent
+/// four rounds unlearning.
 const Set<String> _mediaBehaviourAttributes = {
   'autoplay',
   'loop',
   'preload',
   'autobuffer',
+  'autofocus',
+  'contenteditable',
+  'accesskey',
+  'tabindex',
 };
 
 /// CSS constructs that execute outright (legacy IE) or load a script
