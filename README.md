@@ -475,8 +475,8 @@ A resolver may also return response headers via `SeoDocument.headers`.
 The names are an **allow list** — `cache-control`, `expires`, `etag`,
 `last-modified`, `age`, `x-robots-tag`, `link` and `content-language`,
 plus `vary`, which is merged with `User-Agent` rather than replacing
-it. Everything else is dropped, including anything carrying a control
-character. That is deliberately narrow: a page's content should not be
+it. Everything else is dropped, as is any name that is not a valid
+HTTP token and any value outside printable ASCII. That is deliberately narrow: a page's content should not be
 able to set a cookie, claim a content encoding, or decide your CORS and
 CSP posture. For headers beyond that list, put your own shelf
 middleware in the pipeline.
@@ -682,7 +682,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 415 unit and widget
+Young package under active development, covered by 419 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
