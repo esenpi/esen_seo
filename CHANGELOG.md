@@ -22,14 +22,22 @@ resolver that was deliberately held back.
   `content-encoding` (claiming gzip over an uncompressed body), not
   CORS/CSP/HSTS (site-wide posture must not be decided per page by
   content), and not the protocol headers the package and the adapter
-  own. Any header whose name or value carries a **control character** —
-  CR/LF or otherwise — is dropped whole, so response splitting cannot
-  depend on how a particular shelf adapter behaves. `vary` is **merged**
-  with `User-Agent`, never replaced.
-* **Infrastructure files are cached with a TTL.** `sitemap.xml`,
-  `llms.txt` and `llms-full.txt` are cached forever for a static table
-  (their content cannot change) and for 15 minutes for a dynamic one,
-  overridable via `infrastructureCacheTtl:`. One shared future per file
+  own. Names must be valid HTTP tokens and values printable US-ASCII —
+  stricter than "no CR/LF" deliberately: a non-ASCII value cannot split
+  a response, but `shelf_io` refuses to encode it and the page never
+  arrives at all. Page content must not be able to take a page down.
+  `vary` is **merged** with `User-Agent`, never replaced. All of it is
+  covered by tests over a real socket, not just in-memory `Response`
+  objects — the failure mode here is a hung request, which an in-memory
+  test cannot see.
+* **Infrastructure files are cached with a TTL**, classified per detail
+  level. `sitemap.xml` and `llms.txt` read only head metadata, so they
+  cache forever when no route is dynamic and none enumerates paths.
+  `llms-full.txt` also renders bodies — and a *classic* route's `body`
+  builder may be async and database-backed, so "classic" does not mean
+  "immutable" — so it caches forever only when no route has a body
+  builder at all. Otherwise 15 minutes, overridable via
+  `infrastructureCacheTtl:`. One shared future per file
   also collapses a stampede — twenty concurrent crawler hits trigger one
   pass, not twenty. A build that throws is evicted at once; a build that
   *degraded* (a row failed and was dropped) is served once but not
