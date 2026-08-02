@@ -233,18 +233,28 @@ SeoResolution finishSeoResolution(
   void Function(String path, String warning)? onWarning,
 }) {
   switch (resolution) {
-    case SeoRedirect(:final location):
-      if (_hasControlChars(location) ||
-          !isAllowedSeoAttribute('href', location)) {
+    case SeoRedirect(:final location, :final statusCode):
+      final problem = _redirectProblem(location, statusCode);
+      if (problem != null) {
         onWarning?.call(
           path,
-          'refused an unsafe redirect target ("$location") — served a 404 '
-          'instead',
+          'refused a redirect to "$location" ($statusCode): $problem — '
+          'served a 404 instead',
         );
         return SeoDocument.notFound();
       }
       return resolution;
     case SeoDocument(:final meta, :final statusCode):
+      // `assert` does not run in production, so the status is validated
+      // for real here, at the one point every output path crosses.
+      if (statusCode != 200 && (statusCode < 400 || statusCode > 599)) {
+        onWarning?.call(
+          path,
+          'refused an out-of-range status ($statusCode) — served a 404 '
+          'instead',
+        );
+        return SeoDocument.notFound();
+      }
       if (statusCode != 200 ||
           meta.canonicalUrl != null ||
           canonicalBase == null) {
@@ -259,8 +269,37 @@ SeoResolution finishSeoResolution(
   }
 }
 
-bool _hasControlChars(String value) =>
-    value.codeUnits.any((c) => c < 0x20 || c == 0x7F);
+/// HTTP redirect statuses. `304 Not Modified` is not one of them — it
+/// carries no `Location` and means something else entirely.
+const Set<int> _redirectStatuses = {301, 302, 303, 307, 308};
+
+/// Why [location] must not become a `Location` header, or `null` when it
+/// is fine.
+///
+/// Stricter than the link policy on purpose. `mailto:`, `tel:` and
+/// `ftp:` are legitimate link targets and nonsense as redirects; an
+/// empty target or a bare `#fragment` resolves back to the current URL
+/// and makes a redirect loop the browser gives up on.
+String? _redirectProblem(String location, int statusCode) {
+  if (!_redirectStatuses.contains(statusCode)) {
+    return 'not an HTTP redirect status';
+  }
+  final target = location.trim();
+  if (target.isEmpty) return 'empty target';
+  if (target.startsWith('#')) return 'fragment-only target loops';
+  if (target.codeUnits.any((c) => c < 0x20 || c == 0x7F)) {
+    return 'control characters would split the response';
+  }
+  if (!isAllowedSeoAttribute('href', target)) return 'unsafe URL';
+  final scheme = RegExp(r'^([a-zA-Z][a-zA-Z0-9+.-]*):').firstMatch(target);
+  if (scheme != null) {
+    final name = scheme.group(1)!.toLowerCase();
+    if (name != 'http' && name != 'https') {
+      return 'scheme "$name" cannot be a redirect target';
+    }
+  }
+  return null;
+}
 
 String _stripTrailingSlash(String url) =>
     url.endsWith('/') ? url.substring(0, url.length - 1) : url;

@@ -54,14 +54,20 @@ class SeoRouteObserver extends NavigatorObserver {
   /// `https://esen.software`.
   final String? canonicalBase;
 
-  /// Whether to await a [SeoRoute.dynamic] resolver in the app.
+  /// Whether a [SeoRoute.dynamic] resolver runs in the app at all.
   ///
-  /// Static routes are unaffected either way — their meta is applied in
-  /// the same frame as before. Set this to `false` when a resolver only
-  /// makes sense on the server (it holds a database client, say — the
-  /// route table is imported by both `main.dart` and the server, so such
-  /// a resolver may not even compile for web) and set the page's meta
-  /// from the widget that already holds the record.
+  /// With `false` the resolver is never *called* for a dynamic route —
+  /// no read is started and no metadata is applied, not even by a
+  /// resolver that happens to answer synchronously. Static routes are
+  /// unaffected either way; their meta is applied in the same frame as
+  /// before.
+  ///
+  /// Reach for it when a resolver only makes sense on the server, and
+  /// set the page's meta from the widget that already holds the record.
+  /// Note the limit: this is a **runtime** switch. If the resolver's
+  /// database client cannot compile for the web at all, the table will
+  /// not build for the web either — that needs a conditional import or
+  /// a resolver injected separately per platform, not this flag.
   final bool resolveDynamicRoutes;
 
   /// Called when a dynamic resolver throws. The app keeps running
@@ -87,24 +93,35 @@ class SeoRouteObserver extends NavigatorObserver {
   final String Function()? locationProvider;
 
   void _apply(Route<dynamic>? route) {
+    // Every navigation invalidates a pending resolution, including one
+    // to a path this table does not know: the user has moved on, so a
+    // slow read that lands afterwards must not set a title on whatever
+    // page they are looking at now.
+    final token = ++_navigationToken;
+
     // Direkter Treffer über den Routennamen (Navigator.pushNamed & Co.).
     final name = route?.settings.name;
-    if (name != null && _applyLocation(name)) return;
+    if (name != null && _applyLocation(name, token)) return;
 
     // Router-Packages (go_router & Co.) lassen den Namen meist leer —
     // nach dem Frame steht die aktualisierte URL im Browser.
     if (!SeoController.enabled) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final location = locationProvider?.call() ?? _browserLocation();
-      if (location != null) _applyLocation(location);
+      if (location != null) _applyLocation(location, token);
     });
   }
 
-  bool _applyLocation(String location) {
+  bool _applyLocation(String location, int token) {
     final match = matchSeoRoute(routes, location);
     if (match == null) return false;
 
-    final token = ++_navigationToken;
+    // Ask BEFORE resolving, not after: starting the read and then
+    // discarding it would still hit the database, would still apply a
+    // synchronous dynamic resolver's meta, and would leave an
+    // unobserved Future to throw into the void.
+    if (match.route.isDynamic && !resolveDynamicRoutes) return true;
+
     // A convenience route resolves head-only synchronously, so its meta
     // lands in the same frame, exactly as before the resolver existed.
     final resolution = match.resolve(
@@ -118,7 +135,6 @@ class SeoRouteObserver extends NavigatorObserver {
 
     // Only a dynamic route reaches here. The app's own router owns
     // navigation; we just catch up the meta when the read completes.
-    if (!resolveDynamicRoutes) return true;
     () async {
       try {
         final resolved = await resolution;
