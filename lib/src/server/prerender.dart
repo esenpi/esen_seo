@@ -4,6 +4,8 @@ import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
 import '../renderer/seo_stylesheet.dart';
+import '../routing/seo_resolution.dart';
+import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 import 'llms_txt.dart';
 import 'sitemap.dart';
@@ -66,6 +68,9 @@ Future<List<String>> prerenderSite({
   String? indexNowKey,
   SeoRenderMode renderMode = SeoRenderMode.seoOnly,
   String? stylesheet,
+  int concurrency = 8,
+  void Function(String path, SeoResolution resolution)? onSkipped,
+  void Function(String path, Object error, StackTrace stack)? onError,
 }) async {
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
@@ -104,31 +109,48 @@ Future<List<String>> prerenderSite({
     if (indexNowKey != null) '/${indexNowKey.toLowerCase()}.txt',
   };
 
-  final paths = <String>[
-    for (final route in routes)
-      if (!route.hasParams) _checkedPath(route.path, reserved),
-    ...additionalPaths
-        .map(normalizeSeoPath)
-        .map((path) => _checkedPath(path, reserved)),
-  ];
+  // One resolution pass for the whole build: every page is read once and
+  // the same list feeds the HTML, the sitemap and both llms files, so a
+  // dynamic route cannot show one thing on the page and another in the
+  // sitemap.
+  final pages = await resolveSeoPages(
+    routes: routes,
+    canonicalBase: siteBase,
+    additionalPaths: additionalPaths,
+    detail: SeoDetail.full,
+    concurrency: concurrency,
+    onError: onError,
+  );
+
+  // Validate EVERY output path — including the ones an enumerator
+  // produced, which is the first time untrusted strings become file
+  // paths — before a single file is written.
+  for (final page in pages) {
+    _checkedPath(page.path, reserved);
+  }
 
   final written = <String>[];
-  // Eine Route, die zusätzlich in additionalPaths steht, ist derselbe
-  // Pfad — einmal rendern reicht. Trailing Slashes können hier keine
-  // zweite Schreibweise mehr erzeugen: normalizeSeoPath räumt sie weg,
-  // im SeoRoute-Konstruktor wie bei additionalPaths.
-  for (final path in paths.toSet()) {
-    final match = matchSeoRoute(routes, path);
-    if (match == null) continue;
-    final html = await _renderPage(
+  for (final page in pages) {
+    final doc = page.document;
+    // A static host cannot emit a 301 or a 404 status from a file, so a
+    // redirect or an error page is not written — it is reported instead,
+    // for the caller to turn into a host-specific _redirects fragment.
+    if (doc == null || doc.statusCode != 200) {
+      onSkipped?.call(page.path, page.resolution);
+      continue;
+    }
+    final html = _applyTemplate(
       template,
-      match,
-      siteBase,
+      doc.meta,
+      const HtmlRenderer().render(doc.body),
+      page.lang,
       renderMode,
       stylesheet,
     );
     final file = File(
-      path == '/' ? '$buildDir/index.html' : '$buildDir$path/index.html',
+      page.path == '/'
+          ? '$buildDir/index.html'
+          : '$buildDir${page.path}/index.html',
     );
     await file.parent.create(recursive: true);
     await file.writeAsString(html);
@@ -137,11 +159,7 @@ Future<List<String>> prerenderSite({
 
   if (writeSitemap) {
     final file = File('$buildDir/sitemap.xml');
-    await file.writeAsString(seoSitemapXml(
-      routes: routes,
-      siteBase: siteBase,
-      additionalPaths: additionalPaths,
-    ));
+    await file.writeAsString(seoSitemapXml(pages: pages, siteBase: siteBase));
     written.add(file.path);
   }
   if (writeRobotsTxt) {
@@ -153,19 +171,12 @@ Future<List<String>> prerenderSite({
   }
   if (writeLlmsTxt) {
     final file = File('$buildDir/llms.txt');
-    await file.writeAsString(seoLlmsTxt(
-      routes: routes,
-      siteBase: siteBase,
-      additionalPaths: additionalPaths,
-    ));
+    await file.writeAsString(seoLlmsTxt(pages: pages, siteBase: siteBase));
     written.add(file.path);
 
     final fullFile = File('$buildDir/llms-full.txt');
-    await fullFile.writeAsString(await seoLlmsFullTxt(
-      routes: routes,
-      siteBase: siteBase,
-      additionalPaths: additionalPaths,
-    ));
+    await fullFile
+        .writeAsString(await seoLlmsFullTxt(pages: pages, siteBase: siteBase));
     written.add(fullFile.path);
   }
   if (write404Page) {
@@ -272,25 +283,6 @@ final RegExp _templateTitle = RegExp(r'\s*<title>.*?</title>', dotAll: true);
 final RegExp _templateDescription =
     RegExp(r'\s*<meta name="description"[^>]*>');
 final RegExp _bodyOpenTag = RegExp(r'<body[^>]*>');
-
-Future<String> _renderPage(
-  String template,
-  SeoRouteMatch match,
-  String siteBase,
-  SeoRenderMode renderMode,
-  String? stylesheet,
-) async {
-  final meta = match.buildMeta(canonicalBase: siteBase);
-  final bodyHtml = const HtmlRenderer().render(await match.buildBody());
-  return _applyTemplate(
-    template,
-    meta,
-    bodyHtml,
-    match.route.lang,
-    renderMode,
-    stylesheet,
-  );
-}
 
 String _applyTemplate(
   String template,

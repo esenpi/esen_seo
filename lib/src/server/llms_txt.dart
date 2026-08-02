@@ -1,5 +1,8 @@
+import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/tag_policy.dart';
+import '../routing/seo_resolution.dart';
+import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 
 /// Generates an llms.txt from the SEO route table.
@@ -9,10 +12,15 @@ import '../routing/seo_route.dart';
 /// that names the site and lists its pages with one-line descriptions —
 /// the AI-crawler counterpart to sitemap.xml.
 ///
+/// Pass **exactly one** of [routes] and [pages] — see [seoSitemapXml]
+/// for the same contract. With [routes] the table is resolved
+/// synchronously and a [SeoRoute.dynamic] throws a [StateError]; with a
+/// pre-resolved [pages] snapshot every table works.
+///
 /// Site [title] and [description] default to the metadata of the root
-/// route (`/`); every listed page uses its route's meta title and
-/// description. Like the sitemap, `:param` routes are skipped — pass
-/// known instances via [additionalPaths].
+/// page (`/`); every listed page uses its own meta title and
+/// description. Pages that resolve to a redirect, a non-200, or opt out
+/// of the sitemap are skipped.
 ///
 /// ```dart
 /// final txt = seoLlmsTxt(routes: seoRoutes, siteBase: 'https://x.dev');
@@ -25,8 +33,9 @@ import '../routing/seo_route.dart';
 /// // - [Docs](https://x.dev/docs): So funktioniert esen_seo.
 /// ```
 String seoLlmsTxt({
-  required List<SeoRoute> routes,
   required String siteBase,
+  List<SeoRoute>? routes,
+  List<SeoResolvedPage>? pages,
   String? title,
   String? description,
   List<String> additionalPaths = const [],
@@ -34,8 +43,14 @@ String seoLlmsTxt({
   final base = siteBase.endsWith('/')
       ? siteBase.substring(0, siteBase.length - 1)
       : siteBase;
+  final resolved = pagesForGenerator(
+    routes: routes,
+    pages: pages,
+    additionalPaths: additionalPaths,
+    canonicalBase: siteBase,
+  );
 
-  final rootMeta = matchSeoRoute(routes, '/')?.buildMeta();
+  final rootMeta = _rootMeta(resolved);
   final siteTitle = title ?? rootMeta?.title ?? Uri.parse(base).host;
   final siteDescription = description ?? rootMeta?.description;
 
@@ -44,23 +59,16 @@ String seoLlmsTxt({
     buffer.writeln('> ${_singleLine(siteDescription)}');
   }
 
-  // Set-Literal statt Liste: additionalPaths, die schon als Route
-  // existieren (oder doppelt übergeben werden), erscheinen nur einmal.
-  final paths = <String>{
-    for (final route in routes)
-      if (route.includeInSitemap && !route.hasParams) route.path,
-    ...additionalPaths.map(normalizeSeoPath),
-  };
-
   buffer
     ..writeln()
     ..writeln('## Pages')
     ..writeln();
-  for (final path in paths) {
-    final url = path == '/' ? '$base/' : '$base$path';
-    final meta = matchSeoRoute(routes, path)?.buildMeta();
-    final pageTitle = _linkLabel(_singleLine(meta?.title ?? path));
-    final pageDescription = meta?.description;
+  for (final page in resolved) {
+    if (!page.isIndexable) continue;
+    final meta = page.document!.meta;
+    final url = page.path == '/' ? '$base/' : '$base${page.path}';
+    final pageTitle = _linkLabel(meta.title ?? page.path);
+    final pageDescription = meta.description;
     buffer
       ..write('- [$pageTitle](${_linkTarget(url)})')
       ..writeln(pageDescription == null || pageDescription.isEmpty
@@ -70,28 +78,61 @@ String seoLlmsTxt({
   return buffer.toString();
 }
 
+/// The metadata of the root page (`/`) in a resolved set, for the site
+/// title and description. The root is present even when it opted out of
+/// the sitemap, matching the old behaviour where `matchSeoRoute('/')`
+/// did not filter.
+SeoMeta? _rootMeta(List<SeoResolvedPage> pages) {
+  for (final page in pages) {
+    if (page.path == '/') return page.document?.meta;
+  }
+  return null;
+}
+
 /// Generates an llms-full.txt: like [seoLlmsTxt], but with the complete
 /// page content inlined as markdown — AI assistants get the whole site
 /// in one request instead of crawling page by page.
 ///
-/// The content comes from each route's server-side `body` builder
-/// (the same [SeoNode] trees the SSR server and prerenderer use),
-/// converted to markdown: headings, paragraphs, lists, links, images
-/// and blockquotes. Routes without a body builder list their metadata
-/// only. Async because body builders may load content, e.g. from a
-/// database.
+/// The content comes from each page's resolved body (the same [SeoNode]
+/// trees the SSR server and prerenderer use), converted to markdown:
+/// headings, paragraphs, lists, links, images and blockquotes. Pages
+/// with no body list their metadata only.
+///
+/// Pass **exactly one** of [routes] and [pages]. Unlike the sync
+/// generators this never throws on a dynamic table — it is already
+/// async and resolves internally when given [routes]. Meta and body of
+/// each page come from a **single** resolution, so they cannot describe
+/// different records.
 Future<String> seoLlmsFullTxt({
-  required List<SeoRoute> routes,
   required String siteBase,
+  List<SeoRoute>? routes,
+  List<SeoResolvedPage>? pages,
   String? title,
   String? description,
   List<String> additionalPaths = const [],
+  int concurrency = 8,
 }) async {
+  if ((routes == null) == (pages == null)) {
+    throw ArgumentError('Pass exactly one of `routes:` or `pages:`.');
+  }
+  if (pages != null && additionalPaths.isNotEmpty) {
+    throw ArgumentError(
+      '`additionalPaths` cannot be combined with `pages:`.',
+    );
+  }
   final base = siteBase.endsWith('/')
       ? siteBase.substring(0, siteBase.length - 1)
       : siteBase;
+  final resolved = pages ??
+      await resolveSeoPages(
+        routes: routes!,
+        canonicalBase: siteBase,
+        additionalPaths: additionalPaths,
+        detail: SeoDetail.full,
+        concurrency: concurrency,
+      );
 
-  final rootMeta = matchSeoRoute(routes, '/')?.buildMeta();
+  final rootMeta = _rootMeta(resolved);
   final siteTitle = title ?? rootMeta?.title ?? Uri.parse(base).host;
   final siteDescription = description ?? rootMeta?.description;
 
@@ -100,27 +141,20 @@ Future<String> seoLlmsFullTxt({
     buffer.writeln('> ${_singleLine(siteDescription)}');
   }
 
-  // Set-Literal statt Liste — Duplikate wie in [seoLlmsTxt] nur einmal.
-  final paths = <String>{
-    for (final route in routes)
-      if (route.includeInSitemap && !route.hasParams) route.path,
-    ...additionalPaths.map(normalizeSeoPath),
-  };
-
-  for (final path in paths) {
-    final match = matchSeoRoute(routes, path);
-    if (match == null) continue;
-    final url = path == '/' ? '$base/' : '$base$path';
-    final meta = match.buildMeta();
+  for (final page in resolved) {
+    if (!page.isIndexable) continue;
+    final doc = page.document!;
+    final meta = doc.meta;
+    final url = page.path == '/' ? '$base/' : '$base${page.path}';
     buffer
       ..writeln()
-      ..writeln('## ${_singleLine(meta.title ?? path)}')
+      ..writeln('## ${_singleLine(meta.title ?? page.path)}')
       ..writeln(url);
     final pageDescription = meta.description;
     if (pageDescription != null && pageDescription.isNotEmpty) {
       buffer.writeln('> ${_singleLine(pageDescription)}');
     }
-    final markdown = _nodesToMarkdown(await match.buildBody(), base);
+    final markdown = _nodesToMarkdown(doc.body, base);
     if (markdown.isNotEmpty) {
       buffer
         ..writeln()

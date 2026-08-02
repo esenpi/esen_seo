@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:shelf/shelf.dart';
 
 import '../meta/seo_meta.dart';
+import '../routing/seo_resolution.dart';
+import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 import 'bot_detector.dart';
 import 'llms_txt.dart';
@@ -55,31 +57,51 @@ Middleware seoBotMiddleware({
   List<String> additionalSitemapPaths = const [],
   bool unknownRoutesAs404 = true,
   BotDetector detector = const BotDetector(),
+  void Function(String path, Object error, StackTrace stack)? onResolveError,
 }) {
   assert(
     routes != null || resolve != null,
     'seoBotMiddleware needs `routes` and/or `resolve`.',
   );
+  final hasDynamic = routes?.any((r) => r.isDynamic) ?? false;
   return (Handler inner) {
-    // Sitemap, robots.txt und llms.txt sind pro Konfiguration statisch —
-    // einmal bauen, danach aus dem Cache ausliefern.
+    // A fully static table cannot change, so its infrastructure files are
+    // built once and served from cache forever — byte-identical to
+    // before the resolver existed. A dynamic table resolves fresh on each
+    // request (correct, if not yet cheap); TTL caching for it lands in
+    // 0.7.
     String? sitemapCache;
     String? robotsCache;
     String? llmsCache;
     Future<String>? llmsFullCache;
+
+    void report(String p, Object e, StackTrace s) =>
+        onResolveError?.call(p, e, s);
+
     return (Request request) async {
       final path = normalizeSeoPath(request.url.path);
 
       // Infrastruktur-Dateien — für alle Clients, nicht nur Bots.
       if (siteBase != null) {
         if (serveSitemap && routes != null && path == '/sitemap.xml') {
-          sitemapCache ??= seoSitemapXml(
-            routes: routes,
-            siteBase: siteBase,
-            additionalPaths: additionalSitemapPaths,
-          );
+          final xml = hasDynamic
+              ? seoSitemapXml(
+                  siteBase: siteBase,
+                  pages: await resolveSeoPages(
+                    routes: routes,
+                    canonicalBase: siteBase,
+                    additionalPaths: additionalSitemapPaths,
+                    detail: SeoDetail.head,
+                    onError: report,
+                  ),
+                )
+              : (sitemapCache ??= seoSitemapXml(
+                  routes: routes,
+                  siteBase: siteBase,
+                  additionalPaths: additionalSitemapPaths,
+                ));
           return Response.ok(
-            sitemapCache,
+            xml,
             headers: {'content-type': 'application/xml; charset=utf-8'},
           );
         }
@@ -92,27 +114,52 @@ Middleware seoBotMiddleware({
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms.txt') {
-          llmsCache ??= seoLlmsTxt(
-            routes: routes,
-            siteBase: siteBase,
-            additionalPaths: additionalSitemapPaths,
-          );
+          final txt = hasDynamic
+              ? seoLlmsTxt(
+                  siteBase: siteBase,
+                  pages: await resolveSeoPages(
+                    routes: routes,
+                    canonicalBase: siteBase,
+                    additionalPaths: additionalSitemapPaths,
+                    detail: SeoDetail.head,
+                    onError: report,
+                  ),
+                )
+              : (llmsCache ??= seoLlmsTxt(
+                  routes: routes,
+                  siteBase: siteBase,
+                  additionalPaths: additionalSitemapPaths,
+                ));
           return Response.ok(
-            llmsCache,
+            txt,
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms-full.txt') {
-          // Das Future cachen, nicht den Wert: Zwischen Prüfung und
-          // Zuweisung liegt ein await, sonst rendert jede parallele
-          // Anfrage die komplette Seite ein weiteres Mal.
-          llmsFullCache ??= seoLlmsFullTxt(
-            routes: routes,
-            siteBase: siteBase,
-            additionalPaths: additionalSitemapPaths,
-          );
+          // A dynamic table resolves fresh; a static one caches the
+          // Future (not the value) so concurrent first requests render
+          // the whole site only once.
+          final Future<String> txt;
+          if (hasDynamic) {
+            txt = seoLlmsFullTxt(
+              siteBase: siteBase,
+              pages: await resolveSeoPages(
+                routes: routes,
+                canonicalBase: siteBase,
+                additionalPaths: additionalSitemapPaths,
+                detail: SeoDetail.full,
+                onError: report,
+              ),
+            );
+          } else {
+            txt = llmsFullCache ??= seoLlmsFullTxt(
+              routes: routes,
+              siteBase: siteBase,
+              additionalPaths: additionalSitemapPaths,
+            );
+          }
           return Response.ok(
-            await llmsFullCache,
+            await txt,
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }
@@ -133,16 +180,43 @@ Middleware seoBotMiddleware({
         final match = matchSeoRoute(routes, path);
         if (match != null) {
           routeExists = true;
-          final body = await match.buildBody();
-          // Eine Route ohne body-Builder hat für Bots nichts zu zeigen.
-          // Eine leere 200-Seite wäre schlechter als die Flutter-App:
-          // Google sähe eine echte, leere Seite.
-          if (body.isNotEmpty) {
-            return _htmlResponse(SeoPage.fromNodes(
-              meta: match.buildMeta(canonicalBase: siteBase),
-              body: body,
-              lang: match.route.lang,
-            ));
+          final resolution = await match.resolve(
+            canonicalBase: siteBase,
+            onWarning: (p, w) => report(p, StateError(w), StackTrace.current),
+          );
+          switch (resolution) {
+            case SeoRedirect(:final location, :final statusCode):
+              // A redirect is served to bots. Applying it to human
+              // visitors as well (the anti-cloaking default) lands with
+              // the rest of the HTTP surface in 0.7.
+              return Response(
+                statusCode,
+                headers: {'location': location, ..._varyHeader},
+              );
+            case SeoDocument(:final statusCode, :final body, :final meta)
+                when statusCode >= 400:
+              // A real error status with the document's own body, or the
+              // built-in 404 page when it carries none.
+              return body.isEmpty
+                  ? _htmlResponse(_notFoundPage(), status: statusCode)
+                  : _htmlResponse(
+                      SeoPage.fromNodes(
+                        meta: meta,
+                        body: body,
+                        lang: resolution.lang ?? match.route.lang,
+                      ),
+                      status: statusCode,
+                    );
+            case SeoDocument(:final body, :final meta):
+              // A 200 with nothing to mirror falls through to the app —
+              // an empty SSR page indexes worse than the Flutter shell.
+              if (body.isNotEmpty) {
+                return _htmlResponse(SeoPage.fromNodes(
+                  meta: meta,
+                  body: body,
+                  lang: resolution.lang ?? match.route.lang,
+                ));
+              }
           }
         }
       }

@@ -1,7 +1,13 @@
+// The `meta` and `body` fields are deprecated for external callers, but
+// this file must still store and read them to keep the convenience
+// constructor and the deprecated buildMeta/buildBody working.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 
 import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
+import 'seo_resolution.dart';
 
 /// Builds the [SeoMeta] for a matched route.
 ///
@@ -14,6 +20,15 @@ typedef SeoMetaBuilder = SeoMeta Function(Map<String, String> params);
 typedef SeoBodyBuilder = FutureOr<List<SeoNode>> Function(
   Map<String, String> params,
 );
+
+/// Produces the [SeoResolution] for one concrete URL — metadata and
+/// body from a single read. The content source of a [SeoRoute.dynamic].
+typedef SeoResolver = FutureOr<SeoResolution> Function(SeoRequest request);
+
+/// Lists every concrete URL a `:param` route stands for, so the sitemap,
+/// llms.txt and the prerenderer can enumerate a pattern route. For
+/// `/products/:slug` it returns the actual product paths.
+typedef SeoPathEnumerator = FutureOr<List<String>> Function();
 
 /// One entry in the SEO route table — the single source of truth for a
 /// page's URL, metadata and (server-side) body.
@@ -41,24 +56,92 @@ typedef SeoBodyBuilder = FutureOr<List<SeoNode>> Function(
 /// ];
 /// ```
 class SeoRoute {
+  /// The convenience form: metadata from a synchronous builder, body
+  /// from an optional (possibly async) builder.
+  ///
+  /// The signature is unchanged from before the resolver existed, except
+  /// for the optional [enumeratePaths]. Internally the two builders are
+  /// wrapped into a [resolve] so there is only ever one content source —
+  /// see [SeoRoute.dynamic] for the form that reads both from one place.
   SeoRoute({
     required String path,
-    required this.meta,
+    required SeoMetaBuilder this.meta,
     this.body,
+    this.enumeratePaths,
     this.lang = 'en',
     this.includeInSitemap = true,
     this.lastModified,
-  }) : path = normalizeSeoPath(path);
+  })  : path = normalizeSeoPath(path),
+        isDynamic = false,
+        resolve = _staticResolver(meta, body);
+
+  /// The database form: one [resolve] read produces metadata **and**
+  /// body for a concrete URL, so the two can never describe different
+  /// records.
+  ///
+  /// ```dart
+  /// SeoRoute.dynamic(
+  ///   path: '/products/:slug',
+  ///   enumeratePaths: () async =>
+  ///       (await db.publishedSlugs()).map((s) => '/products/$s').toList(),
+  ///   resolve: (r) async {
+  ///     final p = await db.product(r.param('slug'));
+  ///     if (p == null) return const SeoDocument.notFound();
+  ///     return SeoDocument(
+  ///       meta: SeoMeta(title: p.name, description: p.teaser),
+  ///       body: r.detail == SeoDetail.head ? const [] : p.toSeoNodes(),
+  ///       lastModified: p.updatedAt,
+  ///     );
+  ///   },
+  /// );
+  /// ```
+  SeoRoute.dynamic({
+    required String path,
+    required this.resolve,
+    this.enumeratePaths,
+    this.lang = 'en',
+    this.includeInSitemap = true,
+    this.lastModified,
+  })  : path = normalizeSeoPath(path),
+        meta = null,
+        body = null,
+        isDynamic = true;
 
   /// The URL path pattern, e.g. `/` or `/blog/:slug`.
   /// Segments starting with `:` capture the value as a parameter.
   final String path;
 
+  /// The single content source for this route. For [SeoRoute.new] it is
+  /// synthesized from [meta] and [body]; for [SeoRoute.dynamic] it is
+  /// supplied directly.
+  final SeoResolver resolve;
+
+  /// Whether this route was created with [SeoRoute.dynamic]. Consumers
+  /// never branch on it for content — [resolve] is uniform — but the
+  /// synchronous generators use it to refuse a table they cannot resolve
+  /// without awaiting.
+  final bool isDynamic;
+
+  /// Lists the concrete URLs of a `:param` route for enumeration
+  /// (sitemap, llms.txt, prerender). Optional; without it a `:param`
+  /// route contributes no concrete URLs on its own.
+  final SeoPathEnumerator? enumeratePaths;
+
   /// Builds the page metadata for this route.
-  final SeoMetaBuilder meta;
+  ///
+  /// Non-null only for the convenience [SeoRoute.new]; `null` for
+  /// [SeoRoute.dynamic], which has no separate meta closure.
+  @Deprecated('Convenience form only; null for SeoRoute.dynamic. '
+      'Use matchSeoRoute(...).resolveSync()?.metaOrNull. Removed in 1.0.')
+  final SeoMetaBuilder? meta;
 
   /// Builds the semantic HTML body for the SSR server. Optional — the
-  /// client-side observer only uses [meta].
+  /// client-side observer only uses metadata.
+  ///
+  /// Non-null only for the convenience [SeoRoute.new]; `null` for
+  /// [SeoRoute.dynamic].
+  @Deprecated('Convenience form only; null for SeoRoute.dynamic. '
+      'Use resolve(SeoRequest(detail: SeoDetail.full)). Removed in 1.0.')
   final SeoBodyBuilder? body;
 
   /// The `lang` attribute of the server-rendered document, e.g. `de`.
@@ -104,7 +187,32 @@ class SeoRoute {
   }
 }
 
+/// Wraps the convenience [SeoRoute]'s two builders into a single
+/// resolver, so the whole package has exactly one content source.
+///
+/// The `head` branch is **synchronous even when [body] is async** — it
+/// never touches the body builder. That single property keeps
+/// `seoSitemapXml`, `seoLlmsTxt` and the Flutter observer synchronous
+/// for every route table written before the resolver existed.
+SeoResolver _staticResolver(SeoMetaBuilder meta, SeoBodyBuilder? body) =>
+    (SeoRequest request) {
+      final resolvedMeta = meta(request.params);
+      if (body == null || request.detail == SeoDetail.head) {
+        return SeoDocument(meta: resolvedMeta);
+      }
+      final built = body(request.params);
+      if (built is List<SeoNode>) {
+        return SeoDocument(meta: resolvedMeta, body: built);
+      }
+      return built
+          .then((nodes) => SeoDocument(meta: resolvedMeta, body: nodes));
+    };
+
 /// A successful lookup in the route table.
+///
+/// A match is a **per-request** object. It memoizes the resolver's
+/// output so one URL is read once, which means holding a match across
+/// requests would serve stale content — never do that.
 class SeoRouteMatch {
   SeoRouteMatch(
       {required this.route, required this.params, required this.path});
@@ -118,19 +226,90 @@ class SeoRouteMatch {
   /// The normalized request path that matched, e.g. `/blog/hallo`.
   final String path;
 
+  // The raw resolver output, memoized per detail. `head` and `full` are
+  // kept apart on purpose: a resolver may legitimately skip the body for
+  // `head`, so a `full` request must never be served a `head` result.
+  // The cheap, pure finishing step runs on every call, so the actual
+  // canonicalBase always applies even though the read is cached.
+  FutureOr<SeoResolution>? _headRaw;
+  FutureOr<SeoResolution>? _fullRaw;
+
+  /// Resolves this URL to a [SeoDocument] or [SeoRedirect].
+  ///
+  /// Returns the value directly (no microtask) when the route resolves
+  /// synchronously — which every convenience route does for
+  /// [SeoDetail.head]; `await` works either way. The result is always
+  /// run through [finishSeoResolution] (canonical derivation, redirect
+  /// URL policy).
+  FutureOr<SeoResolution> resolve({
+    SeoDetail detail = SeoDetail.full,
+    String? canonicalBase,
+    String? siteBase,
+    void Function(String path, String warning)? onWarning,
+  }) {
+    var raw = detail == SeoDetail.head ? _headRaw : _fullRaw;
+    if (raw == null) {
+      raw = route.resolve(SeoRequest(
+        path: path,
+        params: params,
+        detail: detail,
+        siteBase: siteBase ?? canonicalBase,
+      ));
+      if (detail == SeoDetail.head) {
+        _headRaw = raw;
+      } else {
+        _fullRaw = raw;
+      }
+    }
+    SeoResolution finish(SeoResolution r) => finishSeoResolution(
+          r,
+          path: path,
+          canonicalBase: canonicalBase,
+          onWarning: onWarning,
+        );
+    return raw is SeoResolution ? finish(raw) : raw.then(finish);
+  }
+
+  /// The resolution when it is available without awaiting, else `null`.
+  ///
+  /// A convenience route always answers [SeoDetail.head] here; a
+  /// [SeoRoute.dynamic] never does.
+  SeoResolution? resolveSync({
+    SeoDetail detail = SeoDetail.head,
+    String? canonicalBase,
+  }) {
+    final r = resolve(detail: detail, canonicalBase: canonicalBase);
+    return r is SeoResolution ? r : null;
+  }
+
   /// Builds the metadata; when the route sets no [SeoMeta.canonicalUrl]
   /// and [canonicalBase] is given, the canonical URL is derived
   /// automatically from base + matched path.
+  @Deprecated('Use resolveSync()/resolve(). Throws for SeoRoute.dynamic. '
+      'Removed in 1.0.')
   SeoMeta buildMeta({String? canonicalBase}) {
-    final meta = route.meta(params);
-    if (meta.canonicalUrl != null || canonicalBase == null) return meta;
-    final base = _stripTrailingSlash(canonicalBase);
-    return meta.copyWith(canonicalUrl: path == '/' ? '$base/' : '$base$path');
+    if (route.isDynamic) {
+      throw StateError(
+        'buildMeta() cannot resolve a SeoRoute.dynamic ("${route.path}") '
+        'synchronously. Use resolve(detail: SeoDetail.head).',
+      );
+    }
+    final resolved =
+        resolveSync(detail: SeoDetail.head, canonicalBase: canonicalBase);
+    // A convenience route always resolves synchronously to a document.
+    return (resolved as SeoDocument).meta;
   }
 
-  /// Builds the server-side body; empty when the route has no builder.
-  FutureOr<List<SeoNode>> buildBody() =>
-      route.body?.call(params) ?? <SeoNode>[];
+  /// Builds the server-side body; empty when the route has no builder or
+  /// resolves to a redirect.
+  @Deprecated('Use resolve(detail: SeoDetail.full). Removed in 1.0.')
+  FutureOr<List<SeoNode>> buildBody() {
+    final r = resolve(detail: SeoDetail.full);
+    return r is SeoResolution ? _bodyOf(r) : r.then(_bodyOf);
+  }
+
+  static List<SeoNode> _bodyOf(SeoResolution r) =>
+      r is SeoDocument ? r.body : const <SeoNode>[];
 }
 
 /// Finds the first route in [routes] matching [path], or `null`.
@@ -155,6 +334,3 @@ String normalizeSeoPath(String path) {
   }
   return p;
 }
-
-String _stripTrailingSlash(String url) =>
-    url.endsWith('/') ? url.substring(0, url.length - 1) : url;
