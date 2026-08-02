@@ -105,6 +105,33 @@ void main() {
       expect(reads, 0);
     });
 
+    test('in a MIXED table a classic route costs no human resolve', () async {
+      // The bug was here, not in a purely classic table: the check was a
+      // property of the whole table, so one dynamic route anywhere made
+      // every classic route rebuild its meta on each human page view.
+      var metaCalls = 0;
+      final handler = _handler([
+        SeoRoute(
+          path: '/statisch',
+          meta: (_) {
+            metaCalls++;
+            return const SeoMeta(title: 'Statisch');
+          },
+        ),
+        SeoRoute.dynamic(
+          path: '/dynamisch',
+          resolve: (_) async => const SeoRedirect('/neu'),
+        ),
+      ]);
+
+      await _get(handler, '/statisch', asBot: false);
+      expect(metaCalls, 0, reason: 'a classic route cannot be a redirect');
+
+      // The dynamic route in the same table still redirects the human.
+      final human = await _get(handler, '/dynamisch', asBot: false);
+      expect(human.statusCode, 301);
+    });
+
     test('a classic route with an enumerator costs no human resolve', () async {
       // It needs the async pass for the sitemap, but a static resolution
       // can never be a redirect — so the human branch must skip it.
@@ -255,6 +282,48 @@ void main() {
       expect(res.headers['location'], isNull);
     });
 
+    test('an error document keeps its own metadata when it has no body',
+        () async {
+      // SeoDocument.notFound accepts meta:, so swapping in a generic
+      // page would silently discard a title and description the caller
+      // deliberately supplied.
+      final res = await _get(
+        _handler([
+          SeoRoute.dynamic(
+            path: '/weg',
+            resolve: (_) async => SeoDocument.gone(
+              meta: const SeoMeta(
+                title: 'Produkt eingestellt',
+                description: 'Dieses Modell wird nicht mehr gefertigt.',
+              ),
+            ),
+          ),
+        ]),
+        '/weg',
+      );
+      expect(res.statusCode, 410);
+      final body = await res.readAsString();
+      expect(body, contains('<title>Produkt eingestellt</title>'));
+      expect(body, contains('nicht mehr gefertigt'));
+      // noindex from the factory survives too.
+      expect(body, contains('noindex'));
+    });
+
+    test('an error document with no metadata still gets a sensible page',
+        () async {
+      final res = await _get(
+        _handler([
+          SeoRoute.dynamic(
+            path: '/weg',
+            resolve: (_) async => SeoDocument.notFound(),
+          ),
+        ]),
+        '/weg',
+      );
+      expect(res.statusCode, 404);
+      expect(await res.readAsString(), contains('404'));
+    });
+
     test('a resolver vary is merged with User-Agent, not replaced', () async {
       final res = await serve({'vary': 'Accept-Language'});
       final vary = res.headers['vary']!;
@@ -293,6 +362,52 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 80));
       await _get(handler, '/sitemap.xml');
       expect(reads, 2, reason: 'after the TTL it re-resolves');
+    });
+
+    test('a classic async body is not frozen for the process lifetime',
+        () async {
+      // "Classic" does not mean "immutable": a classic body builder may
+      // read a database. Only llms-full.txt renders bodies, so only it
+      // must drop the forever-cache.
+      var reads = 0;
+      final handler = _handler([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(title: 'Home'),
+          body: (_) async {
+            reads++;
+            return [SeoNode(tag: 'p', text: 'read $reads')];
+          },
+        ),
+      ], ttl: const Duration(milliseconds: 50));
+
+      await _get(handler, '/llms-full.txt');
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final second = await _get(handler, '/llms-full.txt');
+      expect(reads, 2, reason: 'a database-backed body must not be frozen');
+      expect(await second.readAsString(), contains('read 2'));
+    });
+
+    test('a failing classic async body degrades instead of killing the file',
+        () async {
+      // It also has to take the async path, or its failure would fail
+      // the whole endpoint instead of dropping one page.
+      final failures = <String>[];
+      final handler = _handler(
+        [
+          SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
+          SeoRoute(
+            path: '/kaputt',
+            meta: (_) => const SeoMeta(title: 'Kaputt'),
+            body: (_) async => throw StateError('db down'),
+          ),
+        ],
+        onError: (p, _, __) => failures.add(p),
+      );
+      final res = await _get(handler, '/llms-full.txt');
+      expect(res.statusCode, 200, reason: 'the file survives one bad page');
+      expect(await res.readAsString(), contains('Home'));
+      expect(failures, contains('/kaputt'));
     });
 
     test('a static table caches forever (never re-resolves)', () async {
