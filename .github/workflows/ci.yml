@@ -2,9 +2,11 @@ name: CI
 
 # Was das README behauptet, soll eine Maschine bestätigen — die
 # Testzahl ist nur so viel wert wie der letzte grüne Lauf.
+# Every branch, not just main. Gating on `branches: [main]` meant the
+# check only ran once the work had already landed — a feature branch got
+# no CI at all, which is most of what a feature branch is for.
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
