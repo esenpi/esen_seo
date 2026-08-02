@@ -15,6 +15,41 @@ import 'sitemap.dart';
 /// or `null` to fall through to the regular Flutter app.
 typedef SeoPageResolver = FutureOr<SeoPage?> Function(Request request);
 
+/// Who a resolver-issued [SeoRedirect] is honoured for.
+///
+/// The default [all] serves the 301 to human visitors as well as
+/// crawlers, because a redirect shown only to Googlebot is cloaking —
+/// bots and users must reach the same destination. It costs one extra
+/// head resolution per human page view on a dynamic table; a fully
+/// static table never takes the branch, since a static resolution can
+/// never be a redirect.
+///
+/// Note this governs only *redirects*. Error statuses (404, 410) stay
+/// bot-only regardless — a human hitting a missing page keeps the
+/// Flutter app rather than an SSR stub, and the app's own router owns
+/// what they see.
+enum SeoRedirectScope {
+  /// Redirect both humans and bots (the anti-cloaking default).
+  all,
+
+  /// Redirect only crawlers; humans fall through to the app and its
+  /// router handles navigation.
+  botsOnly,
+
+  /// Ignore resolver redirects entirely — pair this with
+  /// `seoRedirectMiddleware` if you drive 301s from a map instead.
+  off,
+}
+
+/// The default for `seoBotMiddleware(infrastructureCacheTtl:)`: cache
+/// `sitemap.xml`, `llms.txt` and `llms-full.txt` for the process
+/// lifetime when the table is fully static (their content cannot
+/// change), and for 15 minutes when any route is dynamic (their content
+/// comes from a database and a forever-cache would freeze the sitemap at
+/// boot). Pass an explicit [Duration] to override, or `null` to cache
+/// forever regardless.
+const Duration seoAutoInfrastructureCacheTtl = Duration(microseconds: -1);
+
 /// Shelf middleware that serves semantic HTML to bots and passes real
 /// users through to the wrapped handler (usually the Flutter web build).
 ///
@@ -57,6 +92,8 @@ Middleware seoBotMiddleware({
   List<String> additionalSitemapPaths = const [],
   bool unknownRoutesAs404 = true,
   BotDetector detector = const BotDetector(),
+  SeoRedirectScope applyResolverRedirects = SeoRedirectScope.all,
+  Duration? infrastructureCacheTtl = seoAutoInfrastructureCacheTtl,
 
   /// Called when a route resolver fails.
   ///
@@ -79,33 +116,74 @@ Middleware seoBotMiddleware({
   // perfectly legal table.
   final needsAsyncResolution =
       routes?.any((r) => r.isDynamic || r.enumeratePaths != null) ?? false;
+  // Narrower than the above on purpose: only a `SeoRoute.dynamic` can
+  // ever resolve to a redirect. A classic route with an async
+  // `enumeratePaths` needs the async pass for the sitemap but can never
+  // produce one, so it must not pay for a head resolve on every human
+  // page view.
+  final hasDynamicRoute = routes?.any((r) => r.isDynamic) ?? false;
+  // Resolve the sentinel once: forever for a static table (its content
+  // cannot change), 15 minutes for a dynamic one (its content comes from
+  // a database, so a forever-cache would serve a sitemap frozen at boot).
+  final Duration? infraTtl =
+      infrastructureCacheTtl == seoAutoInfrastructureCacheTtl
+          ? (needsAsyncResolution ? const Duration(minutes: 15) : null)
+          : infrastructureCacheTtl;
   return (Handler inner) {
-    // A fully static table cannot change, so its infrastructure files are
-    // built once and served from cache forever — byte-identical to
-    // before the resolver existed. A dynamic table resolves fresh on
-    // each request; TTL caching for it lands in 0.7.
-    String? sitemapCache;
-    String? robotsCache;
-    String? llmsCache;
-    Future<String>? llmsFullCache;
-
-    // Until then, at least never resolve the same file twice at once: a
-    // crawler opening /sitemap.xml twenty times in parallel would
-    // otherwise start twenty full passes over the database. Concurrent
-    // callers share the one in-flight pass; the slot frees as soon as it
-    // completes, so this collapses a stampede without caching anything.
-    final inFlight = <String, Future<String>>{};
-    Future<String> once(String key, Future<String> Function() build) =>
-        inFlight[key] ??= Future(() async {
-          try {
-            return await build();
-          } finally {
-            inFlight.remove(key);
-          }
-        });
+    String? robotsCache; // pure siteBase, never changes — no TTL needed
 
     void report(String p, Object e, StackTrace s) =>
         onResolveError?.call(p, e, s);
+
+    // One cached Future per infrastructure file. A single shared Future
+    // per key does double duty: it caches the result until [infraTtl]
+    // expires (null = forever), and it collapses a stampede — twenty
+    // concurrent crawlers hitting /sitemap.xml trigger one pass, not
+    // twenty.
+    //
+    // Two things are deliberately NOT cached for the full TTL:
+    //  * a build that throws is evicted at once, so the next request
+    //    retries instead of replaying the error;
+    //  * a build that DEGRADED — some rows failed and were dropped —
+    //    is served this once but evicted too, so a transient database
+    //    blip does not freeze an incomplete sitemap in place for
+    //    15 minutes after the database has recovered.
+    final cache = <String, Future<String>>{};
+    final timers = <String, Timer>{};
+
+    // Evict only if the slot still holds THIS generation. A build that
+    // outlives its own TTL would otherwise delete the newer entry a
+    // later request had already installed, quietly disabling the cache.
+    void evict(String key, Future<String> generation) {
+      if (!identical(cache[key], generation)) return;
+      cache.remove(key);
+      timers.remove(key)?.cancel();
+    }
+
+    Future<String> cached(
+      String key,
+      Future<String> Function(void Function() markDegraded) build,
+    ) {
+      final hit = cache[key];
+      if (hit != null) return hit;
+      var degraded = false;
+      late final Future<String> future;
+      future = () async {
+        try {
+          final result = await build(() => degraded = true);
+          if (degraded) evict(key, future);
+          return result;
+        } catch (_) {
+          evict(key, future);
+          rethrow;
+        }
+      }();
+      cache[key] = future;
+      if (infraTtl != null) {
+        timers[key] = Timer(infraTtl, () => evict(key, future));
+      }
+      return future;
+    }
 
     return (Request request) async {
       final path = normalizeSeoPath(request.url.path);
@@ -113,25 +191,28 @@ Middleware seoBotMiddleware({
       // Infrastruktur-Dateien — für alle Clients, nicht nur Bots.
       if (siteBase != null) {
         if (serveSitemap && routes != null && path == '/sitemap.xml') {
-          final xml = needsAsyncResolution
-              ? await once(
-                  '/sitemap.xml',
-                  () async => seoSitemapXml(
+          final xml = await cached(
+            '/sitemap.xml',
+            (markDegraded) async => needsAsyncResolution
+                ? seoSitemapXml(
                     siteBase: siteBase,
                     pages: await resolveSeoPages(
                       routes: routes,
                       canonicalBase: siteBase,
                       additionalPaths: additionalSitemapPaths,
                       detail: SeoDetail.head,
-                      onError: report,
+                      onError: (p, e, st) {
+                        markDegraded();
+                        report(p, e, st);
+                      },
                     ),
+                  )
+                : seoSitemapXml(
+                    routes: routes,
+                    siteBase: siteBase,
+                    additionalPaths: additionalSitemapPaths,
                   ),
-                )
-              : (sitemapCache ??= seoSitemapXml(
-                  routes: routes,
-                  siteBase: siteBase,
-                  additionalPaths: additionalSitemapPaths,
-                ));
+          );
           return Response.ok(
             xml,
             headers: {'content-type': 'application/xml; charset=utf-8'},
@@ -146,58 +227,58 @@ Middleware seoBotMiddleware({
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms.txt') {
-          final txt = needsAsyncResolution
-              ? await once(
-                  '/llms.txt',
-                  () async => seoLlmsTxt(
+          final txt = await cached(
+            '/llms.txt',
+            (markDegraded) async => needsAsyncResolution
+                ? seoLlmsTxt(
                     siteBase: siteBase,
                     pages: await resolveSeoPages(
                       routes: routes,
                       canonicalBase: siteBase,
                       additionalPaths: additionalSitemapPaths,
                       detail: SeoDetail.head,
-                      onError: report,
+                      onError: (p, e, st) {
+                        markDegraded();
+                        report(p, e, st);
+                      },
                     ),
+                  )
+                : seoLlmsTxt(
+                    routes: routes,
+                    siteBase: siteBase,
+                    additionalPaths: additionalSitemapPaths,
                   ),
-                )
-              : (llmsCache ??= seoLlmsTxt(
-                  routes: routes,
-                  siteBase: siteBase,
-                  additionalPaths: additionalSitemapPaths,
-                ));
+          );
           return Response.ok(
             txt,
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms-full.txt') {
-          // A dynamic table resolves fresh; a static one caches the
-          // Future (not the value) so concurrent first requests render
-          // the whole site only once.
-          final Future<String> txt;
-          if (needsAsyncResolution) {
-            txt = once(
-              '/llms-full.txt',
-              () async => seoLlmsFullTxt(
-                siteBase: siteBase,
-                pages: await resolveSeoPages(
-                  routes: routes,
-                  canonicalBase: siteBase,
-                  additionalPaths: additionalSitemapPaths,
-                  detail: SeoDetail.full,
-                  onError: report,
-                ),
-              ),
-            );
-          } else {
-            txt = llmsFullCache ??= seoLlmsFullTxt(
-              routes: routes,
-              siteBase: siteBase,
-              additionalPaths: additionalSitemapPaths,
-            );
-          }
+          final txt = await cached(
+            '/llms-full.txt',
+            (markDegraded) async => needsAsyncResolution
+                ? seoLlmsFullTxt(
+                    siteBase: siteBase,
+                    pages: await resolveSeoPages(
+                      routes: routes,
+                      canonicalBase: siteBase,
+                      additionalPaths: additionalSitemapPaths,
+                      detail: SeoDetail.full,
+                      onError: (p, e, st) {
+                        markDegraded();
+                        report(p, e, st);
+                      },
+                    ),
+                  )
+                : seoLlmsFullTxt(
+                    routes: routes,
+                    siteBase: siteBase,
+                    additionalPaths: additionalSitemapPaths,
+                  ),
+          );
           return Response.ok(
-            await txt,
+            txt,
             headers: {'content-type': 'text/plain; charset=utf-8'},
           );
         }
@@ -209,7 +290,46 @@ Middleware seoBotMiddleware({
         );
       }
 
-      if (!detector.isBot(request.headers['user-agent'])) {
+      final isBot = detector.isBot(request.headers['user-agent']);
+
+      // A resolver redirect applies to humans too by default — a 301
+      // shown only to Googlebot is cloaking, so bots and users must
+      // reach the same destination. Only a dynamic table can produce a
+      // redirect (a static resolution never is one), and only when the
+      // scope allows it. A resolver failure here must never 5xx a human:
+      // it is reported and falls through to the app, which still renders.
+      // No `_looksLikePage` filter here, deliberately: the bot branch
+      // has none either, and gating only this side made a redirect for a
+      // dotted path (`/old-page.html` → clean URL, the commonest
+      // relaunch mapping there is) reach crawlers but not humans — the
+      // exact cloaking this mode exists to prevent. `matchSeoRoute` is
+      // already the right filter: an asset request matches no route and
+      // costs nothing.
+      if (!isBot &&
+          hasDynamicRoute &&
+          routes != null &&
+          applyResolverRedirects == SeoRedirectScope.all) {
+        final match = matchSeoRoute(routes, path);
+        if (match != null) {
+          try {
+            final res = await match.resolve(
+              detail: SeoDetail.head,
+              canonicalBase: siteBase,
+              onWarning: (p, w) => report(p, StateError(w), StackTrace.current),
+            );
+            if (res is SeoRedirect) {
+              return Response(
+                res.statusCode,
+                headers: {'location': res.location, ..._varyHeader},
+              );
+            }
+          } catch (error, stack) {
+            report(path, error, stack);
+          }
+        }
+      }
+
+      if (!isBot) {
         return _appResponse(inner, request);
       }
 
@@ -235,9 +355,11 @@ Middleware seoBotMiddleware({
           }
           switch (resolution) {
             case SeoRedirect(:final location, :final statusCode):
-              // A redirect is served to bots. Applying it to human
-              // visitors as well (the anti-cloaking default) lands with
-              // the rest of the HTTP surface in 0.7.
+              // Under `off` the redirect is ignored and the request
+              // falls through to the app (pair with seoRedirectMiddleware
+              // to drive 301s from a map instead). Otherwise the bot gets
+              // it; the human branch above already handled `all`.
+              if (applyResolverRedirects == SeoRedirectScope.off) break;
               return Response(
                 statusCode,
                 headers: {'location': location, ..._varyHeader},
@@ -247,7 +369,9 @@ Middleware seoBotMiddleware({
               // A real error status with the document's own body, or the
               // built-in 404 page when it carries none.
               return body.isEmpty
-                  ? _htmlResponse(_notFoundPage(), status: statusCode)
+                  ? _htmlResponse(_notFoundPage(),
+                      status: statusCode,
+                      extraHeaders: _safeHeaders(resolution.headers))
                   : _htmlResponse(
                       SeoPage.fromNodes(
                         meta: meta,
@@ -255,16 +379,20 @@ Middleware seoBotMiddleware({
                         lang: resolution.lang ?? match.route.lang,
                       ),
                       status: statusCode,
+                      extraHeaders: _safeHeaders(resolution.headers),
                     );
             case SeoDocument(:final body, :final meta):
               // A 200 with nothing to mirror falls through to the app —
               // an empty SSR page indexes worse than the Flutter shell.
               if (body.isNotEmpty) {
-                return _htmlResponse(SeoPage.fromNodes(
-                  meta: meta,
-                  body: body,
-                  lang: resolution.lang ?? match.route.lang,
-                ));
+                return _htmlResponse(
+                  SeoPage.fromNodes(
+                    meta: meta,
+                    body: body,
+                    lang: resolution.lang ?? match.route.lang,
+                  ),
+                  extraHeaders: _safeHeaders(resolution.headers),
+                );
               }
           }
         }
@@ -291,16 +419,100 @@ Middleware seoBotMiddleware({
   };
 }
 
-Response _htmlResponse(SeoPage page, {int status = 200}) => Response(
+Response _htmlResponse(
+  SeoPage page, {
+  int status = 200,
+  Map<String, String>? extraHeaders,
+}) =>
+    Response(
       status,
       body: page.toHtmlDocument(),
       headers: {
         'content-type': 'text/html; charset=utf-8',
         // Kennzeichnet SSR-Antworten, z.B. zum Debuggen mit curl.
         'x-esen-seo': 'ssr',
-        ..._varyHeader,
+        // extraHeaders (from _safeHeaders) already carries a merged
+        // `vary` including User-Agent; without it, the plain vary applies.
+        ...(extraHeaders ?? _varyHeader),
       },
     );
+
+/// Filters resolver-supplied HTTP headers down to what is safe to emit.
+///
+/// The policy lives here, at the one point every SSR response crosses,
+/// not at the caller — the same principle as the tag and attribute
+/// policy in the renderer. A `SeoDocument.headers` value comes
+/// (eventually) from a CMS, so it is a fresh path from untrusted data
+/// into the response.
+///
+///  * The names are an **allow list**, not a block list. This package
+///    has learned that lesson five times over — URL schemes, HTML tags,
+///    CSS properties — and it held here too: a block list of the
+///    obvious protocol headers still let `set-cookie` through (session
+///    fixation) and `content-encoding` (claiming gzip over an
+///    uncompressed body, corrupting the page). CORS, CSP and HSTS would
+///    have been the next omissions. What a crawler-facing mirror
+///    legitimately needs is a short, closed set: caching validators,
+///    `x-robots-tag`, `link` and `content-language`.
+///  * A name or value containing any control character is dropped
+///    whole. CR and LF are the response-splitting vector, but the guard
+///    rejects every control char (`< 0x20` or `0x7F`) — the same rigor
+///    the renderer applies to URLs, so safety never depends on how a
+///    particular shelf adapter treats a stray NUL, vertical tab or
+///    U+2028.
+///  * `vary` is **merged** with `User-Agent`, never replaced — the CDN
+///    correctness of this middleware rests on `vary: User-Agent`, and a
+///    resolver that also varies on `Accept-Language` must add to it, not
+///    overwrite it.
+Map<String, String> _safeHeaders(Map<String, String> headers) {
+  final safe = <String, String>{};
+  final vary = <String>{'User-Agent'};
+  headers.forEach((rawName, value) {
+    if (_hasControlChars(rawName) || _hasControlChars(value)) return;
+    final name = rawName.trim().toLowerCase();
+    if (name.isEmpty) return;
+    if (name != 'vary' && !_allowedResolverHeaders.contains(name)) return;
+    if (name == 'vary') {
+      for (final part in value.split(',')) {
+        final trimmed = part.trim();
+        if (trimmed.isNotEmpty) vary.add(trimmed);
+      }
+      return;
+    }
+    safe[name] = value;
+  });
+  safe['vary'] = vary.join(', ');
+  return safe;
+}
+
+/// The response headers a resolver may set, beyond `vary` (which is
+/// merged rather than replaced).
+///
+/// Everything a crawler-facing page legitimately needs and nothing
+/// else. Notably absent, each for a reason: `content-type`,
+/// `content-length`, `transfer-encoding` and `connection` belong to the
+/// package and the adapter; `location` is expressible only as a
+/// [SeoRedirect], which is validated; `set-cookie` has no business on a
+/// mirror and would be session fixation; `content-encoding` would claim
+/// an encoding the body does not have; `access-control-*`,
+/// `content-security-policy` and `strict-transport-security` are
+/// site-wide security posture and must not be decided per page by
+/// content.
+const Set<String> _allowedResolverHeaders = {
+  // Caching and validators.
+  'cache-control',
+  'expires',
+  'etag',
+  'last-modified',
+  'age',
+  // SEO-relevant.
+  'x-robots-tag',
+  'link',
+  'content-language',
+};
+
+bool _hasControlChars(String value) =>
+    value.codeUnits.any((c) => c < 0x20 || c == 0x7F);
 
 /// What this middleware answers depends on the User-Agent. Without
 /// saying so, a CDN caches whichever variant it saw first and serves it
