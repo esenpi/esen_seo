@@ -272,8 +272,13 @@ class SeoRouteMatch {
 
   /// The resolution when it is available without awaiting, else `null`.
   ///
-  /// A convenience route always answers [SeoDetail.head] here; a
-  /// [SeoRoute.dynamic] never does.
+  /// A convenience route always answers [SeoDetail.head] here. A
+  /// [SeoRoute.dynamic] answers only if its resolver happens to be
+  /// synchronous — [SeoResolver] is a `FutureOr`, so that is allowed,
+  /// and the database-backed case this constructor exists for is not.
+  /// Callers that must not block on I/O should therefore treat `null`
+  /// as the normal answer for a dynamic route rather than the
+  /// exception.
   SeoResolution? resolveSync({
     SeoDetail detail = SeoDetail.head,
     String? canonicalBase,

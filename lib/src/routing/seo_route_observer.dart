@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -124,10 +126,21 @@ class SeoRouteObserver extends NavigatorObserver {
 
     // A convenience route resolves head-only synchronously, so its meta
     // lands in the same frame, exactly as before the resolver existed.
-    final resolution = match.resolve(
-      detail: SeoDetail.head,
-      canonicalBase: canonicalBase,
-    );
+    //
+    // The call itself is guarded too: SeoResolver is a FutureOr, so a
+    // resolver may answer — and therefore throw — synchronously, and an
+    // exception escaping here would leave the NavigatorObserver, which
+    // no app expects from a metadata layer.
+    final FutureOr<SeoResolution> resolution;
+    try {
+      resolution = match.resolve(
+        detail: SeoDetail.head,
+        canonicalBase: canonicalBase,
+      );
+    } catch (error, stack) {
+      onResolveError?.call(location, error, stack);
+      return true;
+    }
     if (resolution is SeoResolution) {
       _applyResolution(resolution);
       return true;
