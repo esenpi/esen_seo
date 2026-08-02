@@ -241,6 +241,119 @@ void main() {
     });
   });
 
+  group('enumeration order does not depend on timing', () {
+    // `explicit` decides whether a route's includeInSitemap is honoured,
+    // so if an additionalPath could win a duplicate URL from an
+    // enumerator, adding `async` to that enumerator would silently move
+    // a page into the sitemap.
+    Future<List<SeoResolvedPage>> run({required bool asyncEnumerator}) =>
+        resolveSeoPages(
+          routes: [
+            SeoRoute(
+              path: '/blog/:slug',
+              meta: (p) => SeoMeta(title: p['slug']),
+              includeInSitemap: false, // the pattern opts out
+              enumeratePaths:
+                  asyncEnumerator ? () async => ['/blog/a'] : () => ['/blog/a'],
+            ),
+          ],
+          additionalPaths: const ['/blog/a'], // same URL, explicitly
+        );
+
+    test('a sync and an async enumerator produce the same ownership', () async {
+      final sync = await run(asyncEnumerator: false);
+      final async = await run(asyncEnumerator: true);
+      expect(sync.map((p) => p.path), async.map((p) => p.path));
+      expect(
+        sync.single.explicit,
+        async.single.explicit,
+        reason: 'adding async must not flip who owns the URL',
+      );
+      // The enumerator claimed it first, so the route's opt-out applies.
+      expect(sync.single.explicit, isFalse);
+      expect(sync.single.isIndexable, isFalse);
+    });
+
+    test('multiple async enumerators keep table order', () async {
+      final pages = await resolveSeoPages(
+        routes: [
+          SeoRoute(
+            path: '/a/:x',
+            meta: (_) => const SeoMeta(),
+            enumeratePaths: () async {
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+              return ['/a/1'];
+            },
+          ),
+          SeoRoute(
+            path: '/b/:x',
+            meta: (_) => const SeoMeta(),
+            enumeratePaths: () async => ['/b/1'], // completes first
+          ),
+        ],
+      );
+      // Table order, not completion order.
+      expect(pages.map((p) => p.path).toList(), ['/a/1', '/b/1']);
+    });
+  });
+
+  group('the stability check covers more than the title', () {
+    test('a differing status between head and full is caught', () async {
+      expect(
+        () => resolveSeoPages(
+          routes: [
+            SeoRoute.dynamic(
+              path: '/p',
+              resolve: (r) async => r.detail == SeoDetail.head
+                  ? const SeoDocument(meta: SeoMeta(title: 'X'))
+                  : SeoDocument.gone(meta: const SeoMeta(title: 'X')),
+            ),
+          ],
+          debugCheckMetaStability: true,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('a differing lastModified is caught', () async {
+      expect(
+        () => resolveSeoPages(
+          routes: [
+            SeoRoute.dynamic(
+              path: '/p',
+              resolve: (r) async => SeoDocument(
+                meta: const SeoMeta(title: 'X'),
+                lastModified: r.detail == SeoDetail.head
+                    ? DateTime.utc(2026, 1, 1)
+                    : DateTime.utc(2026, 2, 2),
+              ),
+            ),
+          ],
+          debugCheckMetaStability: true,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('skipping only the body is allowed', () async {
+      final pages = await resolveSeoPages(
+        routes: [
+          SeoRoute.dynamic(
+            path: '/p',
+            resolve: (r) async => SeoDocument(
+              meta: const SeoMeta(title: 'X'),
+              body: r.detail == SeoDetail.head
+                  ? const []
+                  : [SeoNode(tag: 'p', text: 'body')],
+            ),
+          ),
+        ],
+        debugCheckMetaStability: true,
+      );
+      expect(pages.single.document!.body, isNotEmpty);
+    });
+  });
+
   group('the sync generators refuse a dynamic table loudly', () {
     final dynamicTable = [
       SeoRoute.dynamic(
