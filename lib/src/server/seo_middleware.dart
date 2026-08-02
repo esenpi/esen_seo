@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:shelf/shelf.dart';
 
 import '../meta/seo_meta.dart';
+import '../renderer/seo_node.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
@@ -122,13 +123,28 @@ Middleware seoBotMiddleware({
   // produce one, so it must not pay for a head resolve on every human
   // page view.
   final hasDynamicRoute = routes?.any((r) => r.isDynamic) ?? false;
-  // Resolve the sentinel once: forever for a static table (its content
-  // cannot change), 15 minutes for a dynamic one (its content comes from
-  // a database, so a forever-cache would serve a sitemap frozen at boot).
-  final Duration? infraTtl =
-      infrastructureCacheTtl == seoAutoInfrastructureCacheTtl
-          ? (needsAsyncResolution ? const Duration(minutes: 15) : null)
-          : infrastructureCacheTtl;
+  // "Classic" does not mean "immutable": a classic route's `body`
+  // builder may be async and read a database. Its output only reaches
+  // llms-full.txt (the sitemap and llms.txt need head detail, which
+  // never touches the body), but freezing THAT for the process lifetime
+  // would serve content captured at boot forever. It also has to take
+  // the async path so a failing body goes through the degrade-and-report
+  // policy instead of failing the whole endpoint.
+  final fullDetailMayDoIo = needsAsyncResolution ||
+      // ignore: deprecated_member_use_from_same_package
+      (routes?.any((r) => r.body != null) ?? false);
+  // Resolve the sentinel once, and separately per detail level: the
+  // sitemap and llms.txt only ever read head metadata, while
+  // llms-full.txt also renders bodies — so a table that is "static" for
+  // the first two can still be database-backed for the third.
+  const auto = seoAutoInfrastructureCacheTtl;
+  const autoTtl = Duration(minutes: 15);
+  final Duration? headTtl = infrastructureCacheTtl == auto
+      ? (needsAsyncResolution ? autoTtl : null)
+      : infrastructureCacheTtl;
+  final Duration? fullTtl = infrastructureCacheTtl == auto
+      ? (fullDetailMayDoIo ? autoTtl : null)
+      : infrastructureCacheTtl;
   return (Handler inner) {
     String? robotsCache; // pure siteBase, never changes — no TTL needed
 
@@ -162,6 +178,7 @@ Middleware seoBotMiddleware({
 
     Future<String> cached(
       String key,
+      Duration? ttl,
       Future<String> Function(void Function() markDegraded) build,
     ) {
       final hit = cache[key];
@@ -179,8 +196,8 @@ Middleware seoBotMiddleware({
         }
       }();
       cache[key] = future;
-      if (infraTtl != null) {
-        timers[key] = Timer(infraTtl, () => evict(key, future));
+      if (ttl != null) {
+        timers[key] = Timer(ttl, () => evict(key, future));
       }
       return future;
     }
@@ -193,6 +210,7 @@ Middleware seoBotMiddleware({
         if (serveSitemap && routes != null && path == '/sitemap.xml') {
           final xml = await cached(
             '/sitemap.xml',
+            headTtl,
             (markDegraded) async => needsAsyncResolution
                 ? seoSitemapXml(
                     siteBase: siteBase,
@@ -229,6 +247,7 @@ Middleware seoBotMiddleware({
         if (serveLlmsTxt && routes != null && path == '/llms.txt') {
           final txt = await cached(
             '/llms.txt',
+            headTtl,
             (markDegraded) async => needsAsyncResolution
                 ? seoLlmsTxt(
                     siteBase: siteBase,
@@ -257,7 +276,8 @@ Middleware seoBotMiddleware({
         if (serveLlmsTxt && routes != null && path == '/llms-full.txt') {
           final txt = await cached(
             '/llms-full.txt',
-            (markDegraded) async => needsAsyncResolution
+            fullTtl,
+            (markDegraded) async => fullDetailMayDoIo
                 ? seoLlmsFullTxt(
                     siteBase: siteBase,
                     pages: await resolveSeoPages(
@@ -310,7 +330,11 @@ Middleware seoBotMiddleware({
           routes != null &&
           applyResolverRedirects == SeoRedirectScope.all) {
         final match = matchSeoRoute(routes, path);
-        if (match != null) {
+        // Per route, not per table: in a mixed table the classic routes
+        // must not pay a meta build on every human page view just
+        // because a dynamic route exists somewhere else. Only a dynamic
+        // route can resolve to a redirect.
+        if (match != null && match.route.isDynamic) {
           try {
             final res = await match.resolve(
               detail: SeoDetail.head,
@@ -367,20 +391,22 @@ Middleware seoBotMiddleware({
             case SeoDocument(:final statusCode, :final body, :final meta)
                 when statusCode >= 400:
               // A real error status with the document's own body, or the
-              // built-in 404 page when it carries none.
-              return body.isEmpty
-                  ? _htmlResponse(_notFoundPage(),
-                      status: statusCode,
-                      extraHeaders: _safeHeaders(resolution.headers))
-                  : _htmlResponse(
-                      SeoPage.fromNodes(
-                        meta: meta,
-                        body: body,
-                        lang: resolution.lang ?? match.route.lang,
-                      ),
-                      status: statusCode,
-                      extraHeaders: _safeHeaders(resolution.headers),
-                    );
+              // built-in error markup when it carries none — but always
+              // with the resolver's own metadata. `SeoDocument.notFound`
+              // takes a `meta:` argument, so silently swapping in a
+              // generic page would throw away a title and description
+              // the caller deliberately supplied.
+              return _htmlResponse(
+                SeoPage.fromNodes(
+                  meta: meta.title == null
+                      ? meta.copyWith(title: _statusTitle(statusCode))
+                      : meta,
+                  body: body.isEmpty ? _statusBody(statusCode) : body,
+                  lang: resolution.lang ?? match.route.lang,
+                ),
+                status: statusCode,
+                extraHeaders: _safeHeaders(resolution.headers),
+              );
             case SeoDocument(:final body, :final meta):
               // A 200 with nothing to mirror falls through to the app —
               // an empty SSR page indexes worse than the Flutter shell.
@@ -468,8 +494,11 @@ Map<String, String> _safeHeaders(Map<String, String> headers) {
   final safe = <String, String>{};
   final vary = <String>{'User-Agent'};
   headers.forEach((rawName, value) {
-    if (_hasControlChars(rawName) || _hasControlChars(value)) return;
     final name = rawName.trim().toLowerCase();
+    if (!_validHeaderName.hasMatch(name) ||
+        !_validHeaderValue.hasMatch(value)) {
+      return;
+    }
     if (name.isEmpty) return;
     if (name != 'vary' && !_allowedResolverHeaders.contains(name)) return;
     if (name == 'vary') {
@@ -511,8 +540,20 @@ const Set<String> _allowedResolverHeaders = {
   'content-language',
 };
 
-bool _hasControlChars(String value) =>
-    value.codeUnits.any((c) => c < 0x20 || c == 0x7F);
+/// A valid HTTP field name (RFC 9110 token). Rejects spaces, colons,
+/// separators and anything non-ASCII.
+final RegExp _validHeaderName = RegExp(r"^[!#$%&'*+\-.^_`|~0-9a-z]+$");
+
+/// A valid HTTP field value: printable US-ASCII plus horizontal tab.
+///
+/// Deliberately stricter than "no CR/LF". Header text is transmitted as
+/// bytes, so a non-ASCII rune has no defined encoding here — an earlier
+/// version allowed U+2028 on the grounds that it cannot split a
+/// response, which was true and beside the point: over a real socket
+/// `shelf_io` rejects it and the request hangs instead of answering.
+/// A CMS-supplied header must never be able to take a page down, so the
+/// value is held to what HTTP can actually carry.
+final RegExp _validHeaderValue = RegExp(r'^[\x20-\x7E\t]*$');
 
 /// What this middleware answers depends on the User-Agent. Without
 /// saying so, a CDN caches whichever variant it saw first and serves it
@@ -543,6 +584,17 @@ Future<Response> _appResponse(Handler inner, Request request) async {
 /// Asset requests (`/main.dart.js`, `/favicon.png`) carry a file
 /// extension in their last segment — everything else is a page path.
 bool _looksLikePage(String path) => !path.split('/').last.contains('.');
+
+/// A title for an error page whose resolver supplied none.
+String _statusTitle(int status) => switch (status) {
+      404 => '404 — Page not found',
+      410 => '410 — Gone',
+      _ => '$status — Error',
+    };
+
+/// The fallback body for an error page whose resolver supplied none.
+List<SeoNode> _statusBody(int status) =>
+    [SeoNode(tag: 'h1', text: _statusTitle(status))];
 
 SeoPage _notFoundPage() => SeoPage(
       meta: const SeoMeta(title: '404 — Page not found', robots: 'noindex'),
