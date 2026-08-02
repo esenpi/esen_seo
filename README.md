@@ -448,6 +448,39 @@ and nonsense in a `Location`; an empty or `#fragment` target just
 redirects to itself. Anything refused becomes a 404 rather than an
 unsafe header.
 
+A resolver redirect is served to **human visitors as well as bots** —
+sending Googlebot to the new URL while a user stays on the old one is
+cloaking. Error statuses are the deliberate exception: a 404 or 410
+answers crawlers, while a human keeps the Flutter app and its own
+router decides what to show. Both are configurable:
+
+```dart
+seoBotMiddleware(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  applyResolverRedirects: SeoRedirectScope.all,   // default; .botsOnly, .off
+  infrastructureCacheTtl: Duration(minutes: 15),  // default for dynamic tables
+  onResolveError: (path, error, stack) => log.warning('$path: $error'),
+)
+```
+
+`sitemap.xml`, `llms.txt` and `llms-full.txt` are cached — forever for a
+static table, 15 minutes for a dynamic one — and concurrent requests
+share a single pass instead of each starting their own. **Set
+`onResolveError` when you use dynamic routes:** a failing page is
+dropped from the sitemap rather than taking the whole file down with it,
+and without the callback that happens silently.
+
+A resolver may also return response headers via `SeoDocument.headers`.
+The names are an **allow list** — `cache-control`, `expires`, `etag`,
+`last-modified`, `age`, `x-robots-tag`, `link` and `content-language`,
+plus `vary`, which is merged with `User-Agent` rather than replacing
+it. Everything else is dropped, including anything carrying a control
+character. That is deliberately narrow: a page's content should not be
+able to set a cookie, claim a content encoding, or decide your CORS and
+CSP posture. For headers beyond that list, put your own shelf
+middleware in the pipeline.
+
 For URL hygiene, add the redirect middleware in front — duplicate
 content under several URLs splits ranking signals:
 
