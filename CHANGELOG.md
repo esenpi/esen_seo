@@ -1,3 +1,49 @@
+## 0.7.0
+
+The runtime HTTP surface for dynamic routes — the half of 0.6.0's
+resolver that was deliberately held back.
+
+### `seoBotMiddleware`
+
+* **Resolver redirects reach humans too.** A `SeoRedirect` from a
+  resolver was served only to bots in 0.6.0; now it answers human
+  visitors as well by default (`applyResolverRedirects:
+  SeoRedirectScope.all`), because a 301 shown only to Googlebot is
+  cloaking. `.botsOnly` keeps the old behaviour, `.off` ignores resolver
+  redirects (pair it with `seoRedirectMiddleware`). Error statuses
+  (404/410) stay bot-only regardless — a human keeps the Flutter app,
+  not an SSR stub — and a resolver failure on the human path never
+  becomes a 5xx.
+* **`SeoDocument.headers` are emitted**, filtered at a single chokepoint.
+  The names are an **allow list** — caching validators
+  (`cache-control`, `expires`, `etag`, `last-modified`, `age`),
+  `x-robots-tag`, `link` and `content-language`. Nothing else: not
+  `set-cookie` (session fixation on a page that has no session), not
+  `content-encoding` (claiming gzip over an uncompressed body), not
+  CORS/CSP/HSTS (site-wide posture must not be decided per page by
+  content), and not the protocol headers the package and the adapter
+  own. Any header whose name or value carries a **control character** —
+  CR/LF or otherwise — is dropped whole, so response splitting cannot
+  depend on how a particular shelf adapter behaves. `vary` is **merged**
+  with `User-Agent`, never replaced.
+* **Infrastructure files are cached with a TTL.** `sitemap.xml`,
+  `llms.txt` and `llms-full.txt` are cached forever for a static table
+  (their content cannot change) and for 15 minutes for a dynamic one,
+  overridable via `infrastructureCacheTtl:`. One shared future per file
+  also collapses a stampede — twenty concurrent crawler hits trigger one
+  pass, not twenty. A build that throws is evicted at once; a build that
+  *degraded* (a row failed and was dropped) is served once but not
+  cached, so a transient database blip cannot freeze a partial sitemap
+  in place for the whole TTL.
+
+### Not yet
+
+`SeoDocument.headers` is honoured by the middleware only; the
+prerenderer still ignores it, since a static file has no response
+headers. `SeoPage.bodyHtml` (verbatim HTML past the policy) still has no
+representation in `SeoDocument` — `resolve:` on the middleware remains
+the escape hatch for hand-written HTML.
+
 ## 0.6.0
 
 Database-backed routes: one read produces a page's metadata **and** its
