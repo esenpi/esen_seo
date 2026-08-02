@@ -132,6 +132,27 @@ void main() {
     expect(EsenSeo.currentHeadHtml, isNot(contains('P slow')));
   });
 
+  testWidgets('a SYNCHRONOUSLY throwing resolver is caught too',
+      (tester) async {
+    // SeoResolver is a FutureOr, so a resolver may throw before it ever
+    // returns a Future. That escaped straight out of the
+    // NavigatorObserver, which no app expects from a metadata layer.
+    enableSeoForTests();
+    Object? reported;
+    final observer = SeoRouteObserver(
+      routes: [
+        SeoRoute.dynamic(
+          path: '/boom',
+          resolve: (_) => throw StateError('config broken'),
+        ),
+      ],
+      onResolveError: (path, error, _) => reported = error,
+    );
+
+    expect(() => observer.didPush(_route('/boom'), null), returnsNormally);
+    expect(reported, isA<StateError>());
+  });
+
   testWidgets('a throwing resolver reports and keeps the app alive',
       (tester) async {
     enableSeoForTests();

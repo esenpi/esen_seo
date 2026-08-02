@@ -125,6 +125,27 @@ void main() {
       }
     });
 
+    test('a trailing CRLF is caught, not trimmed away before the check', () {
+      // Checking the TRIMMED value and emitting the RAW one let a
+      // trailing CRLF pass the guard and reach the Location header.
+      for (final bad in ['/neu\r\n', '/neu\n', '/neu\r\nSet-Cookie: x=1']) {
+        final r = finishSeoResolution(SeoRedirect(bad), path: '/alt');
+        expect(r, isA<SeoDocument>(), reason: 'accepted: ${bad.codeUnits}');
+        expect((r as SeoDocument).statusCode, 404);
+      }
+    });
+
+    test('surrounding whitespace is normalised out of what is emitted', () {
+      // Plain spaces are harmless but must not reach the header
+      // unchecked — emit exactly the value that was validated.
+      final r = finishSeoResolution(
+        const SeoRedirect('  /neu  '),
+        path: '/alt',
+      );
+      expect(r, isA<SeoRedirect>());
+      expect((r as SeoRedirect).location, '/neu');
+    });
+
     test('a safe redirect passes through', () {
       final r = finishSeoResolution(
         const SeoRedirect('/neu'),
@@ -222,6 +243,46 @@ void main() {
             debugCheckMetaStability: true,
           );
       expect(run, throwsStateError);
+    });
+
+    test('an enumerator that fails ASYNCHRONOUSLY goes through onError',
+        () async {
+      // A database enumerator fails this way, not by throwing from the
+      // call. The error used to surface out of Future.wait, past the
+      // error policy, and take the whole pass with it.
+      final failed = <String>[];
+      final pages = await resolveSeoPages(
+        routes: [
+          SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
+          SeoRoute(
+            path: '/p/:id',
+            meta: (_) => const SeoMeta(),
+            enumeratePaths: () async => throw StateError('db down'),
+          ),
+        ],
+        onError: (path, _, __) => failed.add(path),
+      );
+      expect(failed, ['/p/:id']);
+      // The rest of the site still resolves.
+      expect(pages.map((p) => p.path), ['/']);
+    });
+
+    test('without onError an async enumerator failure still surfaces',
+        () async {
+      // A build must fail loudly rather than ship a sitemap missing a
+      // whole section.
+      expect(
+        () => resolveSeoPages(
+          routes: [
+            SeoRoute(
+              path: '/p/:id',
+              meta: (_) => const SeoMeta(),
+              enumeratePaths: () async => throw StateError('db down'),
+            ),
+          ],
+        ),
+        throwsStateError,
+      );
     });
 
     test('onError skips a failing page instead of aborting', () async {
