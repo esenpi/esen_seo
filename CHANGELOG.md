@@ -1,3 +1,65 @@
+## 0.6.0
+
+Database-backed routes: one read produces a page's metadata **and** its
+body, so the two can never describe different records.
+
+### `SeoRoute.dynamic`
+
+* `SeoRoute.dynamic(path:, resolve:)` resolves one concrete URL to a
+  `SeoResolution` — a `SeoDocument` (meta + body + status + lastModified)
+  or a `SeoRedirect`. For `/products/:slug` backed by a database, title,
+  description, schemas, body and last-modified come from a single record
+  instead of two reads that could disagree.
+* `SeoDocument.notFound()` / `.gone()` express a real 404 / 410 from a
+  resolver; `SeoRedirect` expresses a 301/302. The redirect target runs
+  through the same URL policy as an `href` at a single chokepoint
+  (`finishSeoResolution`), so a resolver can never emit a `javascript:`
+  `Location` or split a response — a bad target becomes a 404.
+* `SeoRoute(enumeratePaths:)` lists the concrete URLs a `:param` route
+  stands for, so the sitemap, llms.txt and the prerenderer can cover a
+  database of pages without hand-listing every slug.
+* `resolveSeoPages(...)` resolves the whole table once (bounded
+  concurrency, per-page error policy); the prerenderer, the middleware
+  and both llms generators share that single pass, so a URL is read once
+  no matter how many outputs it feeds.
+* The classic `SeoRoute(meta:, body:)` is **unchanged** and now sugar
+  over a resolver — one internal content path. Existing route tables,
+  the example app, the SSR server and `prerenderSite` need no edits.
+
+### Fixed by the same change
+
+* `llms-full.txt` read a page's metadata and its body separately (two
+  reads of one record in one file); they now come from a single
+  resolution, so the title and body in the output always match.
+* A resolver-issued redirect or a non-200 is dropped from sitemap.xml
+  and llms.txt and skipped by the prerenderer (reported via `onSkipped`)
+  — a static host can't emit a 301 or a 410 body with a 200 status.
+* A per-record `lastModified` now drives `<lastmod>`, and a record can
+  pull an unpublished page out of the sitemap even when the route opts
+  in.
+
+### Breaking
+
+* `SeoRoute.meta` is now `SeoMetaBuilder?` (was non-nullable) and
+  deprecated — it is `null` for `SeoRoute.dynamic`. **Constructing** a
+  route is unchanged; only reading the field off a route breaks. Use
+  `matchSeoRoute(...).resolveSync()?.metaOrNull`.
+* `SeoRouteMatch.buildMeta()` / `buildBody()` are deprecated (removed in
+  1.0); `buildMeta()` throws for a dynamic route. `seoSitemapXml`,
+  `seoLlmsTxt` and `seoLlmsFullTxt` now take **either** `routes:` or a
+  pre-resolved `pages:`; the sync two throw a `StateError` naming the fix
+  when a `routes:` table contains a dynamic route rather than silently
+  emitting an incomplete sitemap. Return types are unchanged. Both
+  `seoBotMiddleware` and `prerenderSite` resolve internally, so this is
+  unreachable from ordinary use.
+
+### Not yet — coming in 0.7.0
+
+Resolver redirects apply to bots today; extending them to human visitors
+(the anti-cloaking default), emitting `SeoDocument.headers`, and TTL
+caching of a dynamic table's infrastructure files are the runtime HTTP
+surface, kept separate from this release.
+
 ## 0.5.1
 
 Three findings from an audit that finished after 0.5.0 went out. Two are

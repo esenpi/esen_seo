@@ -7,6 +7,25 @@ import 'package:esen_seo/core.dart';
 
 const siteBase = 'https://esen.software';
 
+// A tiny in-memory "database" so the dynamic route below runs anywhere,
+// without a real backend. In a CMS this is a Postgres/Firestore read.
+const _posts = <String, ({String title, String teaser, String body})>{
+  'why-flutter-seo': (
+    title: 'Why Flutter Web needs real SEO',
+    teaser: 'A widget tree is not a document — here is the gap.',
+    body: 'Flutter renders to a canvas, so a crawler finds no headings, '
+        'paragraphs or links to read. esen_seo mirrors the tree as '
+        'semantic HTML from the same source.',
+  ),
+  'dynamic-routes': (
+    title: 'One read, one page: dynamic routes',
+    teaser: 'Title, description and body from a single database record.',
+    body: 'SeoRoute.dynamic resolves metadata and body together, so the '
+        'page a user sees and the entry in sitemap.xml can never drift '
+        'apart.',
+  ),
+};
+
 final seoRoutes = [
   SeoRoute(
     path: '/',
@@ -202,5 +221,41 @@ final seoRoutes = [
       ]),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],
+  ),
+  // A dynamic, database-style route. One resolve() read produces the
+  // metadata AND the body for /blog/<slug>, and enumeratePaths lists the
+  // concrete URLs so the sitemap, llms.txt and the prerenderer can bake
+  // them. An unknown slug resolves to a real 404.
+  SeoRoute.dynamic(
+    path: '/blog/:slug',
+    enumeratePaths: () async =>
+        _posts.keys.map((slug) => '/blog/$slug').toList(),
+    resolve: (request) async {
+      final post = _posts[request.param('slug')];
+      if (post == null) return SeoDocument.notFound();
+      return SeoDocument(
+        meta: SeoMeta(
+          title: '${post.title} — esen_seo',
+          description: post.teaser,
+          schemas: [
+            SeoSchema.breadcrumbs([
+              (name: 'Home', url: '$siteBase/'),
+              (name: post.title, url: '$siteBase/blog/${request['slug']}'),
+            ]),
+          ],
+        ),
+        // The head request (sitemap/llms) needs no body — skipping it
+        // keeps enumeration cheap.
+        body: request.detail == SeoDetail.head
+            ? const []
+            : [
+                SeoNode(tag: 'h1', text: post.title),
+                SeoNode(tag: 'p', text: post.body),
+                SeoNode(
+                    tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+              ],
+        lastModified: DateTime.utc(2026, 8, 1),
+      );
+    },
   ),
 ];

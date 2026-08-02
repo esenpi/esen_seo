@@ -404,6 +404,46 @@ routes whose `SeoMeta.alternates` list language variants get
 `<xhtml:link rel="alternate" hreflang="…">` entries — Google's
 recommended way to announce translations at scale.
 
+### Database-backed pages — one read, one page
+
+A `/products/:slug` page usually pulls its title, description, schema
+*and* body from a single record. Building the metadata and the body
+separately means two reads that can disagree — the page a user sees
+drifting from the entry in your sitemap. `SeoRoute.dynamic` resolves
+both from one read:
+
+```dart
+SeoRoute.dynamic(
+  path: '/products/:slug',
+  // Lists the concrete URLs for the sitemap, llms.txt and prerender.
+  enumeratePaths: () async =>
+      (await db.publishedSlugs()).map((s) => '/products/$s').toList(),
+  resolve: (request) async {
+    final product = await db.product(request.param('slug'));
+    if (product == null) return SeoDocument.notFound();       // real 404
+    if (product.movedTo != null) {
+      return SeoRedirect('/products/${product.movedTo}');     // real 301
+    }
+    return SeoDocument(
+      meta: SeoMeta(title: product.name, description: product.teaser),
+      // The head request (sitemap/llms) needs no body — skip it to keep
+      // enumeration cheap; never trim the meta.
+      body: request.detail == SeoDetail.head
+          ? const []
+          : product.toSeoNodes(),
+      lastModified: product.updatedAt,          // per-record <lastmod>
+      includeInSitemap: product.isPublished,    // pull drafts from the index
+    );
+  },
+)
+```
+
+`seoBotMiddleware` and `prerenderSite` resolve the table for you — the
+classic `SeoRoute(meta:, body:)` form is unchanged and mixes freely with
+dynamic routes in the same table. A `SeoRedirect` target passes the same
+URL policy as any link, so untrusted data can never produce an unsafe
+`Location`.
+
 For URL hygiene, add the redirect middleware in front — duplicate
 content under several URLs splits ranking signals:
 
