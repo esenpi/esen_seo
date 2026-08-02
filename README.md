@@ -440,9 +440,13 @@ SeoRoute.dynamic(
 
 `seoBotMiddleware` and `prerenderSite` resolve the table for you — the
 classic `SeoRoute(meta:, body:)` form is unchanged and mixes freely with
-dynamic routes in the same table. A `SeoRedirect` target passes the same
-URL policy as any link, so untrusted data can never produce an unsafe
-`Location`.
+dynamic routes in the same table. A `SeoRedirect` target is held to
+*stricter* rules than a link: only `http`, `https` or a relative path,
+only real redirect statuses (301, 302, 303, 307, 308), and never an
+empty or fragment-only target. `mailto:` and `tel:` are fine in a link
+and nonsense in a `Location`; an empty or `#fragment` target just
+redirects to itself. Anything refused becomes a 404 rather than an
+unsafe header.
 
 For URL hygiene, add the redirect middleware in front — duplicate
 content under several URLs splits ranking signals:
@@ -645,7 +649,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 390 unit and widget
+Young package under active development, covered by 395 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
