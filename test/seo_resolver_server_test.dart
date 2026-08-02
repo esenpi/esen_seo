@@ -111,6 +111,109 @@ void main() {
     });
   });
 
+  group('a classic route with an async enumerator is not a dynamic table', () {
+    // enumeratePaths is public on the CLASSIC constructor too, and it may
+    // return a Future. Deciding the sync/async path on `isDynamic` alone
+    // sent this table down the synchronous branch, where it threw.
+    List<SeoRoute> table() => [
+          SeoRoute(
+            path: '/blog/:slug',
+            meta: (p) => SeoMeta(title: 'Post ${p['slug']}'),
+            enumeratePaths: () async => ['/blog/a', '/blog/b'],
+          ),
+        ];
+
+    test('the served sitemap resolves instead of throwing', () async {
+      final handler = const Pipeline()
+          .addMiddleware(
+              seoBotMiddleware(routes: table(), siteBase: 'https://x.dev'))
+          .addHandler((_) => Response.ok('app'));
+      final res = await handler(
+          Request('GET', Uri.parse('http://localhost/sitemap.xml')));
+      expect(res.statusCode, 200);
+      final xml = await res.readAsString();
+      expect(xml, contains('https://x.dev/blog/a'));
+      expect(xml, contains('https://x.dev/blog/b'));
+    });
+
+    test('llms.txt resolves too', () async {
+      final handler = const Pipeline()
+          .addMiddleware(
+              seoBotMiddleware(routes: table(), siteBase: 'https://x.dev'))
+          .addHandler((_) => Response.ok('app'));
+      final res =
+          await handler(Request('GET', Uri.parse('http://localhost/llms.txt')));
+      expect(await res.readAsString(), contains('Post a'));
+    });
+  });
+
+  group('concurrent infrastructure requests share one pass', () {
+    test('twenty parallel sitemap requests resolve the table once', () async {
+      var reads = 0;
+      final routes = [
+        SeoRoute.dynamic(
+          path: '/p/:id',
+          enumeratePaths: () async => ['/p/a'],
+          resolve: (r) async {
+            reads++;
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+            return SeoDocument(meta: SeoMeta(title: r['id']));
+          },
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(
+              seoBotMiddleware(routes: routes, siteBase: 'https://x.dev'))
+          .addHandler((_) => Response.ok('app'));
+
+      await Future.wait([
+        for (var i = 0; i < 20; i++)
+          Future(() => handler(
+              Request('GET', Uri.parse('http://localhost/sitemap.xml')))),
+      ]);
+      // Without in-flight dedup this was 20 full passes over the table.
+      expect(reads, 1);
+    });
+  });
+
+  group('redirect targets are held to redirect rules, not link rules', () {
+    Future<Response> redirectTo(String location, {int status = 301}) => _ask([
+          SeoRoute.dynamic(
+            path: '/r',
+            resolve: (_) async => SeoRedirect(location, statusCode: status),
+          ),
+        ], '/r');
+
+    test('schemes that make no sense as a Location are refused', () async {
+      for (final bad in ['mailto:a@b.de', 'tel:+49123', 'ftp://x.dev/f']) {
+        final res = await redirectTo(bad);
+        expect(res.statusCode, 404, reason: 'accepted: $bad');
+        expect(res.headers['location'], isNull);
+      }
+    });
+
+    test('an empty or fragment-only target would loop', () async {
+      for (final bad in ['', '   ', '#top']) {
+        final res = await redirectTo(bad);
+        expect(res.statusCode, 404, reason: 'accepted: "$bad"');
+      }
+    });
+
+    test('304 is not a redirect', () async {
+      final res = await redirectTo('/neu', status: 304);
+      expect(res.statusCode, 404);
+    });
+
+    test('real redirects still work', () async {
+      for (final good in ['/neu', 'https://x.dev/neu']) {
+        final res = await redirectTo(good);
+        expect(res.statusCode, 301, reason: 'refused: $good');
+        expect(res.headers['location'], good);
+      }
+      expect((await redirectTo('/neu', status: 308)).statusCode, 308);
+    });
+  });
+
   group('prerenderSite bakes resolver output', () {
     late Directory buildDir;
 

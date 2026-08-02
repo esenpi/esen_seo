@@ -60,15 +60,21 @@ void main() {
     expect(EsenSeo.currentHeadHtml, isNot(contains('P slow')));
   });
 
-  testWidgets('resolveDynamicRoutes: false leaves dynamic meta untouched',
+  testWidgets('resolveDynamicRoutes: false never calls the resolver at all',
       (tester) async {
+    // Not just "the title stays": the read must not START. Checking the
+    // title alone passed even while the database was being hit.
     enableSeoForTests();
+    var calls = 0;
     final observer = SeoRouteObserver(
       routes: [
         SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
         SeoRoute.dynamic(
           path: '/p/:id',
-          resolve: (r) async => SeoDocument(meta: SeoMeta(title: r['id'])),
+          resolve: (r) async {
+            calls++;
+            return SeoDocument(meta: SeoMeta(title: r['id']));
+          },
         ),
       ],
       resolveDynamicRoutes: false,
@@ -77,8 +83,53 @@ void main() {
     observer.didPush(_route('/'), null);
     observer.didPush(_route('/p/x'), null);
     await tester.pump(const Duration(milliseconds: 20));
-    // The dynamic route was skipped; the last applied meta stays Home.
+    expect(calls, 0, reason: 'the resolver must not be invoked');
     expect(EsenSeo.currentHeadHtml, contains('<title>Home</title>'));
+  });
+
+  testWidgets('a synchronous dynamic resolver is also blocked by the switch',
+      (tester) async {
+    // A dynamic resolver may answer without awaiting. Deciding on the
+    // returned type instead of the route kind let its meta through.
+    enableSeoForTests();
+    final observer = SeoRouteObserver(
+      routes: [
+        SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
+        SeoRoute.dynamic(
+          path: '/p/:id',
+          resolve: (r) => SeoDocument(meta: SeoMeta(title: 'Sync ${r['id']}')),
+        ),
+      ],
+      resolveDynamicRoutes: false,
+    );
+
+    observer.didPush(_route('/'), null);
+    observer.didPush(_route('/p/x'), null);
+    await tester.pump(const Duration(milliseconds: 20));
+    expect(EsenSeo.currentHeadHtml, isNot(contains('Sync x')));
+  });
+
+  testWidgets('navigating to an unknown path still cancels a pending read',
+      (tester) async {
+    // The token used to advance only on a successful match, so a slow
+    // product read would set its title on a page the table never knew.
+    enableSeoForTests();
+    final observer = SeoRouteObserver(
+      routes: [
+        SeoRoute.dynamic(
+          path: '/p/:id',
+          resolve: (r) async {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return SeoDocument(meta: SeoMeta(title: 'P ${r['id']}'));
+          },
+        ),
+      ],
+    );
+
+    observer.didPush(_route('/p/slow'), null);
+    observer.didPush(_route('/unbekannt'), null); // matches nothing
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(EsenSeo.currentHeadHtml, isNot(contains('P slow')));
   });
 
   testWidgets('a throwing resolver reports and keeps the app alive',
