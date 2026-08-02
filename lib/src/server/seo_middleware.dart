@@ -42,13 +42,22 @@ enum SeoRedirectScope {
   off,
 }
 
-/// The default for `seoBotMiddleware(infrastructureCacheTtl:)`: cache
-/// `sitemap.xml`, `llms.txt` and `llms-full.txt` for the process
-/// lifetime when the table is fully static (their content cannot
-/// change), and for 15 minutes when any route is dynamic (their content
-/// comes from a database and a forever-cache would freeze the sitemap at
-/// boot). Pass an explicit [Duration] to override, or `null` to cache
-/// forever regardless.
+/// The default for `seoBotMiddleware(infrastructureCacheTtl:)`: derive
+/// each infrastructure file's cache lifetime from what it actually
+/// reads, rather than from one flag for the whole table.
+///
+/// - `sitemap.xml` and `llms.txt` need only head metadata, so they are
+///   cached for the process lifetime unless a route is dynamic or
+///   enumerates its paths.
+/// - `llms-full.txt` also renders bodies, and a **classic** route's
+///   `body` builder may be async and database-backed — "classic" does
+///   not mean "immutable". It is cached for the process lifetime only
+///   when no route has a body builder at all.
+///
+/// Anything not eligible for a forever-cache gets 15 minutes, so a
+/// long-running server never advertises a sitemap frozen at boot. Pass
+/// an explicit [Duration] to override both, or `null` to cache forever
+/// regardless.
 const Duration seoAutoInfrastructureCacheTtl = Duration(microseconds: -1);
 
 /// Shelf middleware that serves semantic HTML to bots and passes real
