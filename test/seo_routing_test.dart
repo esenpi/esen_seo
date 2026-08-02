@@ -33,6 +33,10 @@ Request _request(String path, {String? userAgent}) => Request(
       headers: {if (userAgent != null) 'user-agent': userAgent},
     );
 
+/// The resolved metadata of a matched (static) route.
+SeoMeta _meta(SeoRouteMatch match, {String? canonicalBase}) =>
+    (match.resolveSync(canonicalBase: canonicalBase)! as SeoDocument).meta;
+
 void main() {
   group('SeoRoute matching', () {
     test('matches exact paths and normalizes trailing slashes', () {
@@ -48,7 +52,7 @@ void main() {
       final match = matchSeoRoute(_routes(), '/blog/mein-artikel')!;
       expect(match.route.path, '/blog/:slug');
       expect(match.params, {'slug': 'mein-artikel'});
-      expect(match.buildMeta().title, 'Blog — mein-artikel');
+      expect(_meta(match).title, 'Blog — mein-artikel');
     });
 
     test('param segments must not be empty', () {
@@ -58,14 +62,12 @@ void main() {
     test('derives canonical from base when route sets none', () {
       final routes = _routes();
       expect(
-        matchSeoRoute(routes, '/demo')!
-            .buildMeta(canonicalBase: 'https://x.dev/')
+        _meta(matchSeoRoute(routes, '/demo')!, canonicalBase: 'https://x.dev/')
             .canonicalUrl,
         'https://x.dev/demo',
       );
       expect(
-        matchSeoRoute(routes, '/')!
-            .buildMeta(canonicalBase: 'https://x.dev')
+        _meta(matchSeoRoute(routes, '/')!, canonicalBase: 'https://x.dev')
             .canonicalUrl,
         'https://x.dev/',
       );
@@ -77,8 +79,7 @@ void main() {
         meta: (_) => const SeoMeta(canonicalUrl: 'https://x.dev/b'),
       );
       expect(
-        matchSeoRoute([route], '/a')!
-            .buildMeta(canonicalBase: 'https://x.dev')
+        _meta(matchSeoRoute([route], '/a')!, canonicalBase: 'https://x.dev')
             .canonicalUrl,
         'https://x.dev/b',
       );

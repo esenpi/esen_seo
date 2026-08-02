@@ -1,0 +1,278 @@
+import 'package:esen_seo/core.dart';
+import 'package:esen_seo/server.dart'
+    show seoLlmsFullTxt, seoLlmsTxt, seoSitemapXml;
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('the static convenience route stays synchronous', () {
+    test('head resolves in the same turn even with an async body', () {
+      // The whole design rests on this line: a route whose body builder
+      // is async must still answer a head request without a microtask,
+      // or the sitemap, llms.txt and the observer would all go async.
+      final match = matchSeoRoute([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(title: 'Home'),
+          body: (_) async => [SeoNode(tag: 'h1', text: 'late')],
+        ),
+      ], '/')!;
+
+      final head = match.resolveSync(detail: SeoDetail.head);
+      expect(head, isA<SeoDocument>());
+      expect((head! as SeoDocument).meta.title, 'Home');
+      // full needs the async body, so it is NOT available synchronously.
+      expect(match.resolveSync(detail: SeoDetail.full), isNull);
+    });
+
+    test('full carries the async body once awaited', () async {
+      final match = matchSeoRoute([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(title: 'Home'),
+          body: (_) async => [SeoNode(tag: 'h1', text: 'late')],
+        ),
+      ], '/')!;
+      final full = await match.resolve(detail: SeoDetail.full) as SeoDocument;
+      expect(full.body.single.text, 'late');
+    });
+
+    test('a dynamic route never resolves synchronously', () {
+      final match = matchSeoRoute([
+        SeoRoute.dynamic(
+          path: '/p/:id',
+          resolve: (r) async => SeoDocument(meta: SeoMeta(title: r['id'])),
+        ),
+      ], '/p/7')!;
+      expect(match.resolveSync(detail: SeoDetail.head), isNull);
+    });
+  });
+
+  group('memoisation reads a URL once', () {
+    test('two head resolves share one read; full is a separate read', () async {
+      var reads = 0;
+      final match = matchSeoRoute([
+        SeoRoute.dynamic(
+          path: '/p/:id',
+          resolve: (r) async {
+            reads++;
+            return SeoDocument(
+              meta: SeoMeta(title: 'P ${r['id']}'),
+              body: r.detail == SeoDetail.head
+                  ? const []
+                  : [SeoNode(tag: 'p', text: 'body')],
+            );
+          },
+        ),
+      ], '/p/1')!;
+
+      await match.resolve(detail: SeoDetail.head);
+      await match.resolve(detail: SeoDetail.head);
+      expect(reads, 1, reason: 'two head reads must share one resolver call');
+
+      final full = await match.resolve(detail: SeoDetail.full) as SeoDocument;
+      expect(reads, 2, reason: 'full is a distinct read');
+      // The invariant: a full request is never served the head result,
+      // so the body the head skipped is really here.
+      expect(full.body.single.text, 'body');
+    });
+  });
+
+  group('the chokepoint finishes every resolution', () {
+    test('canonical is derived for a 200 without one', () {
+      final r = finishSeoResolution(
+        const SeoDocument(meta: SeoMeta(title: 'X')),
+        path: '/x',
+        canonicalBase: 'https://x.dev',
+      ) as SeoDocument;
+      expect(r.meta.canonicalUrl, 'https://x.dev/x');
+    });
+
+    test('a 404 gets no canonical to itself', () {
+      final r = finishSeoResolution(
+        SeoDocument.notFound(),
+        path: '/gone',
+        canonicalBase: 'https://x.dev',
+      ) as SeoDocument;
+      expect(r.meta.canonicalUrl, isNull);
+      expect(r.statusCode, 404);
+      expect(r.meta.robots, 'noindex');
+    });
+
+    test('an explicit canonical is never overwritten', () {
+      final r = finishSeoResolution(
+        const SeoDocument(meta: SeoMeta(canonicalUrl: 'https://x.dev/keep')),
+        path: '/x',
+        canonicalBase: 'https://x.dev',
+      ) as SeoDocument;
+      expect(r.meta.canonicalUrl, 'https://x.dev/keep');
+    });
+
+    test('an unsafe redirect target becomes a 404, never a Location', () {
+      var warned = '';
+      for (final bad in [
+        'javascript:alert(1)',
+        '/ok\r\nSet-Cookie: x=1',
+        'vbscript:msgbox(1)',
+      ]) {
+        final r = finishSeoResolution(
+          SeoRedirect(bad),
+          path: '/p',
+          onWarning: (_, w) => warned = w,
+        );
+        expect(r, isA<SeoDocument>(), reason: 'accepted: $bad');
+        expect((r as SeoDocument).statusCode, 404);
+        expect(warned, isNotEmpty);
+      }
+    });
+
+    test('a safe redirect passes through', () {
+      final r = finishSeoResolution(
+        const SeoRedirect('/neu'),
+        path: '/alt',
+      );
+      expect(r, isA<SeoRedirect>());
+      expect((r as SeoRedirect).location, '/neu');
+      expect(r.statusCode, 301);
+    });
+  });
+
+  group('resolveSeoPages', () {
+    List<SeoRoute> table() => [
+          SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
+          SeoRoute.dynamic(
+            path: '/p/:id',
+            enumeratePaths: () async => ['/p/a', '/p/b', '/p/gone', '/p/old'],
+            resolve: (r) async {
+              switch (r['id']) {
+                case 'gone':
+                  return SeoDocument.gone();
+                case 'old':
+                  return const SeoRedirect('/p/a');
+                default:
+                  return SeoDocument(
+                    meta: SeoMeta(title: 'P ${r['id']}'),
+                    lastModified: DateTime.utc(2026, 8, r['id'] == 'a' ? 1 : 2),
+                  );
+              }
+            },
+          ),
+        ];
+
+    test('enumerates and resolves every concrete URL once', () async {
+      final pages = await resolveSeoPages(
+        routes: table(),
+        canonicalBase: 'https://x.dev',
+      );
+      expect(pages.map((p) => p.path),
+          containsAll(['/', '/p/a', '/p/b', '/p/gone', '/p/old']));
+    });
+
+    test('sitemap drops redirects, gone pages, keeps per-record lastmod',
+        () async {
+      final pages = await resolveSeoPages(
+        routes: table(),
+        canonicalBase: 'https://x.dev',
+      );
+      final xml = seoSitemapXml(pages: pages, siteBase: 'https://x.dev');
+      expect(xml, contains('<loc>https://x.dev/p/a</loc>'));
+      expect(xml, contains('<lastmod>2026-08-01</lastmod>'));
+      // The 410 and the redirect are not indexable.
+      expect(xml, isNot(contains('/p/gone')));
+      expect(xml, isNot(contains('/p/old')));
+    });
+
+    test('llms-full reads meta and body from one resolution', () async {
+      // The drift the whole feature exists to remove: a resolver whose
+      // output changes between reads must show ONE consistent read.
+      var counter = 0;
+      final txt = await seoLlmsFullTxt(
+        siteBase: 'https://x.dev',
+        routes: [
+          SeoRoute.dynamic(
+            path: '/p',
+            resolve: (r) async {
+              final n = ++counter;
+              return SeoDocument(
+                meta: SeoMeta(title: 'Read $n'),
+                body: [SeoNode(tag: 'p', text: 'Body $n')],
+              );
+            },
+          ),
+        ],
+      );
+      // Title and body carry the SAME read number.
+      expect(txt, contains('## Read 1'));
+      expect(txt, contains('Body 1'));
+      expect(txt, isNot(contains('Read 2')));
+    });
+
+    test('debugCheckMetaStability catches a resolver that lies for head',
+        () async {
+      Future<void> run() => resolveSeoPages(
+            routes: [
+              SeoRoute.dynamic(
+                path: '/p',
+                resolve: (r) async => SeoDocument(
+                  meta: SeoMeta(
+                    title: r.detail == SeoDetail.head ? 'Head' : 'Full',
+                  ),
+                ),
+              ),
+            ],
+            debugCheckMetaStability: true,
+          );
+      expect(run, throwsStateError);
+    });
+
+    test('onError skips a failing page instead of aborting', () async {
+      final pages = await resolveSeoPages(
+        routes: [
+          SeoRoute(path: '/', meta: (_) => const SeoMeta(title: 'Home')),
+          SeoRoute.dynamic(
+            path: '/boom',
+            resolve: (_) async => throw StateError('db down'),
+          ),
+        ],
+        additionalPaths: const ['/boom'],
+        onError: (_, __, ___) {},
+      );
+      expect(pages.map((p) => p.path), contains('/'));
+      expect(pages.map((p) => p.path), isNot(contains('/boom')));
+    });
+  });
+
+  group('the sync generators refuse a dynamic table loudly', () {
+    final dynamicTable = [
+      SeoRoute.dynamic(
+        path: '/p/:id',
+        resolve: (r) async => SeoDocument(meta: SeoMeta(title: r['id'])),
+      ),
+    ];
+
+    test('seoSitemapXml(routes:) throws with the fix in the message', () {
+      expect(
+        () => seoSitemapXml(routes: dynamicTable, siteBase: 'https://x.dev'),
+        throwsA(isA<StateError>().having(
+            (e) => e.toString(), 'message', contains('resolveSeoPages'))),
+      );
+    });
+
+    test('seoLlmsTxt(routes:) throws too', () {
+      expect(
+        () => seoLlmsTxt(routes: dynamicTable, siteBase: 'https://x.dev'),
+        throwsStateError,
+      );
+    });
+
+    test('passing both routes and pages is an ArgumentError', () {
+      expect(
+        () => seoSitemapXml(
+          routes: dynamicTable,
+          pages: const [],
+          siteBase: 'https://x.dev',
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+}
