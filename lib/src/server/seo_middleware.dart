@@ -57,23 +57,52 @@ Middleware seoBotMiddleware({
   List<String> additionalSitemapPaths = const [],
   bool unknownRoutesAs404 = true,
   BotDetector detector = const BotDetector(),
+
+  /// Called when a route resolver fails.
+  ///
+  /// **Set this if you use dynamic routes.** The infrastructure
+  /// endpoints deliberately survive a failing page — a sitemap missing
+  /// one URL beats a sitemap that 500s — which means without this
+  /// callback that page disappears from `/sitemap.xml` and `/llms.txt`
+  /// with nothing to show for it. On the page path itself the error is
+  /// reported and then rethrown, so the crawler gets a 5xx and comes
+  /// back rather than indexing an empty shell.
   void Function(String path, Object error, StackTrace stack)? onResolveError,
 }) {
   assert(
     routes != null || resolve != null,
     'seoBotMiddleware needs `routes` and/or `resolve`.',
   );
-  final hasDynamic = routes?.any((r) => r.isDynamic) ?? false;
+  // Not just `isDynamic`: a CLASSIC route may carry an async
+  // `enumeratePaths` too, and the synchronous pass cannot await it
+  // either. Deciding on "is dynamic" alone made /sitemap.xml throw for a
+  // perfectly legal table.
+  final needsAsyncResolution =
+      routes?.any((r) => r.isDynamic || r.enumeratePaths != null) ?? false;
   return (Handler inner) {
     // A fully static table cannot change, so its infrastructure files are
     // built once and served from cache forever — byte-identical to
-    // before the resolver existed. A dynamic table resolves fresh on each
-    // request (correct, if not yet cheap); TTL caching for it lands in
-    // 0.7.
+    // before the resolver existed. A dynamic table resolves fresh on
+    // each request; TTL caching for it lands in 0.7.
     String? sitemapCache;
     String? robotsCache;
     String? llmsCache;
     Future<String>? llmsFullCache;
+
+    // Until then, at least never resolve the same file twice at once: a
+    // crawler opening /sitemap.xml twenty times in parallel would
+    // otherwise start twenty full passes over the database. Concurrent
+    // callers share the one in-flight pass; the slot frees as soon as it
+    // completes, so this collapses a stampede without caching anything.
+    final inFlight = <String, Future<String>>{};
+    Future<String> once(String key, Future<String> Function() build) =>
+        inFlight[key] ??= Future(() async {
+          try {
+            return await build();
+          } finally {
+            inFlight.remove(key);
+          }
+        });
 
     void report(String p, Object e, StackTrace s) =>
         onResolveError?.call(p, e, s);
@@ -84,15 +113,18 @@ Middleware seoBotMiddleware({
       // Infrastruktur-Dateien — für alle Clients, nicht nur Bots.
       if (siteBase != null) {
         if (serveSitemap && routes != null && path == '/sitemap.xml') {
-          final xml = hasDynamic
-              ? seoSitemapXml(
-                  siteBase: siteBase,
-                  pages: await resolveSeoPages(
-                    routes: routes,
-                    canonicalBase: siteBase,
-                    additionalPaths: additionalSitemapPaths,
-                    detail: SeoDetail.head,
-                    onError: report,
+          final xml = needsAsyncResolution
+              ? await once(
+                  '/sitemap.xml',
+                  () async => seoSitemapXml(
+                    siteBase: siteBase,
+                    pages: await resolveSeoPages(
+                      routes: routes,
+                      canonicalBase: siteBase,
+                      additionalPaths: additionalSitemapPaths,
+                      detail: SeoDetail.head,
+                      onError: report,
+                    ),
                   ),
                 )
               : (sitemapCache ??= seoSitemapXml(
@@ -114,15 +146,18 @@ Middleware seoBotMiddleware({
           );
         }
         if (serveLlmsTxt && routes != null && path == '/llms.txt') {
-          final txt = hasDynamic
-              ? seoLlmsTxt(
-                  siteBase: siteBase,
-                  pages: await resolveSeoPages(
-                    routes: routes,
-                    canonicalBase: siteBase,
-                    additionalPaths: additionalSitemapPaths,
-                    detail: SeoDetail.head,
-                    onError: report,
+          final txt = needsAsyncResolution
+              ? await once(
+                  '/llms.txt',
+                  () async => seoLlmsTxt(
+                    siteBase: siteBase,
+                    pages: await resolveSeoPages(
+                      routes: routes,
+                      canonicalBase: siteBase,
+                      additionalPaths: additionalSitemapPaths,
+                      detail: SeoDetail.head,
+                      onError: report,
+                    ),
                   ),
                 )
               : (llmsCache ??= seoLlmsTxt(
@@ -140,15 +175,18 @@ Middleware seoBotMiddleware({
           // Future (not the value) so concurrent first requests render
           // the whole site only once.
           final Future<String> txt;
-          if (hasDynamic) {
-            txt = seoLlmsFullTxt(
-              siteBase: siteBase,
-              pages: await resolveSeoPages(
-                routes: routes,
-                canonicalBase: siteBase,
-                additionalPaths: additionalSitemapPaths,
-                detail: SeoDetail.full,
-                onError: report,
+          if (needsAsyncResolution) {
+            txt = once(
+              '/llms-full.txt',
+              () async => seoLlmsFullTxt(
+                siteBase: siteBase,
+                pages: await resolveSeoPages(
+                  routes: routes,
+                  canonicalBase: siteBase,
+                  additionalPaths: additionalSitemapPaths,
+                  detail: SeoDetail.full,
+                  onError: report,
+                ),
               ),
             );
           } else {
@@ -180,10 +218,21 @@ Middleware seoBotMiddleware({
         final match = matchSeoRoute(routes, path);
         if (match != null) {
           routeExists = true;
-          final resolution = await match.resolve(
-            canonicalBase: siteBase,
-            onWarning: (p, w) => report(p, StateError(w), StackTrace.current),
-          );
+          final SeoResolution resolution;
+          try {
+            resolution = await match.resolve(
+              canonicalBase: siteBase,
+              onWarning: (p, w) => report(p, StateError(w), StackTrace.current),
+            );
+          } catch (error, stack) {
+            // The page path used to be the one place a resolver failure
+            // bypassed onResolveError entirely. Report it, then let it
+            // through: a 5xx tells a crawler to come back, while serving
+            // the empty Flutter shell with a 200 invites it to index
+            // nothing at all.
+            report(path, error, stack);
+            rethrow;
+          }
           switch (resolution) {
             case SeoRedirect(:final location, :final statusCode):
               // A redirect is served to bots. Applying it to human

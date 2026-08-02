@@ -99,12 +99,11 @@ Future<List<SeoResolvedPage>> resolveSeoPages({
   void Function(String path, String warning)? onWarning,
   bool debugCheckMetaStability = false,
 }) async {
-  final targets = <_Target>[];
-  await _collectTargets(
+  final targets = await _collectTargets(
     routes: routes,
     additionalPaths: additionalPaths,
     enumerateRoutePaths: enumerateRoutePaths,
-    add: targets.add,
+    onError: onError,
   );
 
   final pages = List<SeoResolvedPage?>.filled(targets.length, null);
@@ -167,22 +166,22 @@ List<SeoResolvedPage> resolveSeoPagesSync({
     }
   }
 
-  final targets = <_Target>[];
-  final pending = _collectTargets(
+  final collected = _collectTargets(
     routes: routes,
     additionalPaths: additionalPaths,
     enumerateRoutePaths: enumerateRoutePaths,
-    add: targets.add,
   );
-  if (pending != null) {
+  if (collected is! List<_Target>) {
     throw StateError(
-      'resolveSeoPagesSync cannot await a SeoRoute.enumeratePaths that '
-      'returns a Future. Use the async resolveSeoPages instead.',
+      'A synchronous generator cannot await a SeoRoute.enumeratePaths that '
+      'returns a Future. Resolve the table first: pass '
+      'pages: await resolveSeoPages(routes: …, canonicalBase: …). '
+      'seoBotMiddleware and prerenderSite do this for you.',
     );
   }
 
   return [
-    for (final target in targets)
+    for (final target in collected)
       _resolveTargetSync(
         target,
         canonicalBase: canonicalBase,
@@ -233,50 +232,68 @@ class _Target {
   final bool explicit;
 }
 
-// Builds the deduped target list. Returns a Future to await when an
-// enumerator was async (the sync path treats that as an error), or
-// `null` when everything was gathered synchronously.
-Future<void>? _collectTargets({
+// Builds the deduped target list in a deterministic order: routes,
+// then each route's enumerator (in table order), then additionalPaths.
+//
+// Returns the list directly when every enumerator answered
+// synchronously — the sync generators require that — and a Future
+// otherwise. The order must NOT depend on which enumerator completes
+// first: `explicit` decides whether a route's `includeInSitemap` is
+// honoured, so a URL changing hands between an enumerator and
+// additionalPaths would silently move a page in or out of the sitemap.
+FutureOr<List<_Target>> _collectTargets({
   required List<SeoRoute> routes,
   required List<String> additionalPaths,
   required bool enumerateRoutePaths,
-  required void Function(_Target) add,
+  void Function(String path, Object error, StackTrace stack)? onError,
 }) {
-  final seen = <String>{};
-  final futures = <Future<void>>[];
-
-  void addPath(String rawPath, {required bool explicit}) {
-    final path = normalizeSeoPath(rawPath);
-    if (!seen.add(path)) return;
-    add(_Target(path, matchSeoRoute(routes, path), explicit));
-  }
-
-  for (final route in routes) {
-    if (!route.hasParams) addPath(route.path, explicit: false);
-  }
+  // Gather the enumerator results in table order first, so awaiting can
+  // never reshuffle them.
+  final enumerated = <FutureOr<List<String>>>[];
   if (enumerateRoutePaths) {
     for (final route in routes) {
       final enumerate = route.enumeratePaths;
       if (enumerate == null) continue;
-      final result = enumerate();
-      if (result is List<String>) {
-        for (final path in result) {
-          addPath(path, explicit: false);
-        }
-      } else {
-        futures.add(result.then((paths) {
-          for (final path in paths) {
-            addPath(path, explicit: false);
-          }
-        }));
+      try {
+        enumerated.add(enumerate());
+      } catch (error, stack) {
+        // An enumerator failure used to escape the error policy
+        // entirely and abort the whole pass.
+        if (onError == null) rethrow;
+        onError(route.path, error, stack);
       }
     }
   }
-  for (final path in additionalPaths) {
-    addPath(path, explicit: true);
+
+  List<_Target> build(List<List<String>> enumeratedPaths) {
+    final seen = <String>{};
+    final targets = <_Target>[];
+    void addPath(String rawPath, {required bool explicit}) {
+      final path = normalizeSeoPath(rawPath);
+      if (!seen.add(path)) return;
+      targets.add(_Target(path, matchSeoRoute(routes, path), explicit));
+    }
+
+    for (final route in routes) {
+      if (!route.hasParams) addPath(route.path, explicit: false);
+    }
+    for (final paths in enumeratedPaths) {
+      for (final path in paths) {
+        addPath(path, explicit: false);
+      }
+    }
+    for (final path in additionalPaths) {
+      addPath(path, explicit: true);
+    }
+    return targets;
   }
 
-  return futures.isEmpty ? null : Future.wait(futures);
+  if (enumerated.every((e) => e is List<String>)) {
+    return build([for (final e in enumerated) e as List<String>]);
+  }
+  // Future.wait preserves the input order, so the result is the table
+  // order regardless of completion order.
+  return Future.wait(enumerated.map((e) async => e)).then(build);
 }
 
 Future<SeoResolvedPage> _resolveTarget(
@@ -351,20 +368,40 @@ SeoResolvedPage _resolveTargetSync(
   );
 }
 
+/// Everything about a resolution that must NOT depend on the detail
+/// asked for. The body is the one thing a `head` request may skip;
+/// change any of these between head and full and the sitemap, the
+/// prerendered file and the SSR response start describing different
+/// pages.
+String _stableFingerprint(SeoResolution r) => switch (r) {
+      SeoRedirect(:final location, :final statusCode) =>
+        'redirect $statusCode $location',
+      SeoDocument(
+        :final meta,
+        :final statusCode,
+        :final lang,
+        :final lastModified,
+        :final includeInSitemap
+      ) =>
+        'document $statusCode lang=$lang lastmod=${lastModified?.toIso8601String()} '
+            'sitemap=$includeInSitemap ${meta.toHtml()}',
+    };
+
 void _assertMetaStable(
   String path,
   SeoResolution a,
   SeoResolution b,
 ) {
-  final metaA = a.metaOrNull;
-  final metaB = b.metaOrNull;
-  final headA = metaA?.toHtml();
-  final headB = metaB?.toHtml();
+  final headA = _stableFingerprint(a);
+  final headB = _stableFingerprint(b);
   if (headA != headB) {
     throw StateError(
-      'Resolver for "$path" returned different metadata for head and full. '
-      'A head resolution may carry less BODY, never less META — otherwise '
-      'sitemap.xml and llms.txt disagree with the rendered page.',
+      'Resolver for "$path" answered head and full differently. '
+      'A head resolution may carry less BODY, never a different status, '
+      'redirect target, lang, lastModified, includeInSitemap or meta — '
+      'otherwise sitemap.xml and llms.txt disagree with the rendered page.\n'
+      '  head/full A: $headA\n'
+      '  head/full B: $headB',
     );
   }
 }
