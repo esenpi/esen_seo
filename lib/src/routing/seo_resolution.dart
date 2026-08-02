@@ -197,8 +197,8 @@ final class SeoRedirect extends SeoResolution {
           'A redirect status is 3xx.',
         );
 
-  /// Where to send the request. Held to the same URL policy as an
-  /// `href` — see [finishSeoResolution].
+  /// Where to send the request. Held to stricter rules than a link
+  /// target — see [finishSeoResolution].
   final String location;
 
   @override
@@ -243,7 +243,12 @@ SeoResolution finishSeoResolution(
         );
         return SeoDocument.notFound();
       }
-      return resolution;
+      // Emit exactly what was validated. Returning the original would
+      // let surrounding whitespace reach the header unchecked.
+      final target = location.trim();
+      return target == location
+          ? resolution
+          : SeoRedirect(target, statusCode: statusCode);
     case SeoDocument(:final meta, :final statusCode):
       // `assert` does not run in production, so the status is validated
       // for real here, at the one point every output path crosses.
@@ -284,12 +289,16 @@ String? _redirectProblem(String location, int statusCode) {
   if (!_redirectStatuses.contains(statusCode)) {
     return 'not an HTTP redirect status';
   }
+  // Check control characters on the RAW value, before trimming. Trimming
+  // first would swallow a trailing CRLF here and then hand the untrimmed
+  // string to the Location header — the response split this guard exists
+  // to prevent.
+  if (location.codeUnits.any((c) => c < 0x20 || c == 0x7F)) {
+    return 'control characters would split the response';
+  }
   final target = location.trim();
   if (target.isEmpty) return 'empty target';
   if (target.startsWith('#')) return 'fragment-only target loops';
-  if (target.codeUnits.any((c) => c < 0x20 || c == 0x7F)) {
-    return 'control characters would split the response';
-  }
   if (!isAllowedSeoAttribute('href', target)) return 'unsafe URL';
   final scheme = RegExp(r'^([a-zA-Z][a-zA-Z0-9+.-]*):').firstMatch(target);
   if (scheme != null) {

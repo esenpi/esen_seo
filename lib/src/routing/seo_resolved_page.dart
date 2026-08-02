@@ -255,10 +255,23 @@ FutureOr<List<_Target>> _collectTargets({
       final enumerate = route.enumeratePaths;
       if (enumerate == null) continue;
       try {
-        enumerated.add(enumerate());
+        final result = enumerate();
+        // A database enumerator fails asynchronously, which is exactly
+        // the case a plain try/catch around the CALL does not see: the
+        // error would surface out of Future.wait below, past onError,
+        // and take the whole pass with it.
+        enumerated.add(result is List<String>
+            ? result
+            : () async {
+                try {
+                  return await result;
+                } catch (error, stack) {
+                  if (onError == null) rethrow;
+                  onError(route.path, error, stack);
+                  return <String>[];
+                }
+              }());
       } catch (error, stack) {
-        // An enumerator failure used to escape the error policy
-        // entirely and abort the whole pass.
         if (onError == null) rethrow;
         onError(route.path, error, stack);
       }
