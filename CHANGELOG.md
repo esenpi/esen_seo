@@ -12,9 +12,12 @@ body, so the two can never describe different records.
   instead of two reads that could disagree.
 * `SeoDocument.notFound()` / `.gone()` express a real 404 / 410 from a
   resolver; `SeoRedirect` expresses a 301/302. The redirect target runs
-  through the same URL policy as an `href` at a single chokepoint
-  (`finishSeoResolution`), so a resolver can never emit a `javascript:`
-  `Location` or split a response — a bad target becomes a 404.
+  through a single chokepoint (`finishSeoResolution`) that is *stricter*
+  than the link policy: `http`/`https` or a relative path only, a real
+  redirect status only, and never an empty or fragment-only target
+  (both of which redirect to themselves). So a resolver can never emit
+  a `javascript:` `Location`, a `mailto:` one, or split a response — a
+  bad target becomes a 404.
 * `SeoRoute(enumeratePaths:)` lists the concrete URLs a `:param` route
   stands for, so the sitemap, llms.txt and the prerenderer can cover a
   database of pages without hand-listing every slug.
