@@ -1,4 +1,5 @@
 import '../renderer/html_renderer.dart';
+import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 
 /// Characters XML 1.0 forbids outright. A single one of them in a route
@@ -18,38 +19,48 @@ String _xmlSafe(String value) =>
 
 /// Generates a sitemap.xml from the SEO route table.
 ///
-/// Includes every route with [SeoRoute.includeInSitemap] that has no
-/// `:param` segments (their concrete URLs cannot be enumerated from the
-/// pattern — pass known instances via [additionalPaths], e.g. the slugs
-/// of all published blog posts; they are matched back against the route
-/// table so their metadata is picked up too).
+/// Pass **exactly one** of [routes] and [pages]:
 ///
-/// Per URL the entry carries everything the route knows:
+/// - [routes] is the classic path — the table is resolved synchronously.
+///   It throws a [StateError] when the table contains a
+///   [SeoRoute.dynamic], because a database read cannot happen without
+///   awaiting; the message names the fix.
+/// - [pages] is a pre-resolved snapshot from `resolveSeoPages`, which
+///   works for every table. Passing [additionalPaths] together with
+///   [pages] is an [ArgumentError] — they were already folded into the
+///   pass. `seoBotMiddleware` and `prerenderSite` take this path for you.
 ///
-/// - `<lastmod>` from [SeoRoute.lastModified],
-/// - `<xhtml:link rel="alternate" hreflang="…"/>` for every language
-///   variant in the route's `SeoMeta.alternates` (Google's recommended
-///   way to announce translations via the sitemap).
+/// Includes every indexable URL: a route without `:param` segments, plus
+/// any concrete instances from a route's `enumeratePaths` or from
+/// [additionalPaths]. A page that resolves to a redirect, a non-200, or
+/// opts out via `includeInSitemap` is dropped.
+///
+/// Per URL the entry carries `<lastmod>` (a per-record date beats the
+/// route's static one) and `<xhtml:link rel="alternate" hreflang="…"/>`
+/// for every language variant in the page's `SeoMeta.alternates`.
 String seoSitemapXml({
-  required List<SeoRoute> routes,
   required String siteBase,
+  List<SeoRoute>? routes,
+  List<SeoResolvedPage>? pages,
   List<String> additionalPaths = const [],
 }) {
+  final resolved = pagesForGenerator(
+    routes: routes,
+    pages: pages,
+    additionalPaths: additionalPaths,
+    canonicalBase: siteBase,
+  );
   final base = siteBase.endsWith('/')
       ? siteBase.substring(0, siteBase.length - 1)
       : siteBase;
-  // Doppelte Pfade (z.B. additionalPaths, die schon als Route existieren)
-  // dürfen nur einmal in die Sitemap — Set.add meldet Duplikate.
-  final seen = <String>{};
-  final entries = <_SitemapEntry>[
-    for (final route in routes)
-      if (route.includeInSitemap && !route.hasParams && seen.add(route.path))
-        _SitemapEntry(route.path, route, null),
-    for (final path in additionalPaths.map(normalizeSeoPath))
-      if (seen.add(path)) _entryForPath(routes, path),
+
+  final entries = [
+    for (final page in resolved)
+      if (page.isIndexable) page,
   ];
 
-  final hasAlternates = entries.any((e) => e.alternates.isNotEmpty);
+  final hasAlternates =
+      entries.any((e) => e.document!.meta.alternates.isNotEmpty);
   final buffer = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..write('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"')
@@ -57,8 +68,9 @@ String seoSitemapXml({
         hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml">' : '>');
   for (final entry in entries) {
     final url = entry.path == '/' ? '$base/' : '$base${entry.path}';
-    final lastmod = entry.route?.lastModified;
-    if (lastmod == null && entry.alternates.isEmpty) {
+    final lastmod = entry.lastModified;
+    final alternates = entry.document!.meta.alternates;
+    if (lastmod == null && alternates.isEmpty) {
       buffer.writeln('  <url><loc>${_xmlSafe(url)}</loc></url>');
       continue;
     }
@@ -68,7 +80,7 @@ String seoSitemapXml({
     if (lastmod != null) {
       buffer.writeln('    <lastmod>${_lastmodDate(lastmod)}</lastmod>');
     }
-    entry.alternates.forEach((hreflang, href) {
+    alternates.forEach((hreflang, href) {
       buffer
         ..write('    <xhtml:link rel="alternate" hreflang="')
         ..write(_xmlSafeAttr(hreflang))
@@ -80,25 +92,6 @@ String seoSitemapXml({
   }
   buffer.write('</urlset>');
   return buffer.toString();
-}
-
-class _SitemapEntry {
-  _SitemapEntry(this.path, this.route, Map<String, String>? alternates)
-      : alternates = alternates ??
-            (route == null ? const {} : route.meta(const {}).alternates);
-
-  final String path;
-  final SeoRoute? route;
-  final Map<String, String> alternates;
-}
-
-/// Resolves an additional path against the route table so parameterized
-/// pages (e.g. `/blog/:slug` instances) inherit lastmod and alternates.
-_SitemapEntry _entryForPath(List<SeoRoute> routes, String path) {
-  final match = matchSeoRoute(routes, path);
-  if (match == null) return _SitemapEntry(path, null, const {});
-  return _SitemapEntry(
-      path, match.route, match.route.meta(match.params).alternates);
 }
 
 /// W3C date (YYYY-MM-DD) — the granularity search engines actually use.

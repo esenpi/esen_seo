@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../controller/seo_controller.dart';
+import 'seo_resolution.dart';
 import 'seo_route.dart';
 
 /// Applies the matching [SeoRoute]'s metadata automatically on every
@@ -42,6 +43,8 @@ class SeoRouteObserver extends NavigatorObserver {
     required this.routes,
     this.canonicalBase,
     this.locationProvider,
+    this.resolveDynamicRoutes = true,
+    this.onResolveError,
   });
 
   /// The shared SEO route table.
@@ -50,6 +53,25 @@ class SeoRouteObserver extends NavigatorObserver {
   /// Site base URL for automatic canonical URLs, e.g.
   /// `https://esen.software`.
   final String? canonicalBase;
+
+  /// Whether to await a [SeoRoute.dynamic] resolver in the app.
+  ///
+  /// Static routes are unaffected either way — their meta is applied in
+  /// the same frame as before. Set this to `false` when a resolver only
+  /// makes sense on the server (it holds a database client, say — the
+  /// route table is imported by both `main.dart` and the server, so such
+  /// a resolver may not even compile for web) and set the page's meta
+  /// from the widget that already holds the record.
+  final bool resolveDynamicRoutes;
+
+  /// Called when a dynamic resolver throws. The app keeps running
+  /// (`SeoMode.safe`); this is the hook to log the failure.
+  final void Function(String path, Object error, StackTrace stack)?
+      onResolveError;
+
+  // Guards against out-of-order resolution: a slow /products/a must not
+  // overwrite the meta of /products/b the user has already reached.
+  int _navigationToken = 0;
 
   /// Overrides where the current location is read from when a route
   /// has no URL-like name. Defaults to the browser URL ([Uri.base]).
@@ -81,10 +103,41 @@ class SeoRouteObserver extends NavigatorObserver {
   bool _applyLocation(String location) {
     final match = matchSeoRoute(routes, location);
     if (match == null) return false;
-    SeoController.instance.setMeta(
-      match.buildMeta(canonicalBase: canonicalBase),
+
+    final token = ++_navigationToken;
+    // A convenience route resolves head-only synchronously, so its meta
+    // lands in the same frame, exactly as before the resolver existed.
+    final resolution = match.resolve(
+      detail: SeoDetail.head,
+      canonicalBase: canonicalBase,
     );
+    if (resolution is SeoResolution) {
+      _applyResolution(resolution);
+      return true;
+    }
+
+    // Only a dynamic route reaches here. The app's own router owns
+    // navigation; we just catch up the meta when the read completes.
+    if (!resolveDynamicRoutes) return true;
+    () async {
+      try {
+        final resolved = await resolution;
+        // A newer navigation has since happened — drop this stale result.
+        if (token != _navigationToken) return;
+        _applyResolution(resolved);
+      } catch (error, stack) {
+        onResolveError?.call(location, error, stack);
+      }
+    }();
     return true;
+  }
+
+  void _applyResolution(SeoResolution resolution) {
+    // A redirect is the router's business, not the meta layer's; a
+    // document (including a 404 with its noindex) sets the head.
+    if (resolution is SeoDocument) {
+      SeoController.instance.setMeta(resolution.meta);
+    }
   }
 
   String? _browserLocation() {
