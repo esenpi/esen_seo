@@ -154,12 +154,21 @@ final class SeoDocument extends SeoResolution {
 
   /// Extra HTTP response headers, SSR only.
   ///
-  /// **Reserved in 0.6.0** — the field is part of the sealed shape so it
-  /// need not be added later (which would break exhaustive switches),
-  /// but the middleware does not emit these yet. Header delivery, with
-  /// its own policy at the chokepoint, lands in 0.7.0. The prerenderer
-  /// ignores this field entirely, since a static file has no response
-  /// headers.
+  /// `seoBotMiddleware` emits these through a filter, because a value
+  /// here may ultimately come from a CMS. The names are an **allow
+  /// list** — `cache-control`, `expires`, `etag`, `last-modified`,
+  /// `age`, `x-robots-tag`, `link`, `content-language`, plus `vary`,
+  /// which is merged with `User-Agent` rather than replacing it.
+  /// Anything else is dropped, as is a name that is not a valid HTTP
+  /// token or a value outside printable ASCII.
+  ///
+  /// Deliberately narrow: page content should not be able to set a
+  /// cookie, claim a `content-encoding` the body does not have, or
+  /// decide the site's CORS and CSP posture. For anything beyond the
+  /// list, put your own shelf middleware in the pipeline.
+  ///
+  /// The prerenderer ignores this field entirely — a static file has no
+  /// response headers.
   final Map<String, String> headers;
 
   @override
