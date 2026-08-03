@@ -586,6 +586,229 @@ void main() {
     });
   });
 
+  group('the second review round', () {
+    test('a relative link to nowhere is caught, not skipped', () async {
+      // These were dropped on the floor: only `/`-rooted hrefs were
+      // examined, so `about` and `../agb` could point anywhere.
+      final report = await _audit([
+        _ok('/docs/intro', body: [
+          SeoNode(tag: 'h1', text: 'Intro'),
+          SeoNode(tag: 'a', text: 'Weiter', attributes: {'href': 'gibtsnicht'}),
+        ]),
+      ]);
+      expect(_ids(report), contains('link.broken'));
+      expect(report.describe(), contains('/docs/gibtsnicht'));
+    });
+
+    test('a relative link is resolved against its own page', () async {
+      // `weiter` on /docs/intro means /docs/weiter — resolving it
+      // against the site root instead would report a working link as
+      // broken and miss a broken one as working.
+      final report = await _audit([
+        _ok('/docs/intro', body: [
+          SeoNode(tag: 'h1', text: 'Intro'),
+          SeoNode(tag: 'a', text: 'Weiter', attributes: {'href': 'weiter'}),
+          SeoNode(tag: 'a', text: 'Hoch', attributes: {'href': '../start'}),
+        ]),
+        _ok('/docs/weiter', title: 'Die zweite Doku-Seite'),
+        _ok('/start', title: 'Die Startseite von hier'),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')),
+          reason: report.describe());
+    });
+
+    test('a javascript: link is reported, not silently dropped', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'a',
+            text: 'Klick',
+            attributes: {'href': 'javascript:alert(1)'},
+          ),
+        ]),
+      ]);
+      // The renderer strips the href, so the crawler gets a bare <a>
+      // that leads nowhere — invisible unless the audit says so.
+      expect(_ids(report), contains('url.rejected-by-policy'));
+    });
+
+    test('two patterns of the same shape: the second is dead', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (_) => const SeoMeta(title: 'Ein Blogartikel hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Artikel')],
+        ),
+        SeoRoute(
+          path: '/blog/:id',
+          meta: (_) => const SeoMeta(title: 'Nie erreichbar hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Tot')],
+        ),
+      ]);
+      expect(_ids(report), contains('route.shadowed'));
+      expect(report.describe(), contains('/blog/:slug'));
+    });
+
+    test('a relative hreflang URL is reported', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(
+            title: 'Die deutsche Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            alternates: {'de': '/', 'en': '/en'},
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(_ids(report), contains('hreflang.relative'));
+    });
+
+    test('an hreflang to an un-enumerated :param route is fine', () async {
+      // The old check asked the enumerated page set and called a
+      // perfectly working URL unserved — the same false positive
+      // link.broken had.
+      final report = await _audit([
+        SeoRoute(
+          path: '/produkt/:slug',
+          meta: (_) => const SeoMeta(
+            title: 'Eine deutsche Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            alternates: {
+              'de': '$_base/produkt/x',
+              'en': '$_base/en/product/x',
+            },
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Produkt')],
+        ),
+        SeoRoute(
+          path: '/en/product/:slug',
+          meta: (_) => const SeoMeta(title: 'An English product page'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Product')],
+        ),
+      ], additionalPaths: const [
+        '/produkt/x'
+      ]);
+      expect(_ids(report), isNot(contains('hreflang.unknown-target')),
+          reason: report.describe());
+      expect(_ids(report), isNot(contains('hreflang.not-reciprocal')),
+          reason: report.describe());
+    });
+
+    test('a Product with only a name gets no snippet', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {'name': 'Ding'})
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(_ids(report), contains('schema.missing-required'));
+      expect(report.describe(), contains('offers'));
+    });
+
+    test('an Article without a headline is a warning, not an error', () async {
+      // Google's Article documentation no longer lists any required
+      // property, so failing a build on this would be wrong.
+      final report = await _audit([
+        SeoRoute(
+          path: '/a',
+          meta: (_) => SeoMeta(
+            title: 'Ein Artikel ohne Headline',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Article', const {'author': 'Yahya'})
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'A')],
+        ),
+      ]);
+      expect(_ids(report), contains('schema.missing-recommended'));
+      expect(report.passes(), isTrue, reason: report.describe());
+    });
+
+    test('a Review without an author is ineligible', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/r',
+          meta: (_) => SeoMeta(
+            title: 'Eine Rezension ohne Autor',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Review', const {
+                'itemReviewed': {'@type': 'Thing', 'name': 'Ding'},
+                'reviewRating': {'@type': 'Rating', 'ratingValue': 5},
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'R')],
+        ),
+      ]);
+      expect(report.describe(), contains('author'));
+      expect(report.passes(), isFalse);
+    });
+
+    test('an Event without a location is ineligible', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/e',
+          meta: (_) => SeoMeta(
+            title: 'Ein Termin ohne Ortsangabe',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema.event(
+                name: 'Meetup',
+                startDate: DateTime.utc(2026, 9, 1),
+              ),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'E')],
+        ),
+      ]);
+      expect(report.describe(), contains('location'));
+    });
+
+    test('assertSeoHealthy actually throws on a broken site', () async {
+      // The documented hand-written alternative,
+      // `isNot(contains('[error]'))`, passed here — describe() writes
+      // `x`, not `[error]`.
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ohne Titel')],
+        ),
+      ]);
+      expect(report.describe(), isNot(contains('[error]')));
+      expect(() => assertSeoHealthy(report), throwsA(isA<SeoAuditFailure>()));
+      expect(
+        () => assertSeoHealthy(report),
+        throwsA(
+          isA<SeoAuditFailure>()
+              .having((e) => e.toString(), 'message', contains('title')),
+        ),
+      );
+    });
+
+    test('assertSeoHealthy stays silent on a healthy site', () {
+      final clean = SeoAuditReport(findings: const [], pagesAudited: 1);
+      expect(() => assertSeoHealthy(clean), returnsNormally);
+    });
+  });
+
   group('no false positives on a healthy site', () {
     test('a well-formed table produces nothing at all', () async {
       final report = await _audit([

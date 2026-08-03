@@ -22,10 +22,17 @@
 ///
 /// ```dart
 /// test('the site is SEO-healthy', () async {
-///   final report = await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase);
-///   expect(report.describe(), isNot(contains('[error]')), reason: report.describe());
+///   assertSeoHealthy(
+///     await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase),
+///   );
 /// });
 /// ```
+///
+/// Use [assertSeoHealthy] rather than writing the comparison by hand.
+/// An earlier version of this comment suggested
+/// `expect(report.describe(), isNot(contains('[error]')))`, which never
+/// failed — `describe()` marks an error with `x`, not with `[error]` —
+/// so the recommended test passed on a broken site.
 ///
 /// Or run it from a script, the same way `prerenderSite` is run:
 ///
@@ -38,6 +45,7 @@
 library;
 
 export 'src/audit/audit_engine.dart' show auditSeoPages, auditSeoRoutes;
+export 'src/audit/expect_healthy.dart' show SeoAuditFailure, assertSeoHealthy;
 export 'src/audit/seo_audit_policy.dart' show SeoAuditPolicy;
 export 'src/audit/seo_audit_report.dart' show SeoAuditReport;
 export 'src/audit/seo_finding.dart' show SeoCheck, SeoFinding, SeoSeverity;

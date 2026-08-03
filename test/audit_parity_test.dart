@@ -131,6 +131,24 @@ void main() {
       expect(findings, isEmpty);
     });
 
+    test('the app rendering the headline as a <p> is a difference', () {
+      // The sharpest case, and the one the earlier guard let through: the
+      // words are all there, so the text check finds nothing missing, and
+      // the app has no <h1> at all, so a check that only ran when one
+      // existed skipped silently. The page really does differ — the
+      // server promises a heading the app never delivers.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'h1', text: 'Willkommen bei esen_seo')],
+        app: [SeoNode(tag: 'p', text: 'Willkommen bei esen_seo')],
+      );
+      expect(_idsOf(findings), contains('parity.h1-differs'));
+      expect(
+        findings.first.message,
+        contains('not as a heading'),
+      );
+    });
+
     test('ignoreText silences a cookie banner on both sides', () {
       final findings = compareSeoTrees(
         path: '/',
@@ -240,6 +258,26 @@ void main() {
       // A shrinking sample must not quietly become no sample.
       expect(_ids(report), contains('parity.not-covered'));
       expect(report.describe(), contains('/docs'));
+      // Still a pass: sampling is the caller's call, as long as they
+      // sampled something.
+      expect(report.passes(), isTrue);
+    });
+
+    testWidgets('checking nothing at all is a failure, not a pass',
+        (tester) async {
+      // `paths: []` used to be a green run that proved nothing — an
+      // "info" finding cannot hold up the claim this file makes.
+      final report = await auditSeoParity(
+        routes: routes('Willkommen'),
+        siteBase: _base,
+        paths: const [],
+        pump: (_) async {
+          await tester.pumpWidget(app('Willkommen'));
+          await tester.pumpAndSettle();
+        },
+      );
+      expect(report.passes(), isFalse, reason: report.describe());
+      expect(report.describe(), contains('proves nothing'));
     });
   });
 }
