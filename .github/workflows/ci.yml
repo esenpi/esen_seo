@@ -59,6 +59,14 @@ jobs:
         working-directory: example
         run: flutter analyze
 
+      # Die Example-App auditiert sich mit dem eigenen Paket — das ist
+      # der einzige Lauf, der die Audit-Engine gegen eine echte,
+      # gewachsene Routentabelle stellt statt gegen Testfixtures. Lief
+      # bisher nur lokal, also gar nicht.
+      - name: Test example (dogfooding the audit)
+        working-directory: example
+        run: flutter test
+
       # Der Web-Build ist die einzige Prüfung, die package:web-Interop
       # und die Compile-Fähigkeit des Pfads abdeckt, den das Paket
       # eigentlich adressiert.
