@@ -50,28 +50,30 @@ class HtmlRenderer {
     return buffer.toString();
   }
 
-  /// Writes [node] into [buffer] — one shared buffer for the whole
-  /// tree instead of one string allocation per node.
-  void _write(StringBuffer buffer, SeoNode node, {bool inAnchor = false}) {
+  /// The tag [node] actually becomes under the **body** policy, or
+  /// `null` for a pure text node, which renders as escaped text rather
+  /// than as an element.
+  ///
+  /// This is the render decision itself, exposed: the audit walks this
+  /// same view, so what it checks is the HTML that ships rather than
+  /// the raw tree. An `<img>` carrying text really renders as a
+  /// `<span>`, and an `<a>` inside an `<a>` really loses its link —
+  /// [inAnchor] mirrors that nesting. Auditing the raw tree reported a
+  /// broken image on a node the renderer had already turned into
+  /// something else entirely.
+  static String? effectiveBodyTag(SeoNode node, {bool inAnchor = false}) {
     // Ein leerer Tag ist ein Textknoten — aber nur ohne Kinder. Mit
     // Kindern wäre er ein Wrapper, dessen Inhalt sonst spurlos
     // verschwindet (der Controller fängt das ab, der Renderer muss es
     // auch tun, weil die Server-Pfade nicht durch ihn laufen).
-    if (node.isTextOnly && node.children.isEmpty) {
-      buffer.write(escapeText(node.text ?? ''));
-      return;
-    }
+    if (node.isTextOnly && node.children.isEmpty) return null;
 
-    // Namen einmal normalisieren: Zwei Schlüssel, die sich nur in der
-    // Schreibweise unterscheiden, würden sonst zweimal ausgegeben — und
-    // HTML nimmt das erste, während unsere Prüfung das zweite ansah.
-    final attributes = <String, String>{};
-    node.attributes.forEach((name, value) {
-      attributes[name.trim().toLowerCase()] = value;
-    });
-
-    var tag = _resolveTag(node, attributes);
-    if (tag == null) return; // nichts, was hier stehen dürfte
+    // JSON-LD is the one script that is content rather than code.
+    // Anything else not on the allow list degrades to a neutral
+    // container instead of taking the page down with it.
+    var tag = node.tag == 'script' && _isJsonLd(effectiveAttributeNames(node))
+        ? 'script'
+        : (normalizeSeoTag(node.tag) ?? 'div');
 
     // Ein <a> in einem <a> lässt der HTML-Parser nicht stehen: Er
     // schließt den äußeren Link und hängt dessen Beschriftung daneben —
@@ -83,6 +85,67 @@ class HtmlRenderer {
     final hasContent =
         node.text != null || node.rawText != null || node.children.isNotEmpty;
     if (SeoNode.voidElements.contains(tag) && hasContent) tag = 'span';
+
+    return tag;
+  }
+
+  /// [node]'s attributes under the same name normalization the renderer
+  /// applies before writing: trimmed and lower-cased, a later duplicate
+  /// replacing an earlier one. An audit reading the raw map looks at a
+  /// key the output may never carry.
+  static Map<String, String> effectiveAttributeNames(SeoNode node) {
+    final attributes = <String, String>{};
+    node.attributes.forEach((name, value) {
+      attributes[name.trim().toLowerCase()] = value;
+    });
+    return attributes;
+  }
+
+  /// No real document nests this deep; a tree that does is broken —
+  /// usually a resolver that built a self-referential node. Refusing
+  /// with a diagnosable error beats the alternative on both sides:
+  /// silent truncation would ship an incomplete page, and recursing on
+  /// would end in a StackOverflowError that names nothing.
+  static const int maxDepth = 500;
+
+  /// Writes [node] into [buffer] — one shared buffer for the whole
+  /// tree instead of one string allocation per node.
+  void _write(
+    StringBuffer buffer,
+    SeoNode node, {
+    bool inAnchor = false,
+    int depth = 0,
+  }) {
+    if (depth > maxDepth) {
+      throw StateError(
+        'SeoNode tree nests deeper than $maxDepth levels — is a resolver '
+        'building a self-referential tree? Refusing to render it rather '
+        'than overflowing the stack mid-request.',
+      );
+    }
+    if (node.isTextOnly && node.children.isEmpty) {
+      buffer.write(escapeText(node.text ?? ''));
+      return;
+    }
+
+    // Namen einmal normalisieren: Zwei Schlüssel, die sich nur in der
+    // Schreibweise unterscheiden, würden sonst zweimal ausgegeben — und
+    // HTML nimmt das erste, während unsere Prüfung das zweite ansah.
+    final attributes = effectiveAttributeNames(node);
+
+    String? tag;
+    if (target == SeoRenderTarget.body) {
+      tag = effectiveBodyTag(node, inAnchor: inAnchor);
+    } else {
+      tag = _resolveHeadTag(node, attributes);
+      if (tag != null) {
+        final hasContent = node.text != null ||
+            node.rawText != null ||
+            node.children.isNotEmpty;
+        if (SeoNode.voidElements.contains(tag) && hasContent) tag = 'span';
+      }
+    }
+    if (tag == null) return; // nichts, was hier stehen dürfte
 
     // Ein abgelehntes Element verliert mit seiner Identität auch seine
     // Attribute: `action` oder `values` gehören zu dem Element, das es
@@ -132,7 +195,7 @@ class HtmlRenderer {
     if (!_isJsonLd(attributes) || node.tag != 'script') {
       final nested = inAnchor || tag == 'a';
       for (final child in node.children) {
-        _write(buffer, child, inAnchor: nested);
+        _write(buffer, child, inAnchor: nested, depth: depth + 1);
       }
     }
     buffer
@@ -141,18 +204,13 @@ class HtmlRenderer {
       ..write('>');
   }
 
-  /// The tag this node may actually be rendered as, or `null` when it
-  /// must be dropped entirely.
-  String? _resolveTag(SeoNode node, Map<String, String> attributes) {
+  /// The tag this node may carry in the head, or `null` when it must
+  /// be dropped entirely — the head is no place for arbitrary markup.
+  static String? _resolveHeadTag(SeoNode node, Map<String, String> attributes) {
     // JSON-LD is the one script that is content rather than code, and
     // it is legal in both head and body.
     if (node.tag == 'script' && _isJsonLd(attributes)) return 'script';
-    if (target == SeoRenderTarget.head) {
-      return _headElements.contains(node.tag) ? node.tag : null;
-    }
-    // Anything not on the allow list degrades to a neutral container
-    // instead of taking the page down with it.
-    return normalizeSeoTag(node.tag) ?? 'div';
+    return _headElements.contains(node.tag) ? node.tag : null;
   }
 
   /// Checked against the **normalized** attribute map, so a second key

@@ -140,9 +140,11 @@ Iterable<SeoFinding> _auditRouteTable(
         message: 'declared twice; the later one is dead code',
         detail: 'also at index $firstAt',
       );
-    } else {
-      seen[route.path] = i;
+      // One defect, one finding — the shadow check below would report
+      // the identical pattern a second time.
+      continue;
     }
+    seen[route.path] = i;
 
     // A concrete path declared after a pattern that swallows it never
     // runs. matchSeoRoute takes the FIRST match, so /blog/:slug before
@@ -165,17 +167,18 @@ Iterable<SeoFinding> _auditRouteTable(
         break;
       }
 
-      // Two patterns of the same shape — `/blog/:slug` then
-      // `/blog/:id`. The second can never win a match, so it is
-      // entirely dead, and neither the duplicate-path check (the
-      // strings differ) nor the concrete case above saw it.
-      if (route.hasParams && _sameShape(earlier.path, route.path)) {
+      // A pattern swallowed by an earlier pattern — the same shape
+      // (`/blog/:slug` then `/blog/:id`) or a wider one (`/:section/:slug`
+      // before `/blog/:slug`). Either way the later pattern can never
+      // win a match, and neither the duplicate-path check (the strings
+      // differ) nor the concrete case above saw it.
+      if (route.hasParams && _swallows(earlier.path, route.path)) {
         yield SeoFinding(
           check: SeoCheck.routeShadowed,
           severity: SeoSeverity.error,
           path: route.path,
-          message: 'unreachable: an earlier pattern matches exactly the same '
-              'URLs, so every request goes to that one instead',
+          message: 'unreachable: an earlier pattern matches every URL this '
+              'route could serve, so every request goes to that one instead',
           detail: 'shadowed by ${earlier.path}',
         );
         break;
@@ -207,6 +210,11 @@ Iterable<SeoFinding> _auditPage(
 ) sync* {
   final doc = page.document;
   if (doc == null) return; // a redirect: nothing to audit on the page
+  // An additionalPaths entry matching no route is a placeholder by
+  // design — resolveSeoPages documents that its content is served
+  // outside the table. Auditing the placeholder for a title it can
+  // never have failed every legitimate use of the feature.
+  if (page.route == null) return;
   final meta = doc.meta;
   final path = page.path;
   final indexable = page.isIndexable;
@@ -280,7 +288,22 @@ Iterable<SeoFinding> _auditPage(
 
   // ── body structure
   final facts = SeoBodyFacts.of(doc.body);
-  if (indexable && facts.isEmpty) {
+  if (facts.truncated) {
+    // Without this, a truncated walk reads as "checked and clean"
+    // about the part of the tree nobody looked at.
+    yield SeoFinding(
+      check: SeoCheck.bodyTruncated,
+      severity: SeoSeverity.warning,
+      path: path,
+      message: 'the body nests deeper than the audit walks '
+          '(${SeoBodyFacts.maxDepth} levels) — structural findings on '
+          'this page are incomplete',
+    );
+  }
+  // Absence claims need the whole tree: a truncated walk cannot say
+  // "empty" or "no h1" about the part nobody visited. (Presence claims
+  // — a second <h1> that WAS found — stay valid regardless.)
+  if (indexable && facts.isEmpty && !facts.truncated) {
     yield SeoFinding(
       check: SeoCheck.bodyEmpty,
       severity: SeoSeverity.warning,
@@ -290,7 +313,7 @@ Iterable<SeoFinding> _auditPage(
     );
   } else if (indexable) {
     final h1s = facts.headings.where((h) => h.level == 1).toList();
-    if (h1s.isEmpty) {
+    if (h1s.isEmpty && !facts.truncated) {
       yield SeoFinding(
         check: SeoCheck.headingNoH1,
         severity: SeoSeverity.warning,
@@ -310,7 +333,12 @@ Iterable<SeoFinding> _auditPage(
 
   // ── images
   for (final image in facts.images) {
-    final src = image.attributes['src']?.trim() ?? '';
+    // Presence is judged trimmed, the policy sees the RAW value — the
+    // renderer does too, and its control-character rule refuses a URL
+    // with a trailing newline. Checking the trimmed value here passed
+    // an <img> whose src the renderer had already dropped.
+    final rawSrc = image.attributes['src'];
+    final src = rawSrc?.trim() ?? '';
     if (src.isEmpty) {
       yield SeoFinding(
         check: SeoCheck.imageSrcMissing,
@@ -318,7 +346,7 @@ Iterable<SeoFinding> _auditPage(
         path: path,
         message: 'an <img> with no src',
       );
-    } else if (!isAllowedSeoAttribute('src', src)) {
+    } else if (!isAllowedSeoAttribute('src', rawSrc!)) {
       // Same as the link case: the renderer drops it, so the page ships
       // an <img> that can never load.
       yield SeoFinding(
@@ -343,7 +371,8 @@ Iterable<SeoFinding> _auditPage(
 
   // ── links (the per-page half; targets are checked across pages)
   for (final link in facts.links) {
-    final href = link.attributes['href']?.trim();
+    final rawHref = link.attributes['href'];
+    final href = rawHref?.trim();
     // The audit reads the model, but the renderer still transforms it:
     // a `javascript:` href is dropped, so what ships is an <a> with no
     // destination. Auditing the raw node called that a working link.
@@ -351,7 +380,7 @@ Iterable<SeoFinding> _auditPage(
     // place the value was written.
     if (href != null &&
         href.isNotEmpty &&
-        !isAllowedSeoAttribute('href', href)) {
+        !isAllowedSeoAttribute('href', rawHref!)) {
       yield SeoFinding(
         check: SeoCheck.urlRejectedByPolicy,
         severity: SeoSeverity.error,
@@ -368,12 +397,15 @@ Iterable<SeoFinding> _auditPage(
         severity: SeoSeverity.warning,
         path: path,
         message: 'a link with no destination',
-        detail: seoNodeText(link).isEmpty ? null : seoNodeText(link),
+        detail: seoNodeText(link.node).isEmpty ? null : seoNodeText(link.node),
       );
       continue;
     }
-    if (seoNodeText(link).isEmpty &&
-        !link.children.any((c) => c.tag.toLowerCase() == 'img')) {
+    // The renderer ships the whole subtree inside the <a>, so an image
+    // anywhere below it — a > div > img is what every card link looks
+    // like — provides the anchor text via its alt.
+    if (seoNodeText(link.node).isEmpty &&
+        SeoBodyFacts.of(link.node.children).images.isEmpty) {
       yield SeoFinding(
         check: SeoCheck.linkNoText,
         severity: SeoSeverity.warning,
@@ -444,9 +476,50 @@ Iterable<SeoFinding> _auditUrls(
     }
   }
 
+  // Two different languages pointing at the same URL is the classic
+  // copy-paste slip: the cluster stays formally valid — self-reference
+  // and reciprocity both pass — while one language's real page is
+  // silently orphaned. Same primary subtag (en, en-GB) and x-default
+  // legitimately share a URL, so only distinct primaries count.
+  final byTarget = <String, Set<String>>{};
+  for (final entry in meta.alternates.entries) {
+    if (entry.key.toLowerCase() == 'x-default') continue;
+    final primary = entry.key.split(RegExp('[-_]')).first.toLowerCase();
+    byTarget.putIfAbsent(entry.value, () => {}).add(primary);
+  }
+  for (final entry in byTarget.entries) {
+    if (entry.value.length < 2) continue;
+    yield SeoFinding(
+      check: SeoCheck.hreflangDuplicateTarget,
+      severity: SeoSeverity.warning,
+      path: path,
+      message: 'hreflang declares ${entry.value.join(' and ')} for the '
+          'same URL — one of them is almost certainly a copy-paste slip, '
+          'and its real page is orphaned from the cluster',
+      detail: entry.key,
+    );
+  }
+
   for (final entry in meta.alternates.entries) {
     final url = entry.value;
     final where = '${entry.key} → $url';
+
+    // Google matches hreflang codes against ISO 639-1 + optional script
+    // and region, hyphen-separated. `en_US` — the single most common
+    // authoring mistake — is silently ignored, which is the same
+    // failure mode as a relative URL: nothing looks broken.
+    if (!_validHreflangCode.hasMatch(entry.key)) {
+      yield SeoFinding(
+        check: SeoCheck.hreflangInvalidCode,
+        severity: SeoSeverity.error,
+        path: path,
+        message: 'not a valid hreflang code (language, optional script, '
+            'optional region, hyphen-separated, or x-default) — Google '
+            'ignores the annotation',
+        detail: where,
+      );
+      continue;
+    }
 
     if (!isAllowedSeoAttribute('href', url)) {
       yield SeoFinding(
@@ -496,8 +569,9 @@ Iterable<SeoFinding> _auditUrls(
 /// ineligible for the rich result, so the markup is inert.
 const Map<String, List<String>> _requiredSchemaFields = {
   'Product': ['name'],
-  'Organization': ['name'],
-  'WebSite': ['name'],
+  // The site-name feature reads both — a WebSite without a `url` cannot
+  // be tied to the site it names.
+  'WebSite': ['name', 'url'],
   // A date and a place are what an event result *is*; Google lists both
   // alongside the name. `SeoSchema.event` omits `location` entirely when
   // neither location argument is given, which is exactly the gap.
@@ -532,6 +606,10 @@ const Map<String, List<String>> _recommendedSchemaFields = {
   'Article': ['headline'],
   'NewsArticle': ['headline'],
   'BlogPosting': ['headline'],
+  // Google lists NO required properties for Organization — an error
+  // here failed valid markup. The name is still the one property that
+  // gives the knowledge panel something to show.
+  'Organization': ['name'],
 };
 
 Iterable<SeoFinding> _auditSchemas(
@@ -592,6 +670,64 @@ Iterable<SeoFinding> _auditSchemas(
           message: '${schema.type} has no "$field"; Google no longer '
               'requires it, but the result has nothing to display without '
               'one',
+        );
+      }
+    }
+
+    // Inside the properties Google actually reads. An offers object
+    // without a price, or a rating without a count, satisfies every
+    // presence check above and still yields nothing: the shape is
+    // right, and the snippet is not granted.
+    if (schema.type == 'Product') {
+      final offers = schema.properties['offers'];
+      for (final offer in offers is List ? offers : [offers]) {
+        if (offer is! Map) continue;
+        if (_isBlank(offer['price']) &&
+            _isBlank(offer['lowPrice']) &&
+            _isBlank(offer['priceSpecification'])) {
+          yield SeoFinding(
+            check: SeoCheck.schemaMissingRequired,
+            severity: SeoSeverity.error,
+            path: path,
+            message: 'Product.offers has no "price" — an offer without a '
+                'price (or "lowPrice"/"priceSpecification") is ignored',
+          );
+        } else if (_isBlank(offer['priceCurrency']) &&
+            _isBlank(offer['priceSpecification'])) {
+          // Google's required pair: a price means nothing without its
+          // currency, and the factory leaves priceCurrency optional.
+          yield SeoFinding(
+            check: SeoCheck.schemaMissingRequired,
+            severity: SeoSeverity.error,
+            path: path,
+            message: 'Product.offers has a "price" but no "priceCurrency" '
+                '— Google requires both',
+          );
+        }
+      }
+    }
+
+    // A rating supplied as a one-element list is legal JSON-LD; the
+    // offers check above already accepts that shape.
+    final ratings = schema.properties['aggregateRating'];
+    for (final rating in ratings is List ? ratings : [ratings]) {
+      if (rating is! Map) continue;
+      if (_isBlank(rating['ratingValue'])) {
+        yield SeoFinding(
+          check: SeoCheck.schemaMissingRequired,
+          severity: SeoSeverity.error,
+          path: path,
+          message: '${schema.type}.aggregateRating has no "ratingValue"',
+        );
+      }
+      if (_isBlank(rating['ratingCount']) && _isBlank(rating['reviewCount'])) {
+        yield SeoFinding(
+          check: SeoCheck.schemaMissingRequired,
+          severity: SeoSeverity.error,
+          path: path,
+          message: '${schema.type}.aggregateRating needs "ratingCount" or '
+              '"reviewCount" — a rating nobody appears to have given is '
+              'not shown',
         );
       }
     }
@@ -683,16 +819,20 @@ Iterable<SeoFinding> _auditAcrossPages(
 
   // Where each canonical actually lands. This needs the resolved set,
   // so it cannot live with the per-page canonical checks — and it is
-  // the case the README calls the flagship one: a page that
-  // canonicalises itself onto a 410 or a redirect asks Google to index
-  // something that is not there.
+  // the flagship case of the whole audit: a page that canonicalises
+  // itself onto a 410 or a redirect asks Google to index something
+  // that is not there.
   for (final page in indexable) {
     final canonical = page.document?.meta.canonicalUrl;
     if (canonical == null || canonical.isEmpty) continue;
     final target = _internalTarget(canonical, base);
     if (target == null || target == page.path) continue;
     final resolved = byPath[target];
-    if (resolved == null) continue; // unknown paths are reported already
+    // Not in the resolved set: either no route serves it (the per-page
+    // canonical.unknown-path check reported that) or an un-enumerated
+    // :param route does — whose per-record status this synchronous
+    // pass cannot know. A known limit, not a verdict.
+    if (resolved == null) continue;
 
     final document = resolved.document;
     if (document == null) {
@@ -714,15 +854,35 @@ Iterable<SeoFinding> _auditAcrossPages(
             'that is not there',
         detail: canonical,
       );
-    } else if (!resolved.isIndexable) {
+    } else if (_isNoindex(document.meta)) {
+      // Judged by the robots signal, not by sitemap membership: a page
+      // deliberately kept out of sitemap.xml is still perfectly
+      // indexable, and canonicalising onto it is legitimate.
       yield SeoFinding(
         check: SeoCheck.canonicalNonIndexable,
         severity: SeoSeverity.error,
         path: page.path,
-        message: 'the canonical points at a page excluded from the index, '
-            'so neither URL can rank',
+        message: 'the canonical points at a noindex page — two signals '
+            'that cancel each other, so neither URL can rank',
         detail: canonical,
       );
+    } else {
+      final onward = document.meta.canonicalUrl;
+      final onwardTarget =
+          onward == null ? null : _internalTarget(onward, base);
+      if (onward != null && onward.isNotEmpty && onwardTarget != target) {
+        // A canonical chain: A says B is the original, B says C is.
+        // Google follows one hop reluctantly and distrusts the rest.
+        yield SeoFinding(
+          check: SeoCheck.canonicalChain,
+          severity: SeoSeverity.warning,
+          path: page.path,
+          message: 'the canonical\'s target canonicalises elsewhere — a '
+              'chain (or loop) Google is documented to distrust; point '
+              'both pages at the final URL',
+          detail: '$canonical → $onward',
+        );
+      }
     }
   }
 
@@ -799,11 +959,18 @@ Iterable<SeoFinding> _duplicates(
   SeoCheck check,
   String phrase,
 ) sync* {
+  // Grouped case- and whitespace-insensitively: search engines treat
+  // 'Home — Meine Seite' and 'home  — meine seite' as the same title,
+  // and the templating slips this check exists for produce exactly
+  // that kind of near-duplicate.
   final byValue = <String, List<String>>{};
+  final original = <String, String>{};
   for (final page in pages) {
     final value = valueOf(page);
     if (value == null || value.isEmpty) continue;
-    byValue.putIfAbsent(value, () => []).add(page.path);
+    final key = value.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    byValue.putIfAbsent(key, () => []).add(page.path);
+    original[key] = value;
   }
   for (final entry in byValue.entries) {
     if (entry.value.length < 2) continue;
@@ -814,7 +981,7 @@ Iterable<SeoFinding> _duplicates(
         path: path,
         message: '${entry.value.length} pages $phrase',
         detail:
-            '"${entry.key}" — also ${entry.value.where((p) => p != path).join(', ')}',
+            '"${original[entry.key]}" — also ${entry.value.where((p) => p != path).join(', ')}',
       );
     }
   }
@@ -838,23 +1005,34 @@ bool _isBlank(Object? value) =>
     (value is Iterable && value.isEmpty) ||
     (value is Map && value.isEmpty);
 
-bool _isAbsolute(String url) =>
-    url.startsWith('http://') || url.startsWith('https://');
+/// URL schemes are case-insensitive — `HTTPS://` is as absolute as
+/// `https://`, and crawlers treat it so.
+bool _isAbsolute(String url) {
+  final lower = url.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://');
+}
 
-/// Whether two route patterns match exactly the same set of URLs.
+/// Whether the pattern [general] matches every URL [specific] could
+/// serve.
 ///
-/// `/blog/:slug` and `/blog/:id` do — the parameter name never takes
-/// part in matching, so the second pattern is dead code no matter what
-/// it is called.
-bool _sameShape(String a, String b) {
-  final left = a.split('/');
-  final right = b.split('/');
-  if (left.length != right.length) return false;
-  for (var i = 0; i < left.length; i++) {
-    final l = left[i];
-    final r = right[i];
-    if (l.startsWith(':') && r.startsWith(':')) continue;
-    if (l != r) return false;
+/// True for two patterns of the same shape — `/blog/:slug` then
+/// `/blog/:id`, where the parameter name never takes part in matching —
+/// but also for a strictly wider one: `/:section/:slug` declared before
+/// `/blog/:slug` swallows it just as completely, and checking only for
+/// equal shapes missed that entirely.
+bool _swallows(String general, String specific) {
+  final g = general.split('/');
+  final s = specific.split('/');
+  if (g.length != s.length) return false;
+  for (var i = 0; i < g.length; i++) {
+    if (g[i].startsWith(':')) {
+      // A parameter matches any segment EXCEPT an empty one —
+      // SeoRoute's matcher rejects those, so a pattern with an empty
+      // literal segment is not swallowed by a param at that position.
+      if (s[i].isEmpty) return false;
+      continue;
+    }
+    if (g[i] != s[i]) return false;
   }
   return true;
 }
@@ -862,36 +1040,98 @@ bool _sameShape(String a, String b) {
 /// The site-local path [href] points at, seen from [fromPath].
 ///
 /// Returns `null` for external hosts, fragments and non-web schemes.
+/// Route paths live in decoded space (`/über`), URLs in encoded space
+/// (`/%C3%BCber`) — everything returned from here is decoded so the
+/// two spellings of the same page compare equal.
 String? _internalTarget(String href, String base, {String fromPath = '/'}) {
   if (href.isEmpty || href.startsWith('#')) return null;
 
-  // A site-rooted path, the common case.
+  // A site-rooted path. When the site itself lives under a path prefix
+  // (a GitHub Pages project site, `siteBase: https://user.github.io/repo`),
+  // a rooted href escapes the site unless it carries the prefix.
   if (href.startsWith('/') && !href.startsWith('//')) {
-    return normalizeSeoPath(href.split('#').first.split('?').first);
+    return _stripBasePrefix(
+      _decodePath(href.split('#').first.split('?').first),
+      base,
+    );
   }
 
   // A document-relative link — `about`, `../agb`. These were skipped
   // entirely, so a relative link to nowhere was never reported. Resolve
   // it against the page it appears on, the way a browser would.
+  // [fromPath] is already a route path, so no prefix handling here.
   if (!href.contains(':') && !href.startsWith('//')) {
     final bare = href.split('#').first.split('?').first;
     if (bare.isEmpty) return null;
     final resolved = Uri.parse(fromPath).resolve(bare).path;
-    return normalizeSeoPath(resolved.isEmpty ? '/' : resolved);
+    return normalizeSeoPath(_decodePath(resolved.isEmpty ? '/' : resolved));
   }
 
   // Absolute URLs are compared by parsed host, not by string prefix:
   // `https://x.dev.evil.com/` starts with `https://x.dev` and is a
   // different site entirely.
-  final target = Uri.tryParse(href);
+  final parsed = Uri.tryParse(href);
   final origin = Uri.tryParse(base);
-  if (target == null || origin == null) return null;
-  if (!target.hasScheme || target.host.isEmpty) return null;
+  if (parsed == null || origin == null) return null;
+  // `//x.dev/agb` is scheme-relative: the same site, borrowing the
+  // page's scheme — a browser follows it, so the audit checks it.
+  final target =
+      parsed.hasScheme ? parsed : parsed.replace(scheme: origin.scheme);
+  if (target.host.isEmpty) return null;
+  if (!const {'http', 'https'}.contains(target.scheme)) return null;
   if (target.host.toLowerCase() != origin.host.toLowerCase()) return null;
-  if (target.hasPort && origin.hasPort && target.port != origin.port) {
-    return null;
+  // Uri fills in the scheme's default, so this also separates an
+  // explicit `:8443` from an implicit `:443` — a different origin,
+  // however similar the URL looks. Comparing only when both sides
+  // named a port let that one through as internal.
+  if (target.port != origin.port) return null;
+  return _stripBasePrefix(
+    _decodePath(target.path.isEmpty ? '/' : target.path),
+    base,
+  );
+}
+
+/// Percent-escapes decoded, invalid ones left alone. `Uri.path` returns
+/// `/%C3%BCber` for a page the route table declares as `/über`; without
+/// decoding, the package's own derived canonical failed its own audit.
+String _decodePath(String path) {
+  try {
+    return Uri.decodeFull(path);
+  } on ArgumentError {
+    return path;
   }
-  return normalizeSeoPath(target.path.isEmpty ? '/' : target.path);
+}
+
+/// Maps a full URL path into route space when [base] carries a path
+/// prefix, or returns it unchanged when it does not.
+///
+/// `https://user.github.io/repo/about` is the route `/about` of a site
+/// based at `…/repo` — treating the prefix as part of the route failed
+/// EVERY page of a subpath deployment through the auto-derived
+/// canonical. A same-host path outside the prefix is not this site.
+String? _stripBasePrefix(String path, String base) {
+  final origin = Uri.tryParse(base);
+  final prefix = origin == null ? '' : _stripSlash(_decodePath(origin.path));
+  if (prefix.isEmpty) return normalizeSeoPath(path);
+  if (path == prefix) return '/';
+  if (path.startsWith('$prefix/')) {
+    return normalizeSeoPath(path.substring(prefix.length));
+  }
+  return null;
+}
+
+/// Language, optional script, optional region — hyphen-separated — or
+/// `x-default`. What Google actually matches; anything else is
+/// silently ignored on their side.
+final RegExp _validHreflangCode = RegExp(
+  r'^(x-default|[a-zA-Z]{2,3}(-[a-zA-Z]{4})?(-([a-zA-Z]{2}|[0-9]{3}))?)$',
+);
+
+/// The robots signal, not sitemap membership: `noindex` or `none`.
+bool _isNoindex(SeoMeta meta) {
+  final robots = meta.robots?.toLowerCase() ?? '';
+  return robots.contains('noindex') ||
+      robots.split(',').map((d) => d.trim()).contains('none');
 }
 
 bool _sameUrl(String url, String selfUrl, String base, String path) {

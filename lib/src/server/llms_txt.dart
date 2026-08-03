@@ -1,4 +1,6 @@
+import '../audit/node_walk.dart' show SeoBodyFacts;
 import '../meta/seo_meta.dart';
+import '../renderer/html_renderer.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/tag_policy.dart';
 import '../routing/seo_resolution.dart';
@@ -182,35 +184,53 @@ const _headingLevels = {
   'h6': '######',
 };
 
-void _writeBlock(SeoNode node, List<String> blocks, String base) {
-  final heading = _headingLevels[node.tag];
+void _writeBlock(SeoNode node, List<String> blocks, String base,
+    [int depth = 0]) {
+  // Same ceiling as the audit walk: a self-referential resolver tree
+  // must not take llms-full.txt generation down with it.
+  if (depth > SeoBodyFacts.maxDepth) return;
+
+  // The RENDERER's view of the node, not the raw tree — llms-full.txt
+  // describes the page that ships. 'H2' is an <h2> there, an img
+  // carrying text is a <span> whose src the renderer refused, and a
+  // duplicate 'HREF' key resolves the same way the HTML does. Reading
+  // the raw tree emitted headings, links and images the rendered page
+  // demonstrably does not carry — and dropped ones it does.
+  final tag = HtmlRenderer.effectiveBodyTag(node);
+  if (tag == null) {
+    // A pure text node.
+    final text = _inline(node, base);
+    if (text.isNotEmpty) blocks.add(text);
+    return;
+  }
+  final attributes = HtmlRenderer.effectiveAttributeNames(node);
+  final heading = _headingLevels[tag];
   if (heading != null) {
     final text = _inline(node, base);
     if (text.isNotEmpty) blocks.add('$heading $text');
     return;
   }
-  switch (node.tag) {
+  switch (tag) {
     case 'script':
-    case 'style':
-      return; // JSON-LD & Co. sind kein Inhalt.
+      return; // nur JSON-LD überlebt als script — Daten, kein Inhalt.
     case 'ul':
     case 'ol':
       final items = <String>[];
       for (var i = 0; i < node.children.length; i++) {
         final text = _inline(node.children[i], base);
         if (text.isEmpty) continue;
-        items.add(node.tag == 'ul' ? '- $text' : '${i + 1}. $text');
+        items.add(tag == 'ul' ? '- $text' : '${i + 1}. $text');
       }
       if (items.isNotEmpty) blocks.add(items.join('\n'));
     case 'blockquote':
       final text = _inline(node, base);
       if (text.isNotEmpty) blocks.add('> $text');
     case 'img':
-      final src = node.attributes['src'];
+      final src = attributes['src'];
       if (src != null) {
         final target = _href(src, base);
         if (target != null) {
-          blocks.add('![${_linkLabel(node.attributes['alt'] ?? '')}]'
+          blocks.add('![${_linkLabel(attributes['alt'] ?? '')}]'
               '(${_linkTarget(target)})');
         }
       }
@@ -218,70 +238,85 @@ void _writeBlock(SeoNode node, List<String> blocks, String base) {
       blocks.add('---');
     case 'p':
     case 'a':
-    case '':
       final text = _inline(node, base);
       if (text.isNotEmpty) blocks.add(text);
     default:
       // Container (div, section, article, …): eigener Text als Absatz,
       // Kinder als eigenständige Blöcke.
-      final text = node.text?.trim();
-      if (text != null && text.isNotEmpty) blocks.add(_singleLine(text));
+      for (final text in [node.text, node.rawText]) {
+        if (text != null && text.trim().isNotEmpty) {
+          blocks.add(_singleLine(text));
+        }
+      }
       for (final child in node.children) {
-        _writeBlock(child, blocks, base);
+        _writeBlock(child, blocks, base, depth + 1);
       }
   }
 }
 
 /// Renders a node's text and children as one line of inline markdown.
-String _inline(SeoNode node, String base) {
+String _inline(SeoNode node, String base, {bool inAnchor = false}) {
   final buffer = StringBuffer();
-  void walk(SeoNode n) {
-    switch (n.tag) {
+  void walk(SeoNode n, bool inAnchor, int depth) {
+    if (depth > SeoBodyFacts.maxDepth) return;
+    // Renderer-Sicht auch inline: ein <a> im <a> verliert dort seinen
+    // Link, also verliert es ihn auch hier.
+    final tag = HtmlRenderer.effectiveBodyTag(n, inAnchor: inAnchor);
+    switch (tag) {
       case 'script':
-      case 'style':
         return;
       case 'a':
-        final label = _inlineOf(n, base);
-        final target = n.attributes['href'] == null
-            ? null
-            : _href(n.attributes['href']!, base);
+        final label = _inlineOf(n, base, inAnchor: true);
+        final href = HtmlRenderer.effectiveAttributeNames(n)['href'];
+        final target = href == null ? null : _href(href, base);
         buffer.write(target == null
             ? label
             : '[${_linkLabel(label)}](${_linkTarget(target)})');
         return;
       case 'img':
-        final src = n.attributes['src'];
+        final attributes = HtmlRenderer.effectiveAttributeNames(n);
+        final src = attributes['src'];
         final target = src == null ? null : _href(src, base);
         if (target != null) {
-          buffer.write('![${_linkLabel(n.attributes['alt'] ?? '')}]'
+          buffer.write('![${_linkLabel(attributes['alt'] ?? '')}]'
               '(${_linkTarget(target)})');
         }
         return;
       case 'strong':
       case 'b':
-        buffer.write('**${_inlineOf(n, base)}**');
+        buffer.write('**${_inlineOf(n, base, inAnchor: inAnchor)}**');
         return;
       case 'em':
       case 'i':
-        buffer.write('*${_inlineOf(n, base)}*');
+        buffer.write('*${_inlineOf(n, base, inAnchor: inAnchor)}*');
         return;
       case 'code':
-        buffer.write('`${_inlineOf(n, base)}`');
+        buffer.write('`${_inlineOf(n, base, inAnchor: inAnchor)}`');
         return;
     }
-    if (n.text != null) buffer.write('${n.text} ');
+    for (final text in [n.text, n.rawText]) {
+      if (text != null) buffer.write('$text ');
+    }
     for (final child in n.children) {
-      walk(child);
+      walk(child, inAnchor || tag == 'a', depth + 1);
     }
   }
 
-  walk(node);
+  walk(node, inAnchor, 0);
   return _singleLine(buffer.toString());
 }
 
 /// [_inline] for a child node regardless of its own tag handling.
-String _inlineOf(SeoNode node, String base) =>
-    _inline(SeoNode(tag: '', text: node.text, children: node.children), base);
+String _inlineOf(SeoNode node, String base, {bool inAnchor = false}) => _inline(
+      SeoNode(
+        tag: '',
+        text: node.text,
+        rawText: node.rawText,
+        children: node.children,
+      ),
+      base,
+      inAnchor: inAnchor,
+    );
 
 /// Site-relative URLs become absolute — AI consumers read the file
 /// without a base-URL context. Returns `null` for anything the URL

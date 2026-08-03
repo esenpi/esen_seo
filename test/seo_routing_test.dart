@@ -279,5 +279,29 @@ void main() {
       expect(xml, contains('<loc>https://x.dev/blog/erster-post</loc>'));
       expect(xml, contains('<lastmod>2026-07-31</lastmod>'));
     });
+
+    test('an alternate the URL policy refuses never reaches sitemap.xml', () {
+      // Der Head lässt so eine URL nicht durch — die Sitemap war der
+      // eine Ausgabeweg an der Policy vorbei: ein javascript:-Alternate
+      // aus CMS-Daten stand wörtlich im ausgelieferten XML.
+      final xml = seoSitemapXml(
+        routes: [
+          SeoRoute(
+            path: '/',
+            meta: (_) => const SeoMeta(
+              title: 'Start',
+              alternates: {
+                'de': 'javascript:alert(1)',
+                'en': 'https://x.dev/en',
+              },
+            ),
+          ),
+          SeoRoute(path: '/en', meta: (_) => const SeoMeta(title: 'Home')),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(xml, isNot(contains('javascript:')));
+      expect(xml, contains('href="https://x.dev/en"'));
+    });
   });
 }

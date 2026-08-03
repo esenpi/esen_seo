@@ -513,7 +513,7 @@ void main() {
 
   group('checks the review found missing', () {
     test('a canonical pointing at a gone page', () async {
-      // The README calls this the flagship case, and it was not
+      // The flagship case of the whole audit, and it was not
       // implemented: the page asks Google to index a URL that is 410.
       final report = await _audit([
         SeoRoute(
@@ -569,7 +569,8 @@ void main() {
 
     test('a pathologically deep body does not crash the audit', () async {
       // An audit that takes the build down with a StackOverflowError is
-      // worse than no audit.
+      // worse than no audit — and a silently truncated walk is worse
+      // than a loud one, because it reads as "checked and clean".
       SeoNode deep(int n) => n == 0
           ? SeoNode(tag: 'p', text: 'Grund')
           : SeoNode(tag: 'div', children: [deep(n - 1)]);
@@ -577,6 +578,7 @@ void main() {
         _ok('/', body: [SeoNode(tag: 'h1', text: 'H'), deep(5000)]),
       ]);
       expect(report.pagesAudited, 1);
+      expect(_ids(report), contains('body.truncated'));
     });
 
     test('an empty route table is reported, not silently clean', () async {
@@ -806,6 +808,639 @@ void main() {
     test('assertSeoHealthy stays silent on a healthy site', () {
       final clean = SeoAuditReport(findings: const [], pagesAudited: 1);
       expect(() => assertSeoHealthy(clean), returnsNormally);
+    });
+  });
+
+  group('the third review round', () {
+    test('attribute names are read the way the renderer writes them', () async {
+      // The renderer lower-cases names before writing; the audit read
+      // the raw map. A perfectly rendered {'SRC': …, 'ALT': …} produced
+      // two errors about attributes the output demonstrably carries.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'img',
+            attributes: {'SRC': '/a.png', 'ALT': 'Ein Foto'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('image.src-missing')),
+          reason: report.describe());
+      expect(_ids(report), isNot(contains('image.alt-missing')),
+          reason: report.describe());
+    });
+
+    test('an <img> carrying text renders as a <span>, not a broken image',
+        () async {
+      // The renderer turns a void element with content into a <span>;
+      // auditing the raw tree called the same node a broken image.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'img', text: 'Ich bin gar kein Bild'),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('image.src-missing')),
+          reason: report.describe());
+      expect(_ids(report), isNot(contains('image.alt-missing')),
+          reason: report.describe());
+    });
+
+    test('a nested <a> loses its link in HTML, so it is not audited as one',
+        () async {
+      // An <a> inside an <a> renders as a <span> — the renderer says
+      // so — and a span with no href is not a link with an empty one.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'a', attributes: {
+            'href': '/'
+          }, children: [
+            SeoNode(tag: 'a', text: 'Innen'),
+          ]),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.empty-href')),
+          reason: report.describe());
+    });
+
+    test('Organization without a name is valid markup, not an error', () async {
+      // Google lists no required properties for Organization at all.
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Organization', const {'url': 'https://x.dev'}),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(report.passes(), isTrue, reason: report.describe());
+      expect(_ids(report), contains('schema.missing-recommended'));
+    });
+
+    test('WebSite needs url as well as name', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('WebSite', const {'name': 'Meine Seite'})
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(_ids(report), contains('schema.missing-required'));
+      expect(report.describe(), contains('"url"'));
+    });
+
+    test('a Product offer without a price is inert', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'offers': {'@type': 'Offer', 'priceCurrency': 'EUR'},
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(report.describe(), contains('price'));
+      expect(report.passes(), isFalse);
+    });
+
+    test('a rating nobody appears to have given is not shown', () async {
+      // The factory itself allows this shape, so the audit has to say it.
+      final flagged = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [SeoSchema.product(name: 'Ding', ratingValue: 4.5)],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(flagged.describe(), contains('ratingCount'));
+      expect(flagged.passes(), isFalse);
+
+      final clean = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema.product(
+                name: 'Ding',
+                price: 9.99,
+                priceCurrency: 'EUR',
+                ratingValue: 4.5,
+                ratingCount: 12,
+              ),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(clean.passes(), isTrue, reason: clean.describe());
+    });
+
+    test('a same-host link on another port is another origin', () async {
+      // `https://x.dev:8443/…` against `siteBase: https://x.dev` is not
+      // this site — ports were only compared when both URLs named one.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'a',
+            text: 'Anderer Dienst',
+            attributes: {'href': 'https://x.dev:8443/nope'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')),
+          reason: report.describe());
+    });
+
+    test('a scheme-relative link to this site is checked', () async {
+      // `//x.dev/agb` borrows the page's scheme — a browser follows it,
+      // so a missing target is just as broken as with `/agb`.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'a',
+            text: 'AGB',
+            attributes: {'href': '//x.dev/nirgendwo'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), contains('link.broken'));
+    });
+
+    test('an uppercase scheme is still an absolute URL', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(
+            title: 'Eine ganz normale Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            openGraph: OpenGraphMeta(image: 'HTTPS://x.dev/foto.jpg'),
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('schema.relative-url')),
+          reason: report.describe());
+    });
+
+    test('a wider pattern swallows a later, narrower one', () async {
+      // `/:section/:slug` before `/blog/:slug` leaves the second route
+      // just as dead as an identically shaped pattern would — and the
+      // same-shape check could not see it.
+      final report = await _audit([
+        SeoRoute(
+          path: '/:section/:slug',
+          meta: (p) => SeoMeta(title: 'Seite ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Irgendwas')],
+        ),
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (p) => SeoMeta(title: 'Artikel ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Artikel')],
+        ),
+      ]);
+      expect(_ids(report), contains('route.shadowed'));
+      expect(report.describe(), contains('/:section/:slug'));
+    });
+
+    test('a narrower pattern before a wider one shadows nothing', () async {
+      // The other direction is fine: `/blog/:slug` first, then the
+      // catch-all — the catch-all still serves everything else.
+      final report = await _audit([
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (p) => SeoMeta(title: 'Artikel ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Artikel')],
+        ),
+        SeoRoute(
+          path: '/:section/:slug',
+          meta: (p) => SeoMeta(title: 'Seite ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Irgendwas')],
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('route.shadowed')),
+          reason: report.describe());
+    });
+  });
+
+  group('the fourth review round — the audit audited', () {
+    test('a subpath deployment passes its own derived canonicals', () async {
+      // GitHub Pages project sites live under /repo. The auto-derived
+      // canonical is '$base$path' — and the audit mapped it back to
+      // '/repo/about', a path no route serves, failing EVERY page of
+      // exactly the deployment the README advertises.
+      final report = await auditSeoRoutes(
+        routes: [
+          _ok('/', body: [
+            SeoNode(tag: 'h1', text: 'Start'),
+            SeoNode(
+              tag: 'a',
+              text: 'Docs',
+              attributes: {'href': 'https://user.github.io/repo/docs'},
+            ),
+          ]),
+          _ok('/docs', title: 'Die Doku-Startseite hier'),
+        ],
+        siteBase: 'https://user.github.io/repo',
+      );
+      // No errors — before the fix, the package's own derived canonical
+      // failed canonical.unknown-path on every page, and the prefixed
+      // internal link failed link.broken. (The two _ok pages share a
+      // description, which is a legitimate warning, not the subject.)
+      expect(report.passes(), isTrue, reason: report.describe());
+      expect(_ids(report), isNot(contains('canonical.unknown-path')));
+      expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('a subpath deployment still catches its broken links', () async {
+      final report = await auditSeoRoutes(
+        routes: [
+          _ok('/', body: [
+            SeoNode(tag: 'h1', text: 'Start'),
+            SeoNode(
+              tag: 'a',
+              text: 'Weg',
+              attributes: {'href': 'https://user.github.io/repo/fehlt'},
+            ),
+            // Outside the base path: another site, not a broken link.
+            SeoNode(
+              tag: 'a',
+              text: 'Anderes Projekt',
+              attributes: {'href': 'https://user.github.io/other'},
+            ),
+          ]),
+        ],
+        siteBase: 'https://user.github.io/repo',
+      );
+      expect(_ids(report), contains('link.broken'));
+      expect(report.describe(), contains('/fehlt'));
+      expect(report.describe(), isNot(contains('other')));
+    });
+
+    test('encoded and decoded spellings of one path are one page', () async {
+      // Routes live in decoded space ('/über'), URLs in encoded space
+      // ('/%C3%BCber') — Uri.path keeps the escapes, and the audit
+      // failed the package's own derived canonical over the spelling.
+      final report = await _audit([
+        _ok('/über', body: [SeoNode(tag: 'h1', text: 'Über uns')]),
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(
+            tag: 'a',
+            text: 'Über uns',
+            attributes: {'href': '/%C3%BCber'},
+          ),
+        ]),
+      ]);
+      expect(report.passes(), isTrue, reason: report.describe());
+      expect(_ids(report), isNot(contains('canonical.unknown-path')));
+      expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('a URL the renderer refuses for its RAW value is reported', () async {
+      // The policy sees the raw attribute — a trailing newline is a
+      // control character and the renderer drops the whole attribute.
+      // The audit checked the TRIMMED value and saw nothing wrong with
+      // an <img> that ships without any src.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'img',
+            attributes: {'src': '/a.png\n', 'alt': 'Ein Foto'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), contains('url.rejected-by-policy'));
+    });
+
+    test('an image anywhere inside a link is its anchor text', () async {
+      // a > div > img is what every card link looks like; only direct
+      // children were inspected, so it was "a link with no anchor text".
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'a', attributes: {
+            'href': '/'
+          }, children: [
+            SeoNode(tag: 'div', children: [
+              SeoNode(
+                tag: 'img',
+                attributes: {'src': '/a.png', 'alt': 'Über uns'},
+              ),
+            ]),
+          ]),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.no-text')),
+          reason: report.describe());
+    });
+
+    test('JSON-LD payloads are data, not page content', () async {
+      // The walk descended into a JSON-LD script's children and
+      // collected a phantom <h1> the renderer never emits — which then
+      // suppressed the real findings about the page.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(
+            tag: 'script',
+            attributes: {'type': 'application/ld+json'},
+            rawText: '{"@type":"Thing"}',
+            children: [SeoNode(tag: 'h1', text: 'Phantom')],
+          ),
+        ]),
+      ]);
+      expect(_ids(report), contains('body.empty'));
+    });
+
+    test('rawText is content the renderer ships', () async {
+      // Non-JSON-LD rawText renders as escaped, visible text — a body
+      // whose content lives there was audited as empty.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'p', rawText: 'Sichtbare Worte für den Crawler'),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('body.empty')),
+          reason: report.describe());
+    });
+
+    test('a fully walked tree is not reported as truncated', () async {
+      // Fencepost: the guard fired on the recursion into a leaf's empty
+      // child list, so a tree of exactly maxDepth+1 levels claimed its
+      // own findings were incomplete although every node was visited.
+      SeoNode chain(int n, SeoNode leaf) =>
+          n == 0 ? leaf : SeoNode(tag: 'div', children: [chain(n - 1, leaf)]);
+      final walked = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          chain(200, SeoNode(tag: 'p', text: 'Grund')),
+        ]),
+      ]);
+      expect(_ids(walked), isNot(contains('body.truncated')),
+          reason: walked.describe());
+
+      // And a genuinely truncated tree must not claim to be empty —
+      // the text below the ceiling is one nobody looked at.
+      final truncated = await _audit([
+        _ok('/', body: [chain(300, SeoNode(tag: 'p', text: 'Tief unten'))]),
+      ]);
+      expect(_ids(truncated), contains('body.truncated'));
+      expect(_ids(truncated), isNot(contains('body.empty')),
+          reason: truncated.describe());
+    });
+
+    test('one duplicate route is one finding, not two', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (p) => SeoMeta(title: 'Artikel ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'A')],
+        ),
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (p) => SeoMeta(title: 'Artikel ${p['slug']} hier'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'A')],
+        ),
+      ]);
+      expect(_ids(report), contains('route.duplicate-path'));
+      expect(_ids(report), isNot(contains('route.shadowed')),
+          reason: report.describe());
+    });
+
+    test('a price without a currency is only half of Google\'s pair', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [SeoSchema.product(name: 'Ding', price: 9.99)],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(report.describe(), contains('priceCurrency'));
+      expect(report.passes(), isFalse);
+    });
+
+    test('a rating supplied as a one-element list is still checked', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'offers': {
+                  '@type': 'Offer',
+                  'price': '9.99',
+                  'priceCurrency': 'EUR',
+                },
+                'aggregateRating': [
+                  {'@type': 'AggregateRating'},
+                ],
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(report.describe(), contains('ratingValue'));
+      expect(report.passes(), isFalse);
+    });
+
+    test('a canonical chain is reported, one hop is not', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/a',
+          meta: (_) => const SeoMeta(
+            title: 'Die erste Variante hier',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/b',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'A')],
+        ),
+        SeoRoute(
+          path: '/b',
+          meta: (_) => const SeoMeta(
+            title: 'Die zweite Variante hier',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/c',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'B')],
+        ),
+        _ok('/c', title: 'Das endgueltige Original'),
+      ]);
+      expect(_ids(report), contains('canonical.chain'));
+      // A warning: Google distrusts chains, but nothing is provably 404.
+      expect(report.passes(), isTrue, reason: report.describe());
+    });
+
+    test('canonicalising onto a page kept out of the sitemap is fine',
+        () async {
+      // includeInSitemap: false is not noindex — the target is
+      // perfectly indexable, and the error said otherwise.
+      final report = await _audit([
+        SeoRoute(
+          path: '/promo',
+          meta: (_) => const SeoMeta(
+            title: 'Die Aktionsseite von uns',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Promo')],
+          includeInSitemap: false,
+        ),
+        SeoRoute(
+          path: '/kampagne',
+          meta: (_) => const SeoMeta(
+            title: 'Die Kampagnenseite von uns',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/promo',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Kampagne')],
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('canonical.non-indexable')),
+          reason: report.describe());
+
+      // A noindex target is the real contradiction, and stays one.
+      final noindex = await _audit([
+        SeoRoute(
+          path: '/versteckt',
+          meta: (_) => const SeoMeta(
+            title: 'Die versteckte Seite hier',
+            robots: 'noindex',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Versteckt')],
+          includeInSitemap: false,
+        ),
+        SeoRoute(
+          path: '/sichtbar',
+          meta: (_) => const SeoMeta(
+            title: 'Die sichtbare Seite hier',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/versteckt',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Sichtbar')],
+        ),
+      ]);
+      expect(_ids(noindex), contains('canonical.non-indexable'));
+    });
+
+    test('en_US is not an hreflang code', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(
+            title: 'Die deutsche Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            alternates: {'de': '$_base/', 'en_US': '$_base/en'},
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+        _ok('/en', title: 'The English home page'),
+      ]);
+      expect(_ids(report), contains('hreflang.invalid-code'));
+    });
+
+    test('two languages on the same URL is a copy-paste slip', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/de',
+          meta: (_) => const SeoMeta(
+            title: 'Die deutsche Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            alternates: {'de': '$_base/de', 'en': '$_base/de'},
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(_ids(report), contains('hreflang.duplicate-target'));
+
+      // en and en-GB sharing a URL is legitimate, x-default always is.
+      final legit = await _audit([
+        SeoRoute(
+          path: '/en',
+          meta: (_) => const SeoMeta(
+            title: 'The English home page',
+            description: 'A description long enough to sit inside the window '
+                'that search engines actually show to a reader online.',
+            alternates: {
+              'en': '$_base/en',
+              'en-GB': '$_base/en',
+              'x-default': '$_base/en',
+            },
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Home')],
+        ),
+      ]);
+      expect(_ids(legit), isNot(contains('hreflang.duplicate-target')),
+          reason: legit.describe());
+    });
+
+    test('titles differing only in case and spacing are duplicates', () async {
+      final report = await _audit([
+        _ok('/a', title: 'Home — Meine  Seite'),
+        _ok('/b', title: 'home — meine Seite'),
+      ]);
+      expect(_ids(report), contains('title.duplicate'));
+    });
+
+    test('an additionalPaths placeholder is not nagged for a title', () async {
+      // resolveSeoPages documents these as placeholders whose content
+      // is served outside the table — auditing the placeholder failed
+      // every legitimate use of the feature.
+      final report = await _audit(
+        [_ok('/')],
+        additionalPaths: const ['/legal'],
+      );
+      expect(report.findings, isEmpty, reason: report.describe());
     });
   });
 

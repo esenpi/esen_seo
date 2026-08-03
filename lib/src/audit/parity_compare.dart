@@ -56,6 +56,23 @@ List<SeoFinding> compareSeoTrees({
   final ssrFacts = SeoBodyFacts.of(ssr);
   final appFacts = SeoBodyFacts.of(app);
 
+  if (ssrFacts.truncated || appFacts.truncated) {
+    // A truncated walk cannot support ANY verdict: with the deep half
+    // of one tree unseen, "this text reaches only crawlers" would be a
+    // confident error about content nobody compared. Report the
+    // truncation and stop — the same reasoning that skips cross-page
+    // checks when the page set is partial.
+    findings.add(SeoFinding(
+      check: SeoCheck.bodyTruncated,
+      severity: SeoSeverity.warning,
+      path: path,
+      message: 'a tree nests deeper than the comparison walks '
+          '(${SeoBodyFacts.maxDepth} levels) — parity on this page '
+          'cannot be judged and was not',
+    ));
+    return findings;
+  }
+
   if (policy.compareHeadings) {
     final ssrH1 = _headings(ssrFacts, 1);
     final appH1 = _headings(appFacts, 1);
@@ -110,15 +127,39 @@ List<SeoFinding> compareSeoTrees({
 
   if (policy.compareText) {
     // The cloaking direction, and the serious one: text sent only to
-    // crawlers. Compared as whole words so wording that merely moved
-    // between nodes does not register.
-    final appWords = _words(appFacts.text);
+    // crawlers. Compared as consecutive word *pairs*: the app's words
+    // are concatenated in tree order first, so a passage that merely
+    // moved between nodes — or was split across two adjacent spans —
+    // still matches, while a bag-of-words comparison did not notice a
+    // passage that was missing entirely as long as its words appeared
+    // scattered across navigation, shell and other paragraphs. The
+    // concatenation also manufactures pairs at run seams, so a short
+    // passage whose words happen to straddle a boundary can slip
+    // through — the price of tolerating legitimate splits; adjacency
+    // is an approximation of "the same passage", not a proof.
+    final appSequence = [
+      for (final run in appFacts.textRuns) ..._tokens(run),
+    ];
+    final appWords = appSequence.toSet();
+    final appPairs = _pairs(appSequence).toSet();
     final missing = <String>[];
-    for (final run in _textRuns(ssr)) {
+    final reordered = <String>[];
+    for (final run in ssrFacts.textRuns) {
       if (_ignored(run, policy)) continue;
-      final words = _words(run);
+      final words = _tokens(run);
       if (words.isEmpty) continue;
-      if (!words.every(appWords.contains)) missing.add(run);
+      if (words.length == 1
+          ? appWords.contains(words.single)
+          : _pairs(words).every(appPairs.contains)) {
+        continue;
+      }
+      // Graded: words absent means the content is gone — the cloaking
+      // direction, an error. All words present but not adjacent is
+      // usually a layout artifact — a Row of Columns interleaves label
+      // and value runs in tree order, which is not reading order — and
+      // failing the build over that teaches teams to turn the check
+      // off. A warning keeps it visible without lying about severity.
+      (words.every(appWords.contains) ? reordered : missing).add(run);
     }
     if (missing.isNotEmpty) {
       findings.add(SeoFinding(
@@ -128,6 +169,17 @@ List<SeoFinding> compareSeoTrees({
         message: '${missing.length} passage(s) go to crawlers but never '
             'appear in the app — this is cloaking, however accidental',
         detail: missing.take(3).map((t) => '"${_clip(t)}"').join(', '),
+      ));
+    }
+    if (reordered.isNotEmpty) {
+      findings.add(SeoFinding(
+        check: SeoCheck.paritySsrOnlyText,
+        severity: SeoSeverity.warning,
+        path: path,
+        message: '${reordered.length} passage(s) reach the app only as '
+            'scattered words, not as the passage — usually a layout '
+            'artifact (columns, tables), worth a look either way',
+        detail: reordered.take(3).map((t) => '"${_clip(t)}"').join(', '),
       ));
     }
   }
@@ -157,24 +209,14 @@ List<String> _headings(SeoBodyFacts facts, int level) => [
         if (h.level == level) _normalize(h.text),
     ];
 
-/// Every text run in the tree, so a missing passage can be quoted
-/// rather than reported as a diff of two giant strings.
-List<String> _textRuns(List<SeoNode> nodes) {
-  final runs = <String>[];
-  void walk(List<SeoNode> list) {
-    for (final node in list) {
-      final text = node.text;
-      if (text != null && text.trim().isNotEmpty) runs.add(text.trim());
-      walk(node.children);
-    }
+List<String> _tokens(String text) =>
+    _normalize(text).split(' ').where((w) => w.isNotEmpty).toList();
+
+Iterable<String> _pairs(List<String> words) sync* {
+  for (var i = 0; i + 1 < words.length; i++) {
+    yield '${words[i]} ${words[i + 1]}';
   }
-
-  walk(nodes);
-  return runs;
 }
-
-Set<String> _words(String text) =>
-    _normalize(text).split(' ').where((w) => w.isNotEmpty).toSet();
 
 /// Characters that carry no meaning for this comparison.
 ///
@@ -184,10 +226,16 @@ Set<String> _words(String text) =>
 /// designer's typography pass must not fail the build.
 final RegExp _punctuation = RegExp('[.,;:!?…"\'“”„‘’'
     '«»()\\[\\]{}­–—−-]');
+
+/// U+FFFC marks an inline WidgetSpan in a flattened Flutter text — an
+/// icon between words. It is not a word: leaving it in severed the
+/// surrounding pair and reported the passage as cloaking.
+final RegExp _objectReplacement = RegExp('\uFFFC');
 final RegExp _spacing = RegExp('[\\s  ]+');
 
 /// Whitespace, case and punctuation are not content differences.
 String _normalize(String text) => text
+    .replaceAll(_objectReplacement, ' ')
     .replaceAll(_punctuation, ' ')
     .replaceAll(_spacing, ' ')
     .trim()

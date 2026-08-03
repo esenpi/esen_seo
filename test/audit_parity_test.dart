@@ -149,6 +149,111 @@ void main() {
       );
     });
 
+    test('words scattered across the app are not the passage', () {
+      // The bag-of-words comparison passed this: every word of the SSR
+      // passage exists somewhere in the app — one in the nav, one in a
+      // footnote — but the passage itself was never delivered.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [
+          SeoNode(tag: 'p', text: 'Kostenlose Lieferung ab fünfzig Euro'),
+        ],
+        app: [
+          SeoNode(tag: 'p', text: 'Kostenlose Beratung'),
+          SeoNode(tag: 'p', text: 'Lieferung morgen'),
+          SeoNode(tag: 'p', text: 'ab Lager verfügbar'),
+          SeoNode(tag: 'p', text: 'fünfzig Filialen'),
+          SeoNode(tag: 'p', text: 'Euro und Dollar'),
+        ],
+      );
+      expect(_idsOf(findings), contains('parity.ssr-only-text'));
+    });
+
+    test('a passage split across adjacent nodes still counts as delivered', () {
+      // The tolerance the old check existed for must survive: wording
+      // that merely moved between nodes — a sentence split over two
+      // spans — is not a content difference.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [
+          SeoNode(tag: 'p', text: 'Flutter Web richtig indexieren lassen'),
+        ],
+        app: [
+          SeoNode(tag: 'span', text: 'Flutter Web'),
+          SeoNode(tag: 'span', text: 'richtig indexieren lassen'),
+        ],
+      );
+      expect(findings, isEmpty, reason: findings.join('\n'));
+    });
+
+    test('a pathologically deep tree reports truncation, not a crash', () {
+      SeoNode deep(int n) => n == 0
+          ? SeoNode(tag: 'p', text: 'Grund')
+          : SeoNode(tag: 'div', children: [deep(n - 1)]);
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'Oben'), deep(5000)],
+        app: [SeoNode(tag: 'p', text: 'Oben')],
+      );
+      expect(_idsOf(findings), contains('body.truncated'));
+      // And nothing else: with the deep half of one tree unseen,
+      // "this text reaches only crawlers" would be a confident error
+      // about content nobody compared.
+      expect(_idsOf(findings), isNot(contains('parity.ssr-only-text')),
+          reason: findings.join('\n'));
+    });
+
+    test('an inline icon inside a sentence is not cloaking', () {
+      // Text.rich flattens a WidgetSpan to U+FFFC. Treating it as a
+      // word severed the surrounding pair and reported the passage as
+      // error-severity cloaking — on identical visible text.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'Rated 4.8 by 200 users')],
+        app: [SeoNode(tag: 'p', text: 'Rated 4.8 ￼ by 200 users')],
+      );
+      expect(findings, isEmpty, reason: findings.join('\n'));
+    });
+
+    test('scattered words are a warning, absent words an error', () {
+      // A Row of Columns interleaves label and value runs in tree
+      // order — 'Gewicht', 'Rahmen', '8 kg', 'Carbon' — so the prose
+      // passage exists on screen but not as adjacent tokens. Failing
+      // the build over that teaches teams to turn the check off; words
+      // that are genuinely GONE still must fail it.
+      final scattered = compareSeoTrees(
+        path: '/',
+        ssr: [
+          SeoNode(tag: 'p', text: 'Gewicht: 8 kg'),
+          SeoNode(tag: 'p', text: 'Rahmen: Carbon'),
+        ],
+        app: [
+          SeoNode(tag: 'span', text: 'Gewicht'),
+          SeoNode(tag: 'span', text: 'Rahmen'),
+          SeoNode(tag: 'span', text: '8 kg'),
+          SeoNode(tag: 'span', text: 'Carbon'),
+        ],
+      );
+      expect(_idsOf(scattered), contains('parity.ssr-only-text'));
+      expect(
+        scattered
+            .firstWhere((f) => f.check == SeoCheck.paritySsrOnlyText)
+            .severity,
+        SeoSeverity.warning,
+        reason: scattered.join('\n'),
+      );
+
+      final gone = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'Nur fuer Suchmaschinen bestimmt')],
+        app: [SeoNode(tag: 'p', text: 'Etwas ganz anderes')],
+      );
+      expect(
+        gone.firstWhere((f) => f.check == SeoCheck.paritySsrOnlyText).severity,
+        SeoSeverity.error,
+      );
+    });
+
     test('ignoreText silences a cookie banner on both sides', () {
       final findings = compareSeoTrees(
         path: '/',
