@@ -68,15 +68,23 @@ List<SeoFinding> compareSeoTrees({
     // page's <h1> is still in the tree. Neither means the page content
     // disagrees; an extra heading is already reported separately, as a
     // warning.
-    if (ssrH1.isNotEmpty && appH1.isNotEmpty && !appH1.contains(ssrH1.first)) {
+    // Guarding on `appH1.isNotEmpty` let the sharpest case through: an
+    // app that renders the headline as a <p> has the same words and no
+    // <h1> at all, so the heading check skipped and the word check saw
+    // nothing missing. The page really does differ — the server
+    // promises a heading the app never delivers.
+    if (ssrH1.isNotEmpty && !appH1.contains(ssrH1.first)) {
       findings.add(SeoFinding(
         check: SeoCheck.parityH1Differs,
         severity: SeoSeverity.error,
         path: path,
-        message: 'the server\'s <h1> appears nowhere in the app — crawlers '
-            'and visitors are reading different pages',
+        message: appH1.isEmpty
+            ? 'the server sends an <h1> and the app renders none — the '
+                'text may be there, but not as a heading'
+            : 'the server\'s <h1> appears nowhere in the app — crawlers '
+                'and visitors are reading different pages',
         detail: 'server "${ssrH1.first}", app has '
-            '${appH1.map((h) => '"$h"').join(', ')}',
+            '${appH1.isEmpty ? 'no <h1>' : appH1.map((h) => '"$h"').join(', ')}',
       ));
     }
 

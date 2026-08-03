@@ -136,12 +136,26 @@ Future<SeoAuditReport> auditSeoParity({
 
   // Say plainly which indexable pages nobody looked at, so a sample
   // that quietly shrank to one route is visible in the report.
+  //
+  // Severity depends on whether anything was checked at all, because
+  // "info" alone did not hold up the claim this file makes: with
+  // `passes()` failing only on errors, `paths: []` was a green run that
+  // proved nothing. Checking no page is a failure; checking some is a
+  // judgement call the caller may have made deliberately.
   final unchecked = [
     for (final page in resolved)
       if (page.isIndexable && !paths.map(normalizeSeoPath).contains(page.path))
         page.path,
   ];
-  if (unchecked.isNotEmpty) {
+  if (covered == 0) {
+    findings.add(SeoFinding(
+      check: SeoCheck.parityNotCovered,
+      severity: SeoSeverity.error,
+      message: 'no page was checked for parity, so this run proves nothing '
+          '— pass the paths you want compared',
+      detail: unchecked.isEmpty ? null : unchecked.take(5).join(', '),
+    ));
+  } else if (unchecked.isNotEmpty) {
     findings.add(SeoFinding(
       check: SeoCheck.parityNotCovered,
       severity: SeoSeverity.info,

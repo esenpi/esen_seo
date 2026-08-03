@@ -48,6 +48,7 @@ extension type const SeoCheck(String id) implements String {
   static const canonicalRelative = SeoCheck('canonical.relative');
   static const canonicalUnknownPath = SeoCheck('canonical.unknown-path');
   static const canonicalNonIndexable = SeoCheck('canonical.non-indexable');
+  static const hreflangRelative = SeoCheck('hreflang.relative');
   static const robotsNoindexInSitemap = SeoCheck('robots.noindex-in-sitemap');
   static const sitemapEmpty = SeoCheck('sitemap.empty');
 
@@ -78,6 +79,8 @@ extension type const SeoCheck(String id) implements String {
   // Structured data
   static const schemaInvalidJson = SeoCheck('schema.invalid-json');
   static const schemaMissingRequired = SeoCheck('schema.missing-required');
+  static const schemaMissingRecommended =
+      SeoCheck('schema.missing-recommended');
   static const schemaRelativeUrl = SeoCheck('schema.relative-url');
 
   // Parity — does the app render what the server claims?
