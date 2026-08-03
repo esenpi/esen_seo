@@ -359,6 +359,158 @@ void main() {
     });
   });
 
+  group('legitimate sites must not produce errors', () {
+    // An error-severity finding on a correct site is the worst bug this
+    // tool can have: it teaches the team to switch the audit off. Each
+    // of these shapes triggered one.
+
+    test('a deep link into a :param route without enumeratePaths', () async {
+      // The commonest shape a real app has. The engine itself calls an
+      // un-enumerated :param route a *warning* whose message says "its
+      // URLs work for visitors" — so calling a link to one of those
+      // URLs a broken link contradicted its own verdict.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(
+              tag: 'a', text: 'Doku', attributes: {'href': '/docs/install'}),
+        ]),
+        SeoRoute(
+          path: '/docs/:page',
+          meta: (p) => SeoMeta(title: 'Doku ${p['page']} lesen und lernen'),
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')));
+      expect(report.errorCount, 0, reason: report.describe());
+      // The route-level warning is still raised — it is the right one.
+      expect(_ids(report), contains('route.not-enumerated'));
+    });
+
+    test('a partially enumerated route still serves its other URLs', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(tag: 'a', text: 'Alt', attributes: {'href': '/blog/2019'}),
+        ]),
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (p) => SeoMeta(title: 'Post ${p['slug']} lesen und lernen'),
+          enumeratePaths: () => ['/blog/neu'],
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('links to static assets are not pages', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(tag: 'a', text: 'PDF', attributes: {'href': '/x.pdf'}),
+          SeoNode(tag: 'a', text: 'Logo', attributes: {'href': '/logo.png'}),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('a canonical with a query string or fragment', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/suche',
+          meta: (_) => const SeoMeta(
+            title: 'Die Suche auf dieser Seite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/suche?q=schuhe',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Suche')],
+        ),
+      ]);
+      expect(_ids(report), isNot(contains('canonical.unknown-path')));
+      expect(report.errorCount, 0, reason: report.describe());
+    });
+
+    test('a look-alike host is external, not a broken internal link', () async {
+      // https://x.dev.evil.com starts with the base string but is a
+      // different site; a prefix comparison called it internal.
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(
+            tag: 'a',
+            text: 'Fremd',
+            attributes: {'href': 'https://x.dev.evil.com/nope'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('a language variant kept out of the sitemap is still reciprocal',
+        () async {
+      const both = {'de': '$_base/de', 'en': '$_base/en'};
+      final report = await _audit([
+        SeoRoute(
+          path: '/de',
+          meta: (_) => const SeoMeta(
+            title: 'Die deutsche Startseite hier',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            alternates: both,
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Hallo')],
+        ),
+        SeoRoute(
+          path: '/en',
+          // Deliberately out of the sitemap — still a real page that
+          // links back.
+          includeInSitemap: false,
+          meta: (_) => const SeoMeta(
+            title: 'The English home page here',
+            description: 'A description that sits comfortably inside the '
+                'window search engines actually show to a human reader.',
+            alternates: both,
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Hello')],
+        ),
+      ]);
+      expect(
+        _ids(report).where((id) => id.startsWith('hreflang')),
+        isEmpty,
+        reason: report.describe(),
+      );
+    });
+
+    test('every check can be suppressed, including the errors', () async {
+      // Suppression was wired into 3 of 30 checks and none of the
+      // errors, so a team hitting a false positive could only delete
+      // the audit. It is filtered centrally now.
+      final broken = [
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(),
+          body: (_) => [
+            SeoNode(tag: 'a', text: 'Weg', attributes: {'href': '/nirgends'}),
+          ],
+        ),
+      ];
+      final loud = await _audit(broken);
+      expect(loud.errorCount, greaterThan(0));
+
+      final quiet = await _audit(
+        broken,
+        policy: const SeoAuditPolicy(ignore: {
+          SeoCheck.titleMissing,
+          SeoCheck.linkBroken,
+          SeoCheck.descriptionMissing,
+          SeoCheck.headingNoH1,
+        }),
+      );
+      expect(_ids(quiet), isNot(contains('title.missing')));
+      expect(_ids(quiet), isNot(contains('link.broken')));
+      expect(quiet.errorCount, 0, reason: quiet.describe());
+    });
+  });
+
   group('no false positives on a healthy site', () {
     test('a well-formed table produces nothing at all', () async {
       final report = await _audit([
