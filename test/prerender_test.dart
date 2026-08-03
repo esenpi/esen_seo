@@ -113,6 +113,55 @@ void main() {
       expect(written, hasLength(8));
     });
 
+    test('accepts case-insensitive HTML and removes template description',
+        () async {
+      File('${buildDir.path}/index.html').writeAsStringSync('''
+<!DOCTYPE HTML>
+<HTML class="app">
+<HEAD>
+  <META content="old" NAME='DESCRIPTION'>
+  <TITLE>Template</TITLE>
+</HEAD>
+<BODY><script src="flutter_bootstrap.js"></script></BODY>
+</HTML>
+''');
+
+      await prerenderSite(
+        routes: [_routes().first],
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+
+      final html = File('${buildDir.path}/index.html').readAsStringSync();
+      expect(html, contains('<title>Home</title>'));
+      expect(html, contains('id="esen-seo-content"'));
+      expect(html, contains('<html class="app" lang="de">'));
+      expect(html, isNot(contains('content="old"')));
+    });
+
+    test('an incomplete template fails before the root file is overwritten',
+        () async {
+      const incomplete = '<html><head></head><main>app</main></html>';
+      File('${buildDir.path}/index.html').writeAsStringSync(incomplete);
+
+      await expectLater(
+        prerenderSite(
+          routes: [_routes().first],
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+        ),
+        throwsStateError,
+      );
+      expect(
+        File('${buildDir.path}/index.html').readAsStringSync(),
+        incomplete,
+      );
+    });
+
     test('writes the IndexNow key file when a key is set', () async {
       await prerenderSite(
         routes: _routes(),

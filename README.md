@@ -487,7 +487,8 @@ content under several URLs splits ranking signals:
 ```dart
 seoRedirectMiddleware(
   canonicalHost: 'esen.software',       // www.… → esen.software (301)
-  forceHttps: true,                     // honors x-forwarded-proto
+  forceHttps: true,
+  trustProxy: true,                     // only behind your reverse proxy
   stripTrailingSlashes: true,           // /demo/ → /demo
   redirects: {'/old-page': '/new-page'} // relaunch mappings
 )
@@ -792,7 +793,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 522 unit and widget
+Young package under active development, covered by 555 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.

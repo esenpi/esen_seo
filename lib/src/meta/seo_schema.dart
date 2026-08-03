@@ -33,7 +33,11 @@ class SeoSchema {
   /// `null` value are dropped.
   SeoSchema(this.type, [Map<String, Object?> properties = const {}])
       : properties = Map.unmodifiable(
-          Map.of(properties)..removeWhere((_, value) => value == null),
+          Map.of(properties)
+            ..removeWhere(
+              (key, value) =>
+                  value == null || key == '@context' || key == '@type',
+            ),
         );
 
   /// An `Article` — for blog posts and news pages.

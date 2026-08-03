@@ -21,6 +21,21 @@ void main() {
       expect(schema.toJson().containsKey('url'), isFalse);
     });
 
+    test('reserved JSON-LD keys cannot override context or type', () {
+      final schema = SeoSchema('Product', const {
+        '@context': 'https://attacker.invalid',
+        '@type': 'WebSite',
+        'name': 'Rennrad',
+      });
+
+      expect(schema.properties, {'name': 'Rennrad'});
+      expect(schema.toJson(), {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        'name': 'Rennrad',
+      });
+    });
+
     test('article factory builds author and ISO dates', () {
       final schema = SeoSchema.article(
         headline: 'Flutter SEO ohne Puppeteer',

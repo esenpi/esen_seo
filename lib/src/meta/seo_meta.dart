@@ -90,6 +90,9 @@ class SeoMeta {
   ///   'theme-color': '#0a0f1e',
   /// }
   /// ```
+  ///
+  /// A `referrer` entry is emitted only when its value is a privacy-preserving
+  /// policy accepted by the renderer. Values such as `unsafe-url` are omitted.
   final Map<String, String> extraMeta;
 
   /// Returns a copy with the given fields replaced.
@@ -199,7 +202,13 @@ class SeoMeta {
       name('twitter:creator', tw?.creator);
     }
 
-    extraMeta.forEach(name);
+    extraMeta.forEach((key, content) {
+      if (key.trim().toLowerCase() == 'referrer' &&
+          !isAllowedSeoAttribute('referrerpolicy', content)) {
+        return;
+      }
+      name(key, content);
+    });
 
     for (final schema in schemas) {
       nodes.add(schema.toNode());

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../controller/seo_controller.dart';
+import 'browser_route_location.dart';
 import 'seo_resolution.dart';
 import 'seo_route.dart';
 
@@ -171,17 +172,27 @@ class SeoRouteObserver extends NavigatorObserver {
 
   String? _browserLocation() {
     if (!kIsWeb) return null;
-    final base = Uri.base;
-    // Hash routing keeps the app path in the fragment. Prefer it even when
-    // the deployment itself has a non-root path (`/repo/#/docs`).
-    if (base.fragment.isNotEmpty) return base.fragment;
-    // Path-URL-Strategie (empfohlen, EsenSeo.init(cleanUrls: true)):
-    if (base.path.isNotEmpty && base.path != '/') return base.path;
-    return base.path.isEmpty ? '/' : base.path;
+    return browserRouteLocation(Uri.base);
   }
 
   String _routeLocation(String location) {
-    final path = normalizeSeoPath(location);
+    var routeLocation = location.trim();
+    if (routeLocation.startsWith('#')) {
+      routeLocation = routeLocation.substring(1);
+    }
+    final parsed = Uri.tryParse(routeLocation);
+    if (parsed != null && parsed.hasScheme) {
+      routeLocation = parsed.path;
+    } else {
+      final query = routeLocation.indexOf('?');
+      final fragment = routeLocation.indexOf('#');
+      final end = [
+        if (query >= 0) query,
+        if (fragment >= 0) fragment,
+      ].fold(routeLocation.length, (a, b) => a < b ? a : b);
+      routeLocation = routeLocation.substring(0, end);
+    }
+    final path = normalizeSeoPath(routeLocation);
     final base = canonicalBase == null ? null : Uri.tryParse(canonicalBase!);
     if (base == null) return path;
     final prefix = normalizeSeoPath(base.path);

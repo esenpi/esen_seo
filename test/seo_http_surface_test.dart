@@ -40,6 +40,40 @@ List<SeoRoute> _redirectTable() => [
     ];
 
 void main() {
+  group('request methods', () {
+    test('non-reading methods always reach the application handler', () async {
+      final routes = [
+        SeoRoute(
+          path: '/account',
+          meta: (_) => const SeoMeta(title: 'Account'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Account')],
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(
+            seoBotMiddleware(routes: routes, siteBase: 'https://x.dev'),
+          )
+          .addHandler((request) => Response.ok('app ${request.method}'));
+
+      for (final method in const ['POST', 'PUT', 'PATCH', 'DELETE']) {
+        final response = await handler(Request(
+          method,
+          Uri.parse('https://x.dev/account'),
+          headers: {'user-agent': _googlebot},
+        ));
+        expect(await response.readAsString(), 'app $method');
+        expect(response.headers['x-esen-seo'], isNull);
+      }
+
+      final sitemap = await handler(Request(
+        'POST',
+        Uri.parse('https://x.dev/sitemap.xml'),
+        headers: {'user-agent': _googlebot},
+      ));
+      expect(await sitemap.readAsString(), 'app POST');
+    });
+  });
+
   group('resolver redirects and cloaking', () {
     test('all (default): human AND bot get the 301', () async {
       final handler = _handler(_redirectTable());

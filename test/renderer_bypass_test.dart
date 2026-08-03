@@ -219,6 +219,10 @@ void main() {
 
     test('referrerpolicy may not leak the full URL', () {
       expect(isAllowedSeoAttribute('referrerpolicy', 'unsafe-url'), isFalse);
+      expect(
+        isAllowedSeoAttribute('referrerpolicy', 'no-referrer-when-downgrade'),
+        isFalse,
+      );
       expect(isAllowedSeoAttribute('referrerpolicy', 'no-referrer'), isTrue);
     });
 

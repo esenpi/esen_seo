@@ -1,4 +1,5 @@
 import 'package:esen_seo/esen_seo.dart';
+import 'package:esen_seo/src/routing/browser_route_location.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,6 +11,21 @@ Route<void> _route(String name) => MaterialPageRoute<void>(
     );
 
 void main() {
+  test('browser locations distinguish hash routes from anchors', () {
+    expect(
+      browserRouteLocation(Uri.parse('https://x.dev/repo/#/docs')),
+      '/docs',
+    );
+    expect(
+      browserRouteLocation(Uri.parse('https://x.dev/docs#install')),
+      '/docs',
+    );
+    expect(
+      browserRouteLocation(Uri.parse('https://x.dev/#install')),
+      '/',
+    );
+  });
+
   testWidgets('a static route applies its meta in the same frame',
       (tester) async {
     // No pump/settle between the push and the assertion: an async body
@@ -49,6 +65,25 @@ void main() {
       EsenSeo.currentHeadHtml,
       contains('href="https://x.dev/repo/%C3%BCber"'),
     );
+  });
+
+  testWidgets('URL-like route names ignore query and fragment', (tester) async {
+    enableSeoForTests();
+    final observer = SeoRouteObserver(
+      routes: [
+        SeoRoute(
+          path: '/demo',
+          meta: (_) => const SeoMeta(title: 'Demo with query'),
+        ),
+      ],
+    );
+
+    observer.didPush(_route('/demo?tab=details#reviews'), null);
+    expect(EsenSeo.currentHeadHtml, contains('<title>Demo with query</title>'));
+
+    EsenSeo.setMeta(const SeoMeta(title: 'Reset'));
+    observer.didPush(_route('#/demo?tab=details'), null);
+    expect(EsenSeo.currentHeadHtml, contains('<title>Demo with query</title>'));
   });
 
   testWidgets('a slow resolver never overwrites a newer navigation',

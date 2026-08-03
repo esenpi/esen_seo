@@ -71,7 +71,7 @@ class SeoRoute {
     this.lang = 'en',
     this.includeInSitemap = true,
     this.lastModified,
-  })  : path = normalizeSeoPath(path),
+  })  : path = _validatedSeoRoutePath(path),
         isDynamic = false,
         resolve = _staticResolver(meta, body);
 
@@ -102,7 +102,7 @@ class SeoRoute {
     this.lang = 'en',
     this.includeInSitemap = true,
     this.lastModified,
-  })  : path = normalizeSeoPath(path),
+  })  : path = _validatedSeoRoutePath(path),
         meta = null,
         body = null,
         isDynamic = true;
@@ -338,6 +338,51 @@ String normalizeSeoPath(String path) {
     p = p.substring(0, p.length - 1);
   }
   return p;
+}
+
+/// Validates the part of a route declaration that is a pattern rather than a
+/// request URL. Query strings and fragments never reach `Request.url.path`,
+/// and duplicate parameter names would silently overwrite the earlier value.
+String _validatedSeoRoutePath(String rawPath) {
+  final path = normalizeSeoPath(rawPath);
+  if (path == '/') return path;
+  if (path.contains('?') || path.contains('#')) {
+    throw ArgumentError.value(
+      rawPath,
+      'path',
+      'must contain only a URL path, without query string or fragment',
+    );
+  }
+
+  final names = <String>{};
+  final segments = path.split('/');
+  for (var i = 1; i < segments.length; i++) {
+    final segment = segments[i];
+    if (segment.isEmpty) {
+      throw ArgumentError.value(
+        rawPath,
+        'path',
+        'must not contain an empty path segment',
+      );
+    }
+    if (!segment.startsWith(':')) continue;
+    final name = segment.substring(1);
+    if (name.isEmpty) {
+      throw ArgumentError.value(
+        rawPath,
+        'path',
+        'parameter segments need a name after ":"',
+      );
+    }
+    if (!names.add(name)) {
+      throw ArgumentError.value(
+        rawPath,
+        'path',
+        'parameter name "$name" is declared more than once',
+      );
+    }
+  }
+  return path;
 }
 
 /// URI paths keep percent-escapes; route declarations generally use Unicode.

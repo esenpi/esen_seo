@@ -202,6 +202,41 @@ void main() {
       expect(findings, isEmpty, reason: findings.join('\n'));
     });
 
+    test('one app occurrence cannot satisfy two server passages', () {
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [
+          SeoNode(tag: 'p', text: 'Kostenlose Lieferung'),
+          SeoNode(tag: 'p', text: 'Kostenlose Lieferung'),
+        ],
+        app: [SeoNode(tag: 'p', text: 'Kostenlose Lieferung')],
+      );
+
+      expect(_idsOf(findings), contains('parity.ssr-only-text'));
+      expect(
+        findings
+            .firstWhere((f) => f.check == SeoCheck.paritySsrOnlyText)
+            .severity,
+        SeoSeverity.error,
+      );
+    });
+
+    test('two app occurrences satisfy two server passages', () {
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [
+          SeoNode(tag: 'p', text: 'Kostenlose Lieferung'),
+          SeoNode(tag: 'p', text: 'Kostenlose Lieferung'),
+        ],
+        app: [
+          SeoNode(tag: 'span', text: 'Kostenlose Lieferung'),
+          SeoNode(tag: 'span', text: 'Kostenlose Lieferung'),
+        ],
+      );
+
+      expect(findings, isEmpty, reason: findings.join('\n'));
+    });
+
     test('a pathologically deep tree reports truncation, not a crash', () {
       SeoNode deep(int n) => n == 0
           ? SeoNode(tag: 'p', text: 'Grund')
@@ -282,6 +317,17 @@ void main() {
         policy: const SeoParityPolicy(ignoreText: {'Cookie'}),
       );
       expect(findings, isEmpty);
+    });
+
+    test('an empty ignoreText entry ignores nothing', () {
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'Crawler-only offer')],
+        app: [SeoNode(tag: 'p', text: 'Different app copy')],
+        policy: const SeoParityPolicy(ignoreText: {''}),
+      );
+
+      expect(_idsOf(findings), contains('parity.ssr-only-text'));
     });
   });
 
