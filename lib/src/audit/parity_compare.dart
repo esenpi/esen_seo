@@ -60,14 +60,23 @@ List<SeoFinding> compareSeoTrees({
     final ssrH1 = _headings(ssrFacts, 1);
     final appH1 = _headings(appFacts, 1);
 
-    if (ssrH1.isNotEmpty && appH1.isNotEmpty && ssrH1.first != appH1.first) {
+    // Ask whether the server's headline appears in the app at all, not
+    // whether it comes first. Comparing first-to-first failed on two
+    // perfectly ordinary shapes: an app shell whose untagged brand text
+    // becomes an <h1> through smart defaults, and Flutter keeping an
+    // inactive Navigator route mounted after a push, so the previous
+    // page's <h1> is still in the tree. Neither means the page content
+    // disagrees; an extra heading is already reported separately, as a
+    // warning.
+    if (ssrH1.isNotEmpty && appH1.isNotEmpty && !appH1.contains(ssrH1.first)) {
       findings.add(SeoFinding(
         check: SeoCheck.parityH1Differs,
         severity: SeoSeverity.error,
         path: path,
-        message: 'the app shows a different <h1> than the server sends — '
-            'crawlers and visitors are reading different pages',
-        detail: 'server "${ssrH1.first}" vs app "${appH1.first}"',
+        message: 'the server\'s <h1> appears nowhere in the app — crawlers '
+            'and visitors are reading different pages',
+        detail: 'server "${ssrH1.first}", app has '
+            '${appH1.map((h) => '"$h"').join(', ')}',
       ));
     }
 
@@ -159,9 +168,22 @@ List<String> _textRuns(List<SeoNode> nodes) {
 Set<String> _words(String text) =>
     _normalize(text).split(' ').where((w) => w.isNotEmpty).toSet();
 
-/// Whitespace and case are not content differences.
-String _normalize(String text) =>
-    text.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+/// Characters that carry no meaning for this comparison.
+///
+/// Punctuation is the difference between a copywriter adding an
+/// exclamation mark and the page actually saying something else. Curly
+/// quotes, soft hyphens and non-breaking spaces belong here too — a
+/// designer's typography pass must not fail the build.
+final RegExp _punctuation = RegExp('[.,;:!?…"\'“”„‘’'
+    '«»()\\[\\]{}­–—−-]');
+final RegExp _spacing = RegExp('[\\s  ]+');
+
+/// Whitespace, case and punctuation are not content differences.
+String _normalize(String text) => text
+    .replaceAll(_punctuation, ' ')
+    .replaceAll(_spacing, ' ')
+    .trim()
+    .toLowerCase();
 
 bool _same(String a, String b) => _normalize(a) == _normalize(b);
 

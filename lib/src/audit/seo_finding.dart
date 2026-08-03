@@ -47,6 +47,7 @@ extension type const SeoCheck(String id) implements String {
   static const urlRejectedByPolicy = SeoCheck('url.rejected-by-policy');
   static const canonicalRelative = SeoCheck('canonical.relative');
   static const canonicalUnknownPath = SeoCheck('canonical.unknown-path');
+  static const canonicalNonIndexable = SeoCheck('canonical.non-indexable');
   static const robotsNoindexInSitemap = SeoCheck('robots.noindex-in-sitemap');
   static const sitemapEmpty = SeoCheck('sitemap.empty');
 

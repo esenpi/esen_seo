@@ -84,9 +84,32 @@ Future<SeoAuditReport> auditSeoParity({
   final findings = <SeoFinding>[];
   var covered = 0;
 
+  final seen = <String>{};
   for (final rawPath in paths) {
     final path = normalizeSeoPath(rawPath);
-    final page = byPath[path];
+    // The same path listed twice would pump twice and report every
+    // finding twice.
+    if (!seen.add(path)) continue;
+
+    var page = byPath[path];
+    if (page == null) {
+      // Not in the enumeration is not the same as not served. A
+      // `/products/:slug` route without `enumeratePaths` serves this URL
+      // perfectly well, so resolve it on the spot instead of claiming
+      // the table does not know it — which was simply untrue.
+      final match = matchSeoRoute(routes, path);
+      if (match != null) {
+        page = SeoResolvedPage(
+          path: path,
+          route: match.route,
+          params: match.params,
+          resolution: await match.resolve(
+            detail: SeoDetail.full,
+            canonicalBase: siteBase,
+          ),
+        );
+      }
+    }
     if (page == null) {
       findings.add(SeoFinding(
         check: SeoCheck.parityNotCovered,
