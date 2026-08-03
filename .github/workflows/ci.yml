@@ -98,17 +98,12 @@ jobs:
         with:
           sdk: stable
 
-      - name: Check the server/core libraries for Flutter imports
-        run: |
-          set -euo pipefail
-          hits=$(grep -rEl "package:flutter/|dart:ui" \
-            lib/core.dart lib/server.dart lib/src/server lib/src/routing/seo_route.dart \
-            lib/src/renderer/html_renderer.dart lib/src/renderer/tag_policy.dart \
-            lib/src/renderer/seo_node.dart lib/src/renderer/seo_container.dart \
-            lib/src/meta 2>/dev/null || true)
-          if [ -n "$hits" ]; then
-            echo "::error::Flutter import in a path that must stay pure Dart:"
-            echo "$hits"
-            exit 1
-          fi
-          echo "server and core paths are free of Flutter imports"
+      # Walks the import graph from core.dart / server.dart / audit.dart
+      # instead of checking a hand-written list of files. The list had
+      # already fallen behind — seo_resolved_page.dart and
+      # seo_resolution.dart are exported by core.dart and were never in
+      # it — and a flat list cannot see a Flutter import reached
+      # indirectly, through a file it does not name. The walker is
+      # self-maintaining: reachable means checked.
+      - name: Check the pure-Dart libraries for Flutter imports
+        run: dart run tool/check_pure_dart.dart
