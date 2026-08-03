@@ -594,9 +594,11 @@ Text that reaches crawlers but never appears in the app is an
 an error too. A heading only the app shows is a warning, since an app
 legitimately shows more than a crawler needs. Links are off by default:
 navigation usually lives in the Flutter shell, so the route body will
-never carry it. And pages your sample did not cover are named in the
-report, so a sample that quietly shrank to one route cannot pass for
-coverage.
+never carry it. Coverage is reported honestly: a run that checked no
+page at all is an **error**, because it proves nothing — while pages
+your sample deliberately skipped are counted in the report as info,
+the first few named, so the sample's blind spot is visible without
+the build failing over a judgement call you made.
 
 `testing.dart` is a separate import on purpose — it is test-time
 scaffolding and has no business in a release build.
@@ -790,7 +792,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 485 unit and widget
+Young package under active development, covered by 522 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.

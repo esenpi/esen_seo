@@ -92,6 +92,10 @@ class SeoSchema {
   /// A `Product` with an optional price offer and star rating
   /// ([ratingValue]/[ratingCount] render the aggregate-rating stars in
   /// search results).
+  ///
+  /// Give at least one of [ratingCount]/[reviewCount] alongside
+  /// [ratingValue], and [priceCurrency] alongside [price] — Google
+  /// requires the pairs, and the audit reports the halves.
   factory SeoSchema.product({
     required String name,
     String? description,
@@ -128,6 +132,8 @@ class SeoSchema {
       });
 
   /// A `Review` of a product, place or other thing.
+  /// Give [author] — Google requires it for the review snippet, and
+  /// the audit reports a Review without one.
   factory SeoSchema.review({
     required String itemName,
     required double rating,

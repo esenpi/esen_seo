@@ -51,8 +51,9 @@ actually correct, not just render it.
   heading only the app shows is a warning, since an app legitimately
   shows more. Links are off by default: navigation lives in the Flutter
   shell, so the route body will never carry it.
-* Pages the sample did not cover are named in the report, so a sample
-  that shrank to one route cannot pass for coverage.
+* Coverage is reported honestly: checking no page at all is an error —
+  a green run that proved nothing — while pages the sample deliberately
+  skipped are named as info, since sampling is the caller's call.
 
 ### Hardened by an adversarial review
 
@@ -82,13 +83,13 @@ it:
   treated punctuation as content, so an added exclamation mark broke
   the build.
 * A canonical pointing at a 410, a redirect or a noindex page is now
-  reported — the case the README calls the flagship one and which was
-  not implemented. `robots: 'none'` counts as noindex. A pathological
+  reported — the flagship case of the whole audit, and it was not
+  implemented. `robots: 'none'` counts as noindex. A pathological
   node tree reports instead of raising `StackOverflowError`.
 
 ### A second review round
 
-Seven more findings, all of the same family as the first round: a check
+Eight more findings, all of the same family as the first round: a check
 that reported nothing, or one that reported the wrong thing.
 
 * **`assertSeoHealthy`** — the test this package *recommended*,
@@ -128,6 +129,106 @@ that reported nothing, or one that reported the wrong thing.
   needs `offers`, `review` or `aggregateRating` to have something to
   show.
 
+### A third review round
+
+The same standard, applied once more — this time to the checks that
+were themselves added by review:
+
+* **The audit now checks the renderer's view of the tree, not the raw
+  one.** The render decision (`HtmlRenderer.effectiveBodyTag`) is
+  exposed and the audit walks it: an `<img>` carrying text really
+  renders as a `<span>`, an `<a>` inside an `<a>` really loses its
+  link, and attribute names are lower-cased before they are written —
+  so a perfectly rendered `{'SRC': …, 'ALT': …}` no longer produces
+  two errors about attributes the output demonstrably carries.
+* **Parity compares word pairs, not a bag of words.** A passage whose
+  words appeared individually — one in the nav, one in a footnote —
+  passed as delivered even though the passage itself never was. The
+  app's words are concatenated in tree order first, so a sentence split
+  across adjacent spans still matches; scattered words do not.
+* **A same-host URL on another port is another origin.** Ports were
+  only compared when both URLs named one, so `https://x.dev:8443/…`
+  counted as internal against `siteBase: https://x.dev`. Uri's default
+  ports settle it — and a scheme-relative `//x.dev/agb` is now checked
+  instead of skipped, while `HTTPS://` counts as absolute.
+* **Pattern-versus-pattern shadowing generalised.** `/:section/:slug`
+  declared before `/blog/:slug` swallows it exactly as completely as an
+  identically shaped pattern, and the same-shape check could not see
+  it.
+* **A truncated walk is a finding** (`body.truncated`), on both the
+  engine and the parity side — silence read as "checked and clean"
+  about content nobody looked at. The parity text walk shares the same
+  depth ceiling instead of recursing without one.
+* **Schema requirements corrected against Google's documentation.**
+  `Organization` has no required properties at all — the error failed
+  valid markup; the name is a recommendation now. `WebSite` needs `url`
+  as well as `name`. And the checks read *inside* the properties: a
+  `Product` offer without a `price`, or an `aggregateRating` without a
+  `ratingCount`/`reviewCount`, satisfies every presence check and still
+  yields nothing.
+
+### A fourth review round — the audit audited
+
+Ten adversarial reviewers were pointed at the previous round's fixes
+with one instruction: break them. Thirty findings came back; the ones
+that survived verification are fixed, each with a regression test.
+
+* **Subpath deployments work now.** With `siteBase:
+  'https://user.github.io/repo'` — the GitHub Pages shape the README
+  itself advertises — the audit mapped the package's own derived
+  canonical to `/repo/about`, a path no route serves, and failed EVERY
+  page. The base's path prefix now maps URLs back into route space,
+  and a same-host URL outside the prefix is another site.
+* **Encoded and decoded spellings are one page.** `Uri.path` keeps
+  percent-escapes, so a route declared `/über` failed its own derived
+  canonical (`/%C3%BCber`). Paths are decoded before comparison.
+* **Parity severity is graded.** An SSR passage whose words are all
+  present but not adjacent — a Row of Columns interleaves label and
+  value in tree order — is a warning, not build-failing cloaking; only
+  words that are genuinely gone stay an error. U+FFFC (the flattened
+  form of an inline `WidgetSpan`) no longer severs a passage, and a
+  truncated tree ends the comparison with a warning instead of
+  supporting a confident error about content nobody compared.
+* **The renderer's view, applied everywhere it was still missing.**
+  JSON-LD payloads no longer contribute phantom headings and text to
+  the audit (the renderer never renders a script's children);
+  `rawText` counts as the visible content it is; the URL policy is
+  checked against the RAW attribute value, exactly as the renderer
+  checks it — a trailing newline made the renderer drop an `href`
+  while the audit, checking the trimmed value, saw nothing; and an
+  image anywhere inside a link counts as its anchor text, not only as
+  a direct child.
+* **llms-full.txt now describes the page that ships.** The markdown
+  renderer read the raw tree: `'H2'` lost its heading, an `img`
+  carrying text advertised an image URL the renderer refuses — and
+  dropped the caption it keeps. It walks `HtmlRenderer`'s effective
+  view now, with the same depth ceiling as the audit.
+* **sitemap.xml applies the URL policy to hreflang alternates.** It
+  was the one output path around the choke point — a `javascript:`
+  alternate from CMS data shipped verbatim in the served XML while the
+  head correctly refused it.
+* **`HtmlRenderer` refuses trees deeper than 500 levels** with an
+  error that names the likely cause (a self-referential resolver tree)
+  instead of a `StackOverflowError` mid-request that names nothing.
+* **New checks, corrected checks.** `canonical.chain` (A→B→C — Google
+  distrusts chains); `hreflang.invalid-code` (`en_US` is the single
+  most common authoring mistake, and Google ignores it silently);
+  `hreflang.duplicate-target` (de and en on the same URL — the
+  copy-paste slip that orphans a language while the cluster stays
+  formally valid). `canonical.non-indexable` judges by the robots
+  signal, not sitemap membership — canonicalising onto a page
+  deliberately kept out of sitemap.xml is legitimate. Duplicate titles
+  match case- and whitespace-insensitively. `Product.offers` needs
+  `priceCurrency` beside `price`; an `aggregateRating` in a
+  one-element list is checked like one passed directly.
+* **Fewer wrong findings elsewhere.** An `additionalPaths` placeholder
+  (documented: content served outside the table) is no longer nagged
+  for a title it cannot have; a duplicate route pattern is one finding,
+  not duplicate-path plus shadowed; a pattern with an empty segment is
+  not "shadowed" by a `:param` that provably never matches it; a fully
+  walked tree of exactly maxDepth+1 levels no longer claims its own
+  findings were incomplete.
+
 ### Also
 
 * CI runs the example app's own test suite, which audits a real grown
@@ -139,7 +240,7 @@ that reported nothing, or one that reported the wrong thing.
   a run from the wrong directory reporting a cheerful pass over a graph
   that was not there. The hand-written list had fallen behind — two
   files exported by `core.dart` were never in it — and could not see a
-  Flutter import reached indirectly at all. 47 files are covered where
+  Flutter import reached indirectly at all. 48 files are covered where
   12 were named.
 
 ## 0.7.0

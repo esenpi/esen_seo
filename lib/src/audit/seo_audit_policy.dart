@@ -4,8 +4,8 @@ import 'seo_finding.dart';
 ///
 /// The defaults are deliberately opinionated but not aggressive: every
 /// [SeoSeverity.error] is something measurably wrong, so a team can put
-/// `expectSeoHealthy(routes)` in CI on day one without a wall of
-/// bikeshedding. The soft numbers — title and description length — are
+/// `assertSeoHealthy(await auditSeoRoutes(routes: …, siteBase: …))` in
+/// CI on day one without a wall of bikeshedding. The soft numbers — title and description length — are
 /// only ever [SeoSeverity.info], because "too long" depends on the
 /// language and the brand suffix.
 class SeoAuditPolicy {
