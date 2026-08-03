@@ -95,10 +95,10 @@ SeoAuditReport auditSeoPages({
   // missing, "this title is unique" and "nothing links here" are both
   // unprovable, so they are skipped rather than reported wrongly.
   if (!partial) {
-    findings.addAll(_auditAcrossPages(indexable, pages, base, policy));
+    findings.addAll(_auditAcrossPages(indexable, pages, base, policy, routes));
   }
 
-  if (indexable.isEmpty && pages.isNotEmpty) {
+  if (indexable.isEmpty) {
     findings.add(const SeoFinding(
       check: SeoCheck.sitemapEmpty,
       severity: SeoSeverity.error,
@@ -107,7 +107,15 @@ SeoAuditReport auditSeoPages({
   }
 
   return SeoAuditReport(
-    findings: findings,
+    // Filtered here, once, rather than at each check. Asking every
+    // check to remember `policy.isEnabled` is the kind of rule that
+    // holds until someone adds the thirty-first — and a suppression
+    // that silently does nothing is worse than none, because the team
+    // believes they have turned the finding off.
+    findings: [
+      for (final finding in findings)
+        if (policy.isEnabled(finding.check)) finding,
+    ],
     pagesAudited: pages.length,
     partial: partial,
   );
@@ -368,10 +376,14 @@ Iterable<SeoFinding> _auditUrls(
         message: 'rel=canonical must be an absolute URL',
         detail: canonical,
       );
-    } else if (canonical.startsWith(base)) {
-      final target = canonical.substring(base.length);
-      final normalized = target.isEmpty ? '/' : target;
-      if (matchSeoRoute(routes, normalized) == null) {
+    } else {
+      // Route the canonical through the same normaliser the link check
+      // uses. Comparing the raw string against `base` treated
+      // `https://x.dev.evil.com/` as internal, and left `?q=1#top` in
+      // the path so a perfectly good search page canonicalising to
+      // itself was reported as pointing at a 404.
+      final target = _internalTarget(canonical, base);
+      if (target != null && matchSeoRoute(routes, target) == null) {
         yield SeoFinding(
           check: SeoCheck.canonicalUnknownPath,
           severity: SeoSeverity.error,
@@ -490,6 +502,7 @@ Iterable<SeoFinding> _auditAcrossPages(
   List<SeoResolvedPage> all,
   String base,
   SeoAuditPolicy policy,
+  List<SeoRoute> routes,
 ) sync* {
   // Duplicate titles and descriptions — the copy-pasted route table.
   yield* _duplicates(
@@ -516,6 +529,18 @@ Iterable<SeoFinding> _auditAcrossPages(
       if (target == null) continue;
       final resolved = byPath[target];
       if (resolved == null) {
+        // Ask the router, not the enumeration. A `/docs/:page` route
+        // without `enumeratePaths` serves every one of its URLs
+        // perfectly well — the engine itself says so, one check above,
+        // at warning severity. Judging links by which URLs happened to
+        // be enumerated made deep links into such a route an error, on
+        // the commonest shape a real app has.
+        if (matchSeoRoute(routes, target) != null) continue;
+        // An asset is not a page. /favicon.png and /files/x.pdf are
+        // served by the static handler and were never meant to match a
+        // route — the same rule the middleware uses to decide what is
+        // a page path at all.
+        if (!_looksLikePage(target)) continue;
         yield SeoFinding(
           check: SeoCheck.linkBroken,
           severity: SeoSeverity.error,
@@ -538,8 +563,14 @@ Iterable<SeoFinding> _auditAcrossPages(
   }
 
   // hreflang is only worth anything when the cluster agrees with itself.
+  //
+  // Built from ALL resolved pages, not only the indexable ones. A
+  // language variant that is deliberately kept out of sitemap.xml still
+  // declares its alternates, and judging reciprocity by sitemap
+  // membership reported a perfectly symmetric cluster as one-way — and
+  // said "that page does not link back", which was simply untrue.
   final alternatesByPath = <String, Map<String, String>>{
-    for (final p in indexable)
+    for (final p in all)
       if ((p.document?.meta.alternates ?? const {}).isNotEmpty)
         p.path: p.document!.meta.alternates,
   };
@@ -617,6 +648,11 @@ Iterable<SeoFinding> _duplicates(
 String _stripSlash(String url) =>
     url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
+/// Whether a path is a page rather than an asset — the same rule
+/// `seoBotMiddleware` uses: a dot in the last segment means
+/// `main.dart.js`, `favicon.png`, `whitepaper.pdf`.
+bool _looksLikePage(String path) => !path.split('/').last.contains('.');
+
 bool _isAbsolute(String url) =>
     url.startsWith('http://') || url.startsWith('https://');
 
@@ -624,15 +660,24 @@ bool _isAbsolute(String url) =>
 /// a fragment, or a non-http scheme.
 String? _internalTarget(String href, String base) {
   if (href.isEmpty || href.startsWith('#')) return null;
-  if (href.startsWith(base)) {
-    final rest = href.substring(base.length);
-    final withoutQuery = rest.split('#').first.split('?').first;
-    return normalizeSeoPath(withoutQuery.isEmpty ? '/' : withoutQuery);
-  }
+
+  // A site-rooted path, the common case.
   if (href.startsWith('/') && !href.startsWith('//')) {
     return normalizeSeoPath(href.split('#').first.split('?').first);
   }
-  return null;
+
+  // Absolute URLs are compared by parsed host, not by string prefix:
+  // `https://x.dev.evil.com/` starts with `https://x.dev` and is a
+  // different site entirely.
+  final target = Uri.tryParse(href);
+  final origin = Uri.tryParse(base);
+  if (target == null || origin == null) return null;
+  if (!target.hasScheme || target.host.isEmpty) return null;
+  if (target.host.toLowerCase() != origin.host.toLowerCase()) return null;
+  if (target.hasPort && origin.hasPort && target.port != origin.port) {
+    return null;
+  }
+  return normalizeSeoPath(target.path.isEmpty ? '/' : target.path);
 }
 
 bool _sameUrl(String url, String selfUrl, String base, String path) {
