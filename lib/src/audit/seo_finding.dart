@@ -78,6 +78,17 @@ extension type const SeoCheck(String id) implements String {
   static const schemaInvalidJson = SeoCheck('schema.invalid-json');
   static const schemaMissingRequired = SeoCheck('schema.missing-required');
   static const schemaRelativeUrl = SeoCheck('schema.relative-url');
+
+  // Parity — does the app render what the server claims?
+  //
+  // These need a pumped widget tree, so they come from
+  // `auditSeoParity` in package:esen_seo/testing.dart rather than from
+  // the pure-Dart engine.
+  static const paritySsrOnlyText = SeoCheck('parity.ssr-only-text');
+  static const parityH1Differs = SeoCheck('parity.h1-differs');
+  static const parityAppOnlyHeading = SeoCheck('parity.app-only-heading');
+  static const parityLinkMissingInApp = SeoCheck('parity.link-missing-in-app');
+  static const parityNotCovered = SeoCheck('parity.not-covered');
 }
 
 /// One problem, on one page.
