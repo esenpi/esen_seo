@@ -54,10 +54,46 @@ actually correct, not just render it.
 * Pages the sample did not cover are named in the report, so a sample
   that shrank to one route cannot pass for coverage.
 
+### Hardened by an adversarial review
+
+An adversarial pass built eight legitimate route tables; five failed
+the build. An error-severity false positive is the worst defect an
+auditor can have — it teaches a team to switch it off — so all of them
+are fixed, each with a regression test built from the shape that broke
+it:
+
+* `SeoAuditPolicy(ignore: …)` was wired into 3 of 30 checks and into
+  none of the error-severity ones, so the findings a team would most
+  want to silence could not be. Suppression is applied centrally now.
+* `link.broken` judged targets by which URLs happened to be
+  *enumerated*, so a deep link into a `/docs/:page` route without
+  `enumeratePaths` was an error — while the engine calls that same
+  route a warning saying "its URLs work for visitors". It asks
+  `matchSeoRoute` now, and treats `/whitepaper.pdf` as the asset it is.
+* Host comparison was a string prefix, so `https://x.dev.evil.com`
+  counted as the same site. It parses the URI.
+* `canonical.unknown-path` did not strip query or fragment, so a search
+  page canonicalising to itself with `?q=…` was a "404".
+* hreflang reciprocity was judged against *indexable* pages, so a
+  language variant deliberately kept out of the sitemap made its
+  symmetric partner "not reciprocal" — asserting something untrue.
+* Parity compared the *first* `<h1>` on each side, which an app shell
+  or a Navigator route left mounted after a push made fail; and it
+  treated punctuation as content, so an added exclamation mark broke
+  the build.
+* A canonical pointing at a 410, a redirect or a noindex page is now
+  reported — the case the README calls the flagship one and which was
+  not implemented. `robots: 'none'` counts as noindex. A pathological
+  node tree reports instead of raising `StackOverflowError`.
+
 ### Also
 
 * `tool/check_pure_dart.dart` replaces CI's hand-written file list with
-  an import-graph walk. The list had fallen behind — two files exported
+  an import-graph walk. Three holes found by the same review are closed
+  and proven closed by planting each: a `package:esen_seo/…`
+  self-import, a Flutter import inside a conditional-import branch, and
+  a run from the wrong directory reporting a cheerful pass over a graph
+  that was not there. 47 files covered. The list had fallen behind — two files exported
   by `core.dart` were never in it — and could not see a Flutter import
   reached indirectly at all. 26 files are covered where 12 were named.
 
