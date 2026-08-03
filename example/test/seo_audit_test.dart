@@ -8,11 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('the site has no SEO errors', () async {
-    final report = await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase);
-
-    // describe() as the reason, so a failure prints the whole report
-    // instead of just "expected true".
-    expect(report.passes(), isTrue, reason: '\n${report.describe()}');
+    // assertSeoHealthy rather than a hand-written expect: it owns the
+    // comparison, and it puts the whole report in the failure message.
+    assertSeoHealthy(
+      await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase),
+    );
   });
 
   test('every page is reachable and indexable', () async {

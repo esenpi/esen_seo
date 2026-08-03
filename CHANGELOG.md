@@ -10,7 +10,7 @@ actually correct, not just render it.
   `href` that `matchSeoRoute` cannot match. No crawler, no HTML parser
   dependency, and it runs before `flutter build web` has done anything.
 * Runs in a plain `test()`, so it needs no new CI job:
-  `expect((await auditSeoRoutes(routes: …, siteBase: …)).passes(), isTrue)`.
+  `assertSeoHealthy(await auditSeoRoutes(routes: …, siteBase: …))`.
 * Catches the class of mistake the renderer cannot refuse, because each
   one is a legal use of the API — all verified against the real code:
   a `noindex` page still listed in `sitemap.xml`; a concrete route
@@ -86,16 +86,61 @@ it:
   not implemented. `robots: 'none'` counts as noindex. A pathological
   node tree reports instead of raising `StackOverflowError`.
 
+### A second review round
+
+Seven more findings, all of the same family as the first round: a check
+that reported nothing, or one that reported the wrong thing.
+
+* **`assertSeoHealthy`** — the test this package *recommended*,
+  `expect(report.describe(), isNot(contains('[error]')))`, never
+  failed: `describe()` marks an error with `x`. A helper that owns the
+  comparison cannot drift from the format it compares against, so the
+  helper exists now and the docs point at it. It throws with the whole
+  report in the message.
+* **Relative links were skipped entirely.** Only `/`-rooted hrefs were
+  examined, so `about` and `../agb` could point anywhere at all. They
+  are resolved against the page they appear on, the way a browser does,
+  and the finding quotes both the attribute and the URL it means.
+* **A `javascript:` href or image `src` is reported.** The renderer
+  strips it, which is correct — and leaves the crawler an `<a>` that
+  leads nowhere, with nothing anywhere saying why.
+* **Parity missed the sharpest case:** an app that renders the server's
+  headline as a `<p>`. All the words are present, so the text check saw
+  nothing missing, and the app has no `<h1>`, so a guard that only ran
+  when one existed skipped silently. It is an error now.
+* **`paths: []` was a green parity run** that proved nothing. Checking
+  no page at all is a failure; sampling some is the caller's call.
+* **Pattern-versus-pattern shadowing.** `/blog/:slug` followed by
+  `/blog/:id` leaves the second route wholly dead, and neither the
+  duplicate-path check (the strings differ) nor the concrete-path check
+  saw it.
+* **hreflang** now asks `matchSeoRoute` like the link check does, so an
+  alternate pointing into an un-enumerated `:param` route is no longer
+  called unserved; reciprocity is only asserted for pages actually
+  resolved. A relative hreflang URL is reported — the renderer emits it
+  happily and Google then ignores it, which is the worst combination.
+* **Schema requirements brought up to date.** `Article` no longer needs
+  `headline` per Google's own documentation, so that is a warning, not
+  a build failure. `Review` needs `author` and `itemReviewed` beside
+  the rating; `Event` needs a `location` and `LocalBusiness` an
+  `address` — both of which the factories omit when the caller passes
+  nothing. A `Product` with only a name gets no snippet at all: Google
+  needs `offers`, `review` or `aggregateRating` to have something to
+  show.
+
 ### Also
 
+* CI runs the example app's own test suite, which audits a real grown
+  route table with the released API. It existed but ran nowhere.
 * `tool/check_pure_dart.dart` replaces CI's hand-written file list with
   an import-graph walk. Three holes found by the same review are closed
   and proven closed by planting each: a `package:esen_seo/…`
   self-import, a Flutter import inside a conditional-import branch, and
   a run from the wrong directory reporting a cheerful pass over a graph
-  that was not there. 47 files covered. The list had fallen behind — two files exported
-  by `core.dart` were never in it — and could not see a Flutter import
-  reached indirectly at all. 26 files are covered where 12 were named.
+  that was not there. The hand-written list had fallen behind — two
+  files exported by `core.dart` were never in it — and could not see a
+  Flutter import reached indirectly at all. 47 files are covered where
+  12 were named.
 
 ## 0.7.0
 
