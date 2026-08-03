@@ -212,7 +212,7 @@ Middleware seoBotMiddleware({
     }
 
     return (Request request) async {
-      final path = normalizeSeoPath(request.url.path);
+      final path = _routePath(request.url.path, siteBase);
 
       // Infrastruktur-Dateien — für alle Clients, nicht nur Bots.
       if (siteBase != null) {
@@ -452,6 +452,24 @@ Middleware seoBotMiddleware({
       return _appResponse(inner, request);
     };
   };
+}
+
+/// Maps a request path into the route table's space when the deployment lives
+/// below an origin path (`https://user.github.io/repo`). A shelf handler that
+/// is already mounted below that prefix receives `/about` and stays unchanged;
+/// a root-mounted handler receives `/repo/about` and maps it to `/about`.
+String _routePath(String rawPath, String? siteBase) {
+  final path = normalizeSeoPath(rawPath);
+  if (siteBase == null) return path;
+  final origin = Uri.tryParse(siteBase);
+  if (origin == null) return path;
+  final prefix = normalizeSeoPath(origin.path);
+  if (prefix == '/') return path;
+  if (path == prefix) return '/';
+  if (path.startsWith('$prefix/')) {
+    return normalizeSeoPath(path.substring(prefix.length));
+  }
+  return path;
 }
 
 Response _htmlResponse(

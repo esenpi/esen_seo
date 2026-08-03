@@ -94,8 +94,9 @@ class SeoSchema {
   /// search results).
   ///
   /// Give at least one of [ratingCount]/[reviewCount] alongside
-  /// [ratingValue], and [priceCurrency] alongside [price] — Google
-  /// requires the pairs, and the audit reports the halves.
+  /// [ratingValue]. [priceCurrency] is recommended for product snippets and
+  /// required for merchant listings; the audit reports a missing currency as
+  /// a warning because this factory serves both use cases.
   factory SeoSchema.product({
     required String name,
     String? description,

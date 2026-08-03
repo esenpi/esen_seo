@@ -170,7 +170,7 @@ class SeoRoute {
 
   Map<String, String>? _matchNormalized(String normalized) {
     final pattern = _segments;
-    final actual = normalized.split('/');
+    final actual = _decodedPathSegments(normalized);
     if (pattern.length != actual.length) return null;
 
     final params = <String, String>{};
@@ -179,7 +179,7 @@ class SeoRoute {
       if (segment.startsWith(':')) {
         if (actual[i].isEmpty) return null;
         params[segment.substring(1)] = actual[i];
-      } else if (segment != actual[i]) {
+      } else if (_decodePathSegment(segment) != actual[i]) {
         return null;
       }
     }
@@ -338,4 +338,22 @@ String normalizeSeoPath(String path) {
     p = p.substring(0, p.length - 1);
   }
   return p;
+}
+
+/// URI paths keep percent-escapes; route declarations generally use Unicode.
+/// Decode after splitting so `%2F` remains part of one segment rather than
+/// becoming a new route boundary. Captured params therefore contain the value
+/// a resolver expects (`café`, or `a/b` for an encoded slash).
+List<String> _decodedPathSegments(String path) => [
+      for (final segment in path.split('/')) _decodePathSegment(segment),
+    ];
+
+String _decodePathSegment(String segment) {
+  try {
+    return Uri.decodeComponent(segment);
+  } on FormatException {
+    return segment;
+  } on ArgumentError {
+    return segment;
+  }
 }

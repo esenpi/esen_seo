@@ -64,7 +64,7 @@ List<SeoFinding> compareSeoTrees({
     // checks when the page set is partial.
     findings.add(SeoFinding(
       check: SeoCheck.bodyTruncated,
-      severity: SeoSeverity.warning,
+      severity: SeoSeverity.error,
       path: path,
       message: 'a tree nests deeper than the comparison walks '
           '(${SeoBodyFacts.maxDepth} levels) — parity on this page '
@@ -127,30 +127,21 @@ List<SeoFinding> compareSeoTrees({
 
   if (policy.compareText) {
     // The cloaking direction, and the serious one: text sent only to
-    // crawlers. Compared as consecutive word *pairs*: the app's words
-    // are concatenated in tree order first, so a passage that merely
-    // moved between nodes — or was split across two adjacent spans —
-    // still matches, while a bag-of-words comparison did not notice a
-    // passage that was missing entirely as long as its words appeared
-    // scattered across navigation, shell and other paragraphs. The
-    // concatenation also manufactures pairs at run seams, so a short
-    // passage whose words happen to straddle a boundary can slip
-    // through — the price of tolerating legitimate splits; adjacency
-    // is an approximation of "the same passage", not a proof.
+    // crawlers. The app's words are concatenated in tree order first,
+    // then each SSR text run must occur as one contiguous token sequence.
+    // A passage split across adjacent spans therefore still matches, while
+    // repeated pairs scattered across navigation and other paragraphs do not.
     final appSequence = [
       for (final run in appFacts.textRuns) ..._tokens(run),
     ];
     final appWords = appSequence.toSet();
-    final appPairs = _pairs(appSequence).toSet();
     final missing = <String>[];
     final reordered = <String>[];
     for (final run in ssrFacts.textRuns) {
       if (_ignored(run, policy)) continue;
       final words = _tokens(run);
       if (words.isEmpty) continue;
-      if (words.length == 1
-          ? appWords.contains(words.single)
-          : _pairs(words).every(appPairs.contains)) {
+      if (_containsSequence(appSequence, words)) {
         continue;
       }
       // Graded: words absent means the content is gone — the cloaking
@@ -212,10 +203,17 @@ List<String> _headings(SeoBodyFacts facts, int level) => [
 List<String> _tokens(String text) =>
     _normalize(text).split(' ').where((w) => w.isNotEmpty).toList();
 
-Iterable<String> _pairs(List<String> words) sync* {
-  for (var i = 0; i + 1 < words.length; i++) {
-    yield '${words[i]} ${words[i + 1]}';
+bool _containsSequence(List<String> words, List<String> passage) {
+  if (passage.isEmpty) return true;
+  if (passage.length > words.length) return false;
+  outer:
+  for (var start = 0; start <= words.length - passage.length; start++) {
+    for (var offset = 0; offset < passage.length; offset++) {
+      if (words[start + offset] != passage[offset]) continue outer;
+    }
+    return true;
   }
+  return false;
 }
 
 /// Characters that carry no meaning for this comparison.

@@ -115,7 +115,7 @@ class SeoRouteObserver extends NavigatorObserver {
   }
 
   bool _applyLocation(String location, int token) {
-    final match = matchSeoRoute(routes, location);
+    final match = matchSeoRoute(routes, _routeLocation(location));
     if (match == null) return false;
 
     // Ask BEFORE resolving, not after: starting the read and then
@@ -172,11 +172,25 @@ class SeoRouteObserver extends NavigatorObserver {
   String? _browserLocation() {
     if (!kIsWeb) return null;
     final base = Uri.base;
+    // Hash routing keeps the app path in the fragment. Prefer it even when
+    // the deployment itself has a non-root path (`/repo/#/docs`).
+    if (base.fragment.isNotEmpty) return base.fragment;
     // Path-URL-Strategie (empfohlen, EsenSeo.init(cleanUrls: true)):
     if (base.path.isNotEmpty && base.path != '/') return base.path;
-    // Hash-Strategie: /#/demo → Fragment enthält den Pfad.
-    if (base.fragment.isNotEmpty) return base.fragment;
     return base.path.isEmpty ? '/' : base.path;
+  }
+
+  String _routeLocation(String location) {
+    final path = normalizeSeoPath(location);
+    final base = canonicalBase == null ? null : Uri.tryParse(canonicalBase!);
+    if (base == null) return path;
+    final prefix = normalizeSeoPath(base.path);
+    if (prefix == '/') return path;
+    if (path == prefix) return '/';
+    if (path.startsWith('$prefix/')) {
+      return normalizeSeoPath(path.substring(prefix.length));
+    }
+    return path;
   }
 
   @override
