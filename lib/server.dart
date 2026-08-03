@@ -28,6 +28,7 @@
 /// both worlds.
 library;
 
+export 'audit.dart';
 export 'core.dart';
 export 'src/server/bot_detector.dart';
 export 'src/server/indexnow.dart';
