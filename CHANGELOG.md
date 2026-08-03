@@ -1,3 +1,43 @@
+## 0.8.0
+
+An SEO audit — the package can now tell you whether your site is
+actually correct, not just render it.
+
+### `auditSeoRoutes`
+
+* Reads the **route table**, not built HTML. The package already owns
+  every URL, title and node, so a broken internal link is just an
+  `href` that `matchSeoRoute` cannot match. No crawler, no HTML parser
+  dependency, and it runs before `flutter build web` has done anything.
+* Runs in a plain `test()`, so it needs no new CI job:
+  `expect((await auditSeoRoutes(routes: …, siteBase: …)).passes(), isTrue)`.
+* Catches the class of mistake the renderer cannot refuse, because each
+  one is a legal use of the API — all verified against the real code:
+  a `noindex` page still listed in `sitemap.xml`; a concrete route
+  shadowed by a `:param` pattern declared before it, so the page never
+  runs while the sitemap keeps advertising the URL; a `canonicalUrl`
+  the URL policy refuses, which leaves the page with **no** canonical
+  and suppresses the derived one as well; and a schema value JSON
+  cannot encode, which otherwise throws when the page renders.
+* Plus duplicate titles and descriptions, missing or multiple `<h1>`,
+  images with no `alt`, links with no destination or no anchor text,
+  and hreflang clusters that are not reciprocal or omit the page
+  itself — which Google discards silently.
+* `SeoSeverity` is the contract: `error` is measurably wrong,
+  `warning` is very likely wrong but legitimate sites exist,
+  `info` never fails a build. Suppress any check by id via
+  `SeoAuditPolicy(ignore: {…})`.
+* A resolver that throws becomes a finding instead of aborting the run
+  — but the report is marked `partial` and cross-page checks are then
+  **skipped** rather than guessed, since "this title is unique" is
+  unprovable with a page missing.
+
+### Not yet
+
+The SSR **parity** check — does the Flutter widget tree render what the
+route's `SeoNode`s claim? — needs a `WidgetTester` and therefore cannot
+live in the pure-Dart engine. It lands separately.
+
 ## 0.7.0
 
 The runtime HTTP surface for dynamic routes — the half of 0.6.0's

@@ -493,6 +493,68 @@ seoRedirectMiddleware(
 )
 ```
 
+## Audit — prove the site is correct before you ship it
+
+Most SEO mistakes are not broken code. They are a page marked `noindex`
+that is still in the sitemap, a link to a route somebody renamed, a
+translation cluster that points one way. The renderer cannot refuse any
+of those — each one is a perfectly legal use of the API — so there is a
+separate check for them:
+
+```dart
+// test/seo_audit_test.dart — runs in the CI you already have
+test('the site has no SEO errors', () async {
+  final report = await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase);
+  expect(report.passes(), isTrue, reason: '\n${report.describe()}');
+});
+```
+
+It reads the **route table**, not built HTML: the package already knows
+every URL, title and node, so a broken internal link is simply an
+`href` that `matchSeoRoute` cannot match. No crawler, no HTML parser,
+and it runs before `flutter build web` has done any work.
+
+```
+esen_seo audit: 6 pages, 3 error(s), 2 warning(s), 1 info.
+
+/blog/archive:
+  x route.shadowed  unreachable: an earlier pattern already matches it,
+                    so this route never runs (shadowed by /blog/:slug)
+/geheim:
+  x robots.noindex-in-sitemap  marked noindex but still listed in
+                    sitemap.xml — two contradictory signals
+/kontakt:
+  x link.broken     links to a path that no route serves (/agb)
+```
+
+Among the things it catches, each verified against the real code: a
+`canonicalUrl` the URL policy refuses — which leaves the page with *no*
+canonical **and** suppresses the automatic one, so it ends up worse off
+than if you had set nothing; a schema value JSON cannot encode, which
+otherwise throws when the page renders rather than when you write it;
+and hreflang clusters that are not reciprocal, which Google discards
+without telling anyone.
+
+Severity is the contract: `error` is something measurably wrong,
+`warning` is very likely wrong but a real site can look like that
+(paginated pages share titles), and `info` never fails a build. A
+resolver that throws becomes a finding rather than aborting the run —
+but the report is then marked `partial` and the cross-page checks are
+**skipped**, because "this title is unique" cannot be proven with a
+page missing.
+
+```dart
+auditSeoRoutes(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  policy: const SeoAuditPolicy(ignore: {SeoCheck.titleLength}),
+);
+```
+
+Prefer running it from a script instead of a test? Same shape as the
+prerenderer — a few lines in `bin/seo_audit.dart` that import your own
+route table, then `exit(report.passes() ? 0 : 1)`.
+
 ## Static prerendering — SEO without any server
 
 No Dart server on your host? Bake the same route table directly into
