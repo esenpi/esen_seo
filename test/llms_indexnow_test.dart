@@ -323,6 +323,38 @@ void main() {
       );
     });
 
+    test('llms-full describes the page that ships, not the raw tree', () async {
+      // Der Markdown-Renderer las den Rohbaum: 'H2' verlor seine
+      // Überschrift, ein img mit Text bewarb eine Bild-URL, die der
+      // Renderer verweigert — und verlor den Text, den er behält.
+      final text = await seoLlmsFullTxt(
+        routes: [
+          SeoRoute(
+            path: '/',
+            meta: (_) => const SeoMeta(title: 'Start', description: 'x'),
+            body: (_) => [
+              SeoNode(tag: 'H2', text: 'Features'),
+              SeoNode(
+                tag: 'img',
+                text: 'Eine Bildunterschrift, die bleibt',
+                attributes: {'src': '/weg.png', 'alt': 'A'},
+              ),
+              SeoNode(tag: 'a', attributes: {
+                'HREF': 'https://x.dev/docs'
+              }, children: [
+                SeoNode(tag: '', text: 'Docs'),
+              ]),
+            ],
+          ),
+        ],
+        siteBase: 'https://x.dev',
+      );
+      expect(text, contains('## Features'));
+      expect(text, contains('Eine Bildunterschrift, die bleibt'));
+      expect(text, isNot(contains('weg.png')));
+      expect(text, contains('[Docs](https://x.dev/docs)'));
+    });
+
     test('rejects a siteBase without a scheme before any network I/O', () {
       // Ohne Schema wäre der Host im Payload leer — stille Fehl-Submission.
       // Kein endpoint: der Fehler muss vor jedem Netzwerkzugriff fliegen.

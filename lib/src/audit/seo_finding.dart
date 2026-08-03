@@ -11,8 +11,8 @@ library;
 
 /// How much a finding matters.
 ///
-/// The split is not cosmetic: [error] is what `--fail-on=error` (and
-/// `expectSeoHealthy`) fails a build on, so the line has to be drawn
+/// The split is not cosmetic: [error] is what `passes()` (and
+/// `assertSeoHealthy`) fails a build on, so the line has to be drawn
 /// where a false positive would be intolerable.
 enum SeoSeverity {
   /// Something is measurably wrong and costs indexing: a page with no
@@ -23,8 +23,8 @@ enum SeoSeverity {
   /// pages sharing a title may be paginated variants.
   warning,
 
-  /// Worth a look, never a reason to fail a build: title length, a
-  /// skipped heading level.
+  /// Worth a look, never a reason to fail a build: title length, an
+  /// unchecked page in a parity sample.
   info,
 }
 
@@ -48,7 +48,10 @@ extension type const SeoCheck(String id) implements String {
   static const canonicalRelative = SeoCheck('canonical.relative');
   static const canonicalUnknownPath = SeoCheck('canonical.unknown-path');
   static const canonicalNonIndexable = SeoCheck('canonical.non-indexable');
+  static const canonicalChain = SeoCheck('canonical.chain');
   static const hreflangRelative = SeoCheck('hreflang.relative');
+  static const hreflangInvalidCode = SeoCheck('hreflang.invalid-code');
+  static const hreflangDuplicateTarget = SeoCheck('hreflang.duplicate-target');
   static const robotsNoindexInSitemap = SeoCheck('robots.noindex-in-sitemap');
   static const sitemapEmpty = SeoCheck('sitemap.empty');
 
@@ -60,6 +63,7 @@ extension type const SeoCheck(String id) implements String {
 
   // Document structure
   static const bodyEmpty = SeoCheck('body.empty');
+  static const bodyTruncated = SeoCheck('body.truncated');
   static const headingNoH1 = SeoCheck('heading.no-h1');
   static const headingMultipleH1 = SeoCheck('heading.multiple-h1');
 

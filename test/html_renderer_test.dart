@@ -77,5 +77,24 @@ void main() {
       ];
       expect(renderer.render(nodes), '<h1>Titel</h1><p>Absatz</p>');
     });
+
+    test('a tree deeper than any real document is refused, loudly', () {
+      // Ein selbstreferenzieller Resolver-Baum endete vorher in einem
+      // StackOverflowError mitten im Request — der nichts benennt.
+      // Stilles Abschneiden wäre schlimmer: eine unvollständige Seite,
+      // die niemand bemerkt.
+      SeoNode deep(int n) => n == 0
+          ? SeoNode(tag: 'p', text: 'Grund')
+          : SeoNode(tag: 'div', children: [deep(n - 1)]);
+      expect(renderer.render([deep(499)]), contains('Grund'));
+      expect(
+        () => renderer.render([deep(600)]),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('self-referential'),
+        )),
+      );
+    });
   });
 }

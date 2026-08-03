@@ -1,4 +1,5 @@
 import '../renderer/html_renderer.dart';
+import '../renderer/tag_policy.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 
@@ -81,6 +82,12 @@ String seoSitemapXml({
       buffer.writeln('    <lastmod>${_lastmodDate(lastmod)}</lastmod>');
     }
     alternates.forEach((hreflang, href) {
+      // The same allow list the head renderer applies: a URL SeoMeta
+      // refuses to emit has no business being advertised in
+      // sitemap.xml either. Before this, the sitemap was the one
+      // output path around the policy choke point — a javascript:
+      // alternate from CMS data shipped verbatim.
+      if (!isAllowedSeoAttribute('href', href)) return;
       buffer
         ..write('    <xhtml:link rel="alternate" hreflang="')
         ..write(_xmlSafeAttr(hreflang))
