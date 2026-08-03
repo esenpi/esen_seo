@@ -55,6 +55,24 @@ void main() {
       expect(_meta(match).title, 'Blog — mein-artikel');
     });
 
+    test('matches encoded Unicode and decodes captured segments', () {
+      final routes = [
+        SeoRoute(path: '/über', meta: (_) => const SeoMeta(title: 'Über')),
+        SeoRoute(
+          path: '/blog/:slug',
+          meta: (params) => SeoMeta(title: params['slug']),
+        ),
+      ];
+
+      expect(matchSeoRoute(routes, '/%C3%BCber')!.route.path, '/über');
+      expect(
+        matchSeoRoute(routes, '/blog/caf%C3%A9')!.params['slug'],
+        'café',
+      );
+      // An encoded slash belongs to the parameter, not to the route shape.
+      expect(matchSeoRoute(routes, '/blog/a%2Fb')!.params['slug'], 'a/b');
+    });
+
     test('param segments must not be empty', () {
       expect(matchSeoRoute(_routes(), '/blog/'), isNull);
     });
@@ -137,6 +155,29 @@ void main() {
       final body = await response.readAsString();
       expect(body, contains('<title>Blog — hallo</title>'));
       expect(body, contains('<h1>hallo</h1>'));
+    });
+
+    test('serves encoded Unicode routes below a siteBase path', () async {
+      final subpathHandler = const Pipeline()
+          .addMiddleware(
+            seoBotMiddleware(
+              routes: [
+                SeoRoute(
+                  path: '/über',
+                  meta: (_) => const SeoMeta(title: 'Über uns'),
+                  body: (_) => [SeoNode(tag: 'h1', text: 'Über uns')],
+                ),
+              ],
+              siteBase: 'https://x.dev/repo',
+            ),
+          )
+          .addHandler((request) => Response.ok('flutter app'));
+
+      final response = await subpathHandler(
+        _request('repo/%C3%BCber', userAgent: _googlebot),
+      );
+      expect(response.statusCode, 200);
+      expect(await response.readAsString(), contains('<h1>Über uns</h1>'));
     });
 
     test('unknown page paths become a real 404 for bots', () async {

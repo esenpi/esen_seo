@@ -983,6 +983,21 @@ void main() {
           reason: report.describe());
     });
 
+    test('a same-host link on another scheme is another origin', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(
+            tag: 'a',
+            text: 'Unsicherer Dienst',
+            attributes: {'href': 'http://x.dev/nope'},
+          ),
+        ]),
+      ]);
+      expect(_ids(report), isNot(contains('link.broken')),
+          reason: report.describe());
+    });
+
     test('a scheme-relative link to this site is checked', () async {
       // `//x.dev/agb` borrows the page's scheme — a browser follows it,
       // so a missing target is just as broken as with `/agb`.
@@ -1217,9 +1232,10 @@ void main() {
       // And a genuinely truncated tree must not claim to be empty —
       // the text below the ceiling is one nobody looked at.
       final truncated = await _audit([
-        _ok('/', body: [chain(300, SeoNode(tag: 'p', text: 'Tief unten'))]),
+        _ok('/', body: [chain(600, SeoNode(tag: 'p', text: 'Tief unten'))]),
       ]);
       expect(_ids(truncated), contains('body.truncated'));
+      expect(truncated.passes(), isFalse, reason: truncated.describe());
       expect(_ids(truncated), isNot(contains('body.empty')),
           reason: truncated.describe());
     });
@@ -1242,7 +1258,7 @@ void main() {
           reason: report.describe());
     });
 
-    test('a price without a currency is only half of Google\'s pair', () async {
+    test('a product-snippet price without currency is a warning', () async {
       final report = await _audit([
         SeoRoute(
           path: '/p',
@@ -1256,7 +1272,93 @@ void main() {
         ),
       ]);
       expect(report.describe(), contains('priceCurrency'));
+      expect(report.passes(), isTrue, reason: report.describe());
+      expect(
+        report.findings
+            .firstWhere((f) => f.check == SeoCheck.schemaMissingRecommended)
+            .severity,
+        SeoSeverity.warning,
+      );
+    });
+
+    test('priceSpecification must contain the price it stands for', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'offers': {
+                  '@type': 'Offer',
+                  'priceSpecification': {'@type': 'PriceSpecification'},
+                },
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
       expect(report.passes(), isFalse);
+      expect(report.describe(), contains('priceSpecification.price'));
+    });
+
+    test('priceSpecification accepts currency on the Offer', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'offers': {
+                  '@type': 'Offer',
+                  'priceCurrency': 'EUR',
+                  'priceSpecification': {
+                    '@type': 'PriceSpecification',
+                    'price': 9.99,
+                  },
+                },
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(
+        _ids(report),
+        isNot(contains('schema.missing-recommended')),
+        reason: report.describe(),
+      );
+      expect(report.passes(), isTrue, reason: report.describe());
+    });
+
+    test('AggregateOffer still requires its currency', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'offers': {'@type': 'AggregateOffer', 'lowPrice': 9.99},
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+      expect(report.passes(), isFalse);
+      expect(report.describe(), contains('priceCurrency'));
     });
 
     test('a rating supplied as a one-element list is still checked', () async {
@@ -1386,6 +1488,80 @@ void main() {
         _ok('/en', title: 'The English home page'),
       ]);
       expect(_ids(report), contains('hreflang.invalid-code'));
+    });
+
+    test('hreflang rejects unsupported registries, not only bad punctuation',
+        () async {
+      for (final code in ['zz', 'eng', 'es-419', 'en-UK', 'en-Fake']) {
+        final report = await _audit([
+          SeoRoute(
+            path: '/',
+            meta: (_) => SeoMeta(
+              title: 'Die deutsche Startseite',
+              description: 'Eine Beschreibung, die bequem in das Fenster '
+                  'passt, das Suchmaschinen anzeigen.',
+              alternates: {code: '$_base/'},
+            ),
+            body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+          ),
+        ]);
+        expect(
+          _ids(report),
+          contains('hreflang.invalid-code'),
+          reason: '$code passed:\n${report.describe()}',
+        );
+      }
+
+      final valid = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(
+            title: 'The Chinese home page',
+            description: 'A description long enough for the ordinary search '
+                'result snippet shown to readers.',
+            alternates: {'zh-Hant-US': '$_base/'},
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Home')],
+        ),
+      ]);
+      expect(_ids(valid), isNot(contains('hreflang.invalid-code')),
+          reason: valid.describe());
+    });
+
+    test('an empty-alt image does not give its surrounding link a label',
+        () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'a', attributes: {
+            'href': '/'
+          }, children: [
+            SeoNode(
+              tag: 'img',
+              attributes: {'src': '/a.png', 'alt': ''},
+            ),
+          ]),
+        ]),
+      ]);
+      expect(_ids(report), contains('link.no-text'));
+    });
+
+    test('JSON-LD payload does not become phantom link text', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'H'),
+          SeoNode(tag: 'a', attributes: {
+            'href': '/'
+          }, children: [
+            SeoNode(
+              tag: 'script',
+              attributes: {'type': 'application/ld+json'},
+              rawText: '{"name":"not visible"}',
+            ),
+          ]),
+        ]),
+      ]);
+      expect(_ids(report), contains('link.no-text'));
     });
 
     test('two languages on the same URL is a copy-paste slip', () async {

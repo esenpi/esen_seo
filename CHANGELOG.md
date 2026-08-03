@@ -141,15 +141,16 @@ were themselves added by review:
   link, and attribute names are lower-cased before they are written —
   so a perfectly rendered `{'SRC': …, 'ALT': …}` no longer produces
   two errors about attributes the output demonstrably carries.
-* **Parity compares word pairs, not a bag of words.** A passage whose
-  words appeared individually — one in the nav, one in a footnote —
-  passed as delivered even though the passage itself never was. The
-  app's words are concatenated in tree order first, so a sentence split
-  across adjacent spans still matches; scattered words do not.
-* **A same-host URL on another port is another origin.** Ports were
-  only compared when both URLs named one, so `https://x.dev:8443/…`
-  counted as internal against `siteBase: https://x.dev`. Uri's default
-  ports settle it — and a scheme-relative `//x.dev/agb` is now checked
+* **Parity compares complete token sequences, not a bag of words or
+  independent word pairs.** A passage whose words or repeated pairs
+  appeared in separate places passed as delivered even though the
+  passage itself never was. The app's words are concatenated in tree
+  order first, so a sentence split across adjacent spans still matches;
+  scattered fragments do not.
+* **A same-host URL on another port or scheme is another origin.**
+  `https://x.dev:8443/…` and `http://x.dev/…` no longer count as
+  internal against `siteBase: https://x.dev`. Uri's default ports settle
+  the port case — and a scheme-relative `//x.dev/agb` is now checked
   instead of skipped, while `HTTPS://` counts as absolute.
 * **Pattern-versus-pattern shadowing generalised.** `/:section/:slug`
   declared before `/blog/:slug` swallows it exactly as completely as an
@@ -181,14 +182,17 @@ that survived verification are fixed, each with a regression test.
   and a same-host URL outside the prefix is another site.
 * **Encoded and decoded spellings are one page.** `Uri.path` keeps
   percent-escapes, so a route declared `/über` failed its own derived
-  canonical (`/%C3%BCber`). Paths are decoded before comparison.
+  canonical (`/%C3%BCber`). Paths are decoded segment by segment before
+  comparison, so an encoded slash stays within its route parameter.
+  The middleware and route observer also map a deployment's base-path
+  prefix back into route space.
 * **Parity severity is graded.** An SSR passage whose words are all
   present but not adjacent — a Row of Columns interleaves label and
   value in tree order — is a warning, not build-failing cloaking; only
   words that are genuinely gone stay an error. U+FFFC (the flattened
-  form of an inline `WidgetSpan`) no longer severs a passage, and a
-  truncated tree ends the comparison with a warning instead of
-  supporting a confident error about content nobody compared.
+  form of an inline `WidgetSpan`) no longer severs a passage. A tree
+  beyond the renderer's depth limit is a structural error, and parity
+  stops before making content claims about the part it could not walk.
 * **The renderer's view, applied everywhere it was still missing.**
   JSON-LD payloads no longer contribute phantom headings and text to
   the audit (the renderer never renders a script's children);
@@ -196,8 +200,8 @@ that survived verification are fixed, each with a regression test.
   checked against the RAW attribute value, exactly as the renderer
   checks it — a trailing newline made the renderer drop an `href`
   while the audit, checking the trimmed value, saw nothing; and an
-  image anywhere inside a link counts as its anchor text, not only as
-  a direct child.
+  image anywhere inside a link counts as its anchor text when it has a
+  non-empty `alt`, not only when it is a direct child.
 * **llms-full.txt now describes the page that ships.** The markdown
   renderer read the raw tree: `'H2'` lost its heading, an `img`
   carrying text advertised an image URL the renderer refuses — and
@@ -218,9 +222,13 @@ that survived verification are fixed, each with a regression test.
   formally valid). `canonical.non-indexable` judges by the robots
   signal, not sitemap membership — canonicalising onto a page
   deliberately kept out of sitemap.xml is legitimate. Duplicate titles
-  match case- and whitespace-insensitively. `Product.offers` needs
-  `priceCurrency` beside `price`; an `aggregateRating` in a
-  one-element list is checked like one passed directly.
+  match case- and whitespace-insensitively. hreflang codes are checked
+  against the actual language, script and region registries instead of
+  only their shape. A regular `Product` Offer needs a usable price;
+  missing currency is a warning for product snippets, while an
+  `AggregateOffer` requires `lowPrice` and `priceCurrency`. An
+  `aggregateRating` in a one-element list is checked like one passed
+  directly.
 * **Fewer wrong findings elsewhere.** An `additionalPaths` placeholder
   (documented: content served outside the table) is no longer nagged
   for a title it cannot have; a duplicate route pattern is one finding,
@@ -240,7 +248,7 @@ that survived verification are fixed, each with a regression test.
   a run from the wrong directory reporting a cheerful pass over a graph
   that was not there. The hand-written list had fallen behind — two
   files exported by `core.dart` were never in it — and could not see a
-  Flutter import reached indirectly at all. 48 files are covered where
+  Flutter import reached indirectly at all. 49 files are covered where
   12 were named.
 
 ## 0.7.0

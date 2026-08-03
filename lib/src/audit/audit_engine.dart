@@ -3,6 +3,7 @@ import '../renderer/tag_policy.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
+import 'hreflang_codes.dart';
 import 'node_walk.dart';
 import 'seo_audit_policy.dart';
 import 'seo_audit_report.dart';
@@ -293,11 +294,11 @@ Iterable<SeoFinding> _auditPage(
     // about the part of the tree nobody looked at.
     yield SeoFinding(
       check: SeoCheck.bodyTruncated,
-      severity: SeoSeverity.warning,
+      severity: SeoSeverity.error,
       path: path,
-      message: 'the body nests deeper than the audit walks '
-          '(${SeoBodyFacts.maxDepth} levels) — structural findings on '
-          'this page are incomplete',
+      message: 'the body nests deeper than the renderer accepts '
+          '(${SeoBodyFacts.maxDepth} levels) — rendering this page would '
+          'throw, so the structural audit cannot complete',
     );
   }
   // Absence claims need the whole tree: a truncated walk cannot say
@@ -404,8 +405,11 @@ Iterable<SeoFinding> _auditPage(
     // The renderer ships the whole subtree inside the <a>, so an image
     // anywhere below it — a > div > img is what every card link looks
     // like — provides the anchor text via its alt.
-    if (seoNodeText(link.node).isEmpty &&
-        SeoBodyFacts.of(link.node.children).images.isEmpty) {
+    final linkedImages = SeoBodyFacts.of(link.node.children).images;
+    final hasImageLabel = linkedImages.any(
+      (image) => (image.attributes['alt'] ?? '').trim().isNotEmpty,
+    );
+    if (seoNodeText(link.node).isEmpty && !hasImageLabel) {
       yield SeoFinding(
         check: SeoCheck.linkNoText,
         severity: SeoSeverity.warning,
@@ -508,7 +512,7 @@ Iterable<SeoFinding> _auditUrls(
     // and region, hyphen-separated. `en_US` — the single most common
     // authoring mistake — is silently ignored, which is the same
     // failure mode as a relative URL: nothing looks broken.
-    if (!_validHreflangCode.hasMatch(entry.key)) {
+    if (!isValidHreflangCode(entry.key)) {
       yield SeoFinding(
         check: SeoCheck.hreflangInvalidCode,
         severity: SeoSeverity.error,
@@ -680,28 +684,73 @@ Iterable<SeoFinding> _auditSchemas(
     // right, and the snippet is not granted.
     if (schema.type == 'Product') {
       final offers = schema.properties['offers'];
-      for (final offer in offers is List ? offers : [offers]) {
-        if (offer is! Map) continue;
-        if (_isBlank(offer['price']) &&
-            _isBlank(offer['lowPrice']) &&
-            _isBlank(offer['priceSpecification'])) {
+      final values = offers is List ? offers : [offers];
+      for (final offer in values) {
+        if (_isBlank(offer)) continue;
+        if (offer is! Map) {
           yield SeoFinding(
             check: SeoCheck.schemaMissingRequired,
             severity: SeoSeverity.error,
             path: path,
-            message: 'Product.offers has no "price" — an offer without a '
-                'price (or "lowPrice"/"priceSpecification") is ignored',
+            message: 'Product.offers must be an Offer object or a list of '
+                'Offer objects',
           );
-        } else if (_isBlank(offer['priceCurrency']) &&
-            _isBlank(offer['priceSpecification'])) {
-          // Google's required pair: a price means nothing without its
-          // currency, and the factory leaves priceCurrency optional.
+          continue;
+        }
+
+        final type = offer['@type'];
+        final aggregate =
+            type == 'AggregateOffer' || !_isBlank(offer['lowPrice']);
+        if (aggregate) {
+          if (_isBlank(offer['lowPrice'])) {
+            yield SeoFinding(
+              check: SeoCheck.schemaMissingRequired,
+              severity: SeoSeverity.error,
+              path: path,
+              message: 'Product AggregateOffer has no required "lowPrice"',
+            );
+          }
+          if (_isBlank(offer['priceCurrency'])) {
+            yield SeoFinding(
+              check: SeoCheck.schemaMissingRequired,
+              severity: SeoSeverity.error,
+              path: path,
+              message: 'Product AggregateOffer has no required '
+                  '"priceCurrency"',
+            );
+          }
+          continue;
+        }
+
+        final specifications = _schemaMaps(offer['priceSpecification']);
+        final directPrice = !_isBlank(offer['price']);
+        final pricedSpecifications = [
+          for (final specification in specifications)
+            if (!_isBlank(specification['price'])) specification,
+        ];
+        if (!directPrice && pricedSpecifications.isEmpty) {
           yield SeoFinding(
             check: SeoCheck.schemaMissingRequired,
             severity: SeoSeverity.error,
             path: path,
-            message: 'Product.offers has a "price" but no "priceCurrency" '
-                '— Google requires both',
+            message: 'Product Offer needs "price" or '
+                '"priceSpecification.price"',
+          );
+          continue;
+        }
+
+        final hasCurrency = !_isBlank(offer['priceCurrency']) ||
+            pricedSpecifications.any(
+              (specification) => !_isBlank(specification['priceCurrency']),
+            );
+        if (!hasCurrency) {
+          yield SeoFinding(
+            check: SeoCheck.schemaMissingRecommended,
+            severity: SeoSeverity.warning,
+            path: path,
+            message: 'Product Offer has a price but no currency — '
+                'priceCurrency is recommended for product snippets and '
+                'required for merchant listings',
           );
         }
       }
@@ -1005,6 +1054,11 @@ bool _isBlank(Object? value) =>
     (value is Iterable && value.isEmpty) ||
     (value is Map && value.isEmpty);
 
+List<Map> _schemaMaps(Object? value) => [
+      for (final item in value is List ? value : [value])
+        if (item is Map) item,
+    ];
+
 /// URL schemes are case-insensitive — `HTTPS://` is as absolute as
 /// `https://`, and crawlers treat it so.
 bool _isAbsolute(String url) {
@@ -1079,6 +1133,7 @@ String? _internalTarget(String href, String base, {String fromPath = '/'}) {
       parsed.hasScheme ? parsed : parsed.replace(scheme: origin.scheme);
   if (target.host.isEmpty) return null;
   if (!const {'http', 'https'}.contains(target.scheme)) return null;
+  if (target.scheme != origin.scheme) return null;
   if (target.host.toLowerCase() != origin.host.toLowerCase()) return null;
   // Uri fills in the scheme's default, so this also separates an
   // explicit `:8443` from an implicit `:443` — a different origin,
@@ -1095,10 +1150,20 @@ String? _internalTarget(String href, String base, {String fromPath = '/'}) {
 /// `/%C3%BCber` for a page the route table declares as `/über`; without
 /// decoding, the package's own derived canonical failed its own audit.
 String _decodePath(String path) {
+  return normalizeSeoPath([
+    for (final segment in path.split('/')) _decodePathSegment(segment),
+  ].join('/'));
+}
+
+String _decodePathSegment(String segment) {
   try {
-    return Uri.decodeFull(path);
+    // Preserve route boundaries. A URL segment `a%2Fb` may be captured as the
+    // parameter `a/b`, but it is not the two-segment route `/a/b`.
+    return Uri.decodeComponent(segment).replaceAll('/', '%2F');
+  } on FormatException {
+    return segment;
   } on ArgumentError {
-    return path;
+    return segment;
   }
 }
 
@@ -1119,13 +1184,6 @@ String? _stripBasePrefix(String path, String base) {
   }
   return null;
 }
-
-/// Language, optional script, optional region — hyphen-separated — or
-/// `x-default`. What Google actually matches; anything else is
-/// silently ignored on their side.
-final RegExp _validHreflangCode = RegExp(
-  r'^(x-default|[a-zA-Z]{2,3}(-[a-zA-Z]{4})?(-([a-zA-Z]{2}|[0-9]{3}))?)$',
-);
 
 /// The robots signal, not sitemap membership: `noindex` or `none`.
 bool _isNoindex(SeoMeta meta) {

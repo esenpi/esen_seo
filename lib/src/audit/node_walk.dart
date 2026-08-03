@@ -53,7 +53,7 @@ class SeoBodyFacts {
   /// pathological tree — or one a resolver accidentally made
   /// self-referential — reports a finding instead of taking the
   /// process down with a StackOverflowError.
-  static const int maxDepth = 200;
+  static const int maxDepth = HtmlRenderer.maxDepth;
 
   /// Collects everything the checks need from [nodes].
   static SeoBodyFacts of(List<SeoNode> nodes) {
@@ -80,7 +80,10 @@ class SeoBodyFacts {
       if (tag == 'script') continue;
       final level = tag == null ? null : _headingLevel(tag);
       if (level != null) {
-        headings.add((level: level, text: _textOf(node)));
+        headings.add((
+          level: level,
+          text: _textOf(node, inAnchor: inAnchor),
+        ));
       } else if (tag == 'img') {
         images.add((
           node: node,
@@ -114,12 +117,19 @@ class SeoBodyFacts {
 
 /// All text under [node], including its children — the anchor text of a
 /// link, the words of a heading.
-String _textOf(SeoNode node) {
+String _textOf(SeoNode node, {bool inAnchor = false}) {
   final buffer = StringBuffer();
-  void walk(SeoNode n, int depth) {
+  void walk(SeoNode n, int depth, bool nestedInAnchor) {
     // Same ceiling as the fact-gathering walk: an audit must never be
     // the thing that crashes the build it is checking.
     if (depth > SeoBodyFacts.maxDepth) return;
+    final tag = HtmlRenderer.effectiveBodyTag(
+      n,
+      inAnchor: nestedInAnchor,
+    );
+    // JSON-LD is data. Its raw payload and children are not visible text and
+    // must not give a heading or link a phantom label.
+    if (tag == 'script') return;
     for (final text in [n.text, n.rawText]) {
       if (text == null || text.isEmpty) continue;
       buffer
@@ -127,11 +137,11 @@ String _textOf(SeoNode node) {
         ..write(' ');
     }
     for (final child in n.children) {
-      walk(child, depth + 1);
+      walk(child, depth + 1, nestedInAnchor || tag == 'a');
     }
   }
 
-  walk(node, 0);
+  walk(node, 0, inAnchor);
   return buffer.toString().trim();
 }
 

@@ -30,6 +30,27 @@ void main() {
     expect(EsenSeo.currentHeadHtml, contains('<title>Demo</title>'));
   });
 
+  testWidgets('siteBase prefix and encoded Unicode map into route space',
+      (tester) async {
+    enableSeoForTests();
+    final observer = SeoRouteObserver(
+      routes: [
+        SeoRoute(
+          path: '/über',
+          meta: (_) => const SeoMeta(title: 'Über uns'),
+        ),
+      ],
+      canonicalBase: 'https://x.dev/repo',
+    );
+
+    observer.didPush(_route('/repo/%C3%BCber'), null);
+    expect(EsenSeo.currentHeadHtml, contains('<title>Über uns</title>'));
+    expect(
+      EsenSeo.currentHeadHtml,
+      contains('href="https://x.dev/repo/%C3%BCber"'),
+    );
+  });
+
   testWidgets('a slow resolver never overwrites a newer navigation',
       (tester) async {
     // The bug that cannot exist today: navigate to a slow page, then

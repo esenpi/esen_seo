@@ -169,6 +169,22 @@ void main() {
       expect(_idsOf(findings), contains('parity.ssr-only-text'));
     });
 
+    test('overlapping pairs do not impersonate one contiguous passage', () {
+      // Both pairs "buy now" and "now free" occur, but never together.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'buy now free')],
+        app: [SeoNode(tag: 'p', text: 'buy now later now free')],
+      );
+      expect(_idsOf(findings), contains('parity.ssr-only-text'));
+      expect(
+        findings
+            .firstWhere((f) => f.check == SeoCheck.paritySsrOnlyText)
+            .severity,
+        SeoSeverity.warning,
+      );
+    });
+
     test('a passage split across adjacent nodes still counts as delivered', () {
       // The tolerance the old check existed for must survive: wording
       // that merely moved between nodes — a sentence split over two
@@ -196,6 +212,7 @@ void main() {
         app: [SeoNode(tag: 'p', text: 'Oben')],
       );
       expect(_idsOf(findings), contains('body.truncated'));
+      expect(findings.single.severity, SeoSeverity.error);
       // And nothing else: with the deep half of one tree unseen,
       // "this text reaches only crawlers" would be a confident error
       // about content nobody compared.
@@ -205,7 +222,7 @@ void main() {
 
     test('an inline icon inside a sentence is not cloaking', () {
       // Text.rich flattens a WidgetSpan to U+FFFC. Treating it as a
-      // word severed the surrounding pair and reported the passage as
+      // word severed the surrounding passage and reported the text as
       // error-severity cloaking — on identical visible text.
       final findings = compareSeoTrees(
         path: '/',
