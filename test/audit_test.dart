@@ -511,6 +511,81 @@ void main() {
     });
   });
 
+  group('checks the review found missing', () {
+    test('a canonical pointing at a gone page', () async {
+      // The README calls this the flagship case, and it was not
+      // implemented: the page asks Google to index a URL that is 410.
+      final report = await _audit([
+        SeoRoute(
+          path: '/alt',
+          meta: (_) => const SeoMeta(
+            title: 'Die alte Produktseite hier',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/weg',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Alt')],
+        ),
+        SeoRoute.dynamic(
+          path: '/weg',
+          resolve: (_) async => SeoDocument.gone(),
+        ),
+      ]);
+      expect(_ids(report), contains('canonical.non-indexable'));
+      expect(report.describe(), contains('410'));
+    });
+
+    test('a canonical pointing at a redirect', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/a',
+          meta: (_) => const SeoMeta(
+            title: 'Eine ganz normale Seite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            canonicalUrl: '$_base/b',
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'A')],
+        ),
+        SeoRoute.dynamic(
+          path: '/b',
+          resolve: (_) async => const SeoRedirect('/c'),
+        ),
+        _ok('/c', title: 'Das eigentliche Ziel hier'),
+      ]);
+      expect(_ids(report), contains('canonical.non-indexable'));
+    });
+
+    test("robots: 'none' means noindex", () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/geheim',
+          meta: (_) => const SeoMeta(title: 'Geheime Seite', robots: 'none'),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Geheim')],
+        ),
+      ]);
+      expect(_ids(report), contains('robots.noindex-in-sitemap'));
+    });
+
+    test('a pathologically deep body does not crash the audit', () async {
+      // An audit that takes the build down with a StackOverflowError is
+      // worse than no audit.
+      SeoNode deep(int n) => n == 0
+          ? SeoNode(tag: 'p', text: 'Grund')
+          : SeoNode(tag: 'div', children: [deep(n - 1)]);
+      final report = await _audit([
+        _ok('/', body: [SeoNode(tag: 'h1', text: 'H'), deep(5000)]),
+      ]);
+      expect(report.pagesAudited, 1);
+    });
+
+    test('an empty route table is reported, not silently clean', () async {
+      final report = await _audit([]);
+      expect(_ids(report), contains('sitemap.empty'));
+      expect(report.passes(), isFalse);
+    });
+  });
+
   group('no false positives on a healthy site', () {
     test('a well-formed table produces nothing at all', () async {
       final report = await _audit([

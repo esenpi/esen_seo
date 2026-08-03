@@ -30,9 +30,26 @@ final RegExp _forbidden =
 final RegExp _directive =
     RegExp(r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''', multiLine: true);
 
+/// The `if (dart.library.x) 'other.dart'` branch of a conditional
+/// import — a second target the directive regex above never matches.
+final RegExp _conditional = RegExp(r'''if\s*\([^)]*\)\s*['"]([^'"]+)['"]''');
+
 void main() {
   final visited = <String>{};
   final failures = <String, List<String>>{};
+
+  // Refuse to report success from the wrong directory or with a root
+  // renamed away. Both used to print a cheerful "no Flutter imports"
+  // over a graph that was missing entirely.
+  final missing = _roots.where((r) => !File(r).existsSync()).toList();
+  if (missing.isNotEmpty) {
+    stderr.writeln(
+      'Cannot check purity: ${missing.join(", ")} not found. Run this from '
+      'the package root (cwd is ${Directory.current.path}); if a library '
+      'was renamed, update _roots in this file.',
+    );
+    exit(2);
+  }
 
   for (final root in _roots) {
     _walk(root, visited, failures, [root]);
@@ -81,12 +98,41 @@ void _walk(
 
   for (final match in _directive.allMatches(source)) {
     final target = match.group(1)!;
-    // Only follow the package's own files; dart: and package: imports
-    // other than our own are somebody else's problem, and a Flutter one
-    // among them was already caught above.
-    if (target.startsWith('dart:') || target.startsWith('package:')) continue;
+    if (target.startsWith('dart:')) continue;
+
+    // A self-import reaches straight back into the Flutter half:
+    // `package:esen_seo/esen_seo.dart` exports the controller, which
+    // imports Flutter. Skipping every `package:` URI let that through
+    // as a clean pass.
+    if (target.startsWith('package:esen_seo/')) {
+      final asPath = 'lib/${target.substring('package:esen_seo/'.length)}';
+      _walk(asPath, visited, failures, [...chain, target]);
+      continue;
+    }
+    if (target.startsWith('package:')) continue;
+
     final resolved = _resolve(normalized, target);
     _walk(resolved, visited, failures, [...chain, target]);
+  }
+
+  // Conditional imports name a second file that the plain directive
+  // regex never sees — and a Flutter import hidden in that branch
+  // passed CI green.
+  for (final match in _conditional.allMatches(source)) {
+    final target = match.group(1)!;
+    if (target.startsWith('dart:')) continue;
+    if (target.startsWith('package:esen_seo/')) {
+      final asPath = 'lib/${target.substring('package:esen_seo/'.length)}';
+      _walk(asPath, visited, failures, [...chain, '$target (conditional)']);
+      continue;
+    }
+    if (target.startsWith('package:')) continue;
+    _walk(
+      _resolve(normalized, target),
+      visited,
+      failures,
+      [...chain, '$target (conditional)'],
+    );
   }
 }
 

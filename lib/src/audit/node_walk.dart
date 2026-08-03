@@ -23,6 +23,15 @@ class SeoBodyFacts {
   bool get isEmpty =>
       headings.isEmpty && images.isEmpty && links.isEmpty && text.isEmpty;
 
+  /// Whether the walk stopped early because the tree was too deep.
+  bool truncated = false;
+
+  /// Deep enough for any real document, shallow enough that a
+  /// pathological tree — or one a resolver accidentally made
+  /// self-referential — reports a finding instead of taking the
+  /// process down with a StackOverflowError.
+  static const int maxDepth = 200;
+
   /// Collects everything the checks need from [nodes].
   static SeoBodyFacts of(List<SeoNode> nodes) {
     final facts = SeoBodyFacts._();
@@ -30,7 +39,11 @@ class SeoBodyFacts {
     return facts;
   }
 
-  void _walk(List<SeoNode> nodes) {
+  void _walk(List<SeoNode> nodes, [int depth = 0]) {
+    if (depth > maxDepth) {
+      truncated = true;
+      return;
+    }
     for (final node in nodes) {
       final tag = node.tag.toLowerCase();
       final level = _headingLevel(tag);
@@ -47,7 +60,7 @@ class SeoBodyFacts {
           ..write(text)
           ..write(' ');
       }
-      _walk(node.children);
+      _walk(node.children, depth + 1);
     }
   }
 
@@ -62,7 +75,10 @@ class SeoBodyFacts {
 /// link, the words of a heading.
 String _textOf(SeoNode node) {
   final buffer = StringBuffer();
-  void walk(SeoNode n) {
+  void walk(SeoNode n, int depth) {
+    // Same ceiling as the fact-gathering walk: an audit must never be
+    // the thing that crashes the build it is checking.
+    if (depth > SeoBodyFacts.maxDepth) return;
     final text = n.text;
     if (text != null && text.isNotEmpty) {
       buffer
@@ -70,11 +86,11 @@ String _textOf(SeoNode node) {
         ..write(' ');
     }
     for (final child in n.children) {
-      walk(child);
+      walk(child, depth + 1);
     }
   }
 
-  walk(node);
+  walk(node, 0);
   return buffer.toString().trim();
 }
 

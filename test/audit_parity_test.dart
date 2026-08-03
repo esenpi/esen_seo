@@ -67,6 +67,61 @@ void main() {
       );
     });
 
+    test('an app shell with its own h1 does not mean the page differs', () {
+      // Smart defaults turn an untagged brand text into an <h1>, so the
+      // app tree legitimately carries a heading the route body never
+      // will. Comparing first-to-first made every shell a build failure.
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'h1', text: 'Willkommen')],
+        app: [
+          SeoNode(tag: 'h1', text: 'esen_seo'), // the shell's brand
+          SeoNode(tag: 'h1', text: 'Willkommen'), // the actual page
+        ],
+      );
+      expect(_idsOf(findings), isNot(contains('parity.h1-differs')));
+      // The extra heading is still surfaced — as a warning.
+      expect(_idsOf(findings), contains('parity.app-only-heading'));
+    });
+
+    test('an inactive Navigator route left in the tree is tolerated', () {
+      // Flutter keeps the previous page mounted after a push, so its
+      // h1 is still in the captured tree.
+      final findings = compareSeoTrees(
+        path: '/b',
+        ssr: [SeoNode(tag: 'h1', text: 'Seite B')],
+        app: [
+          SeoNode(tag: 'h1', text: 'Seite A'),
+          SeoNode(tag: 'h1', text: 'Seite B'),
+        ],
+      );
+      expect(_idsOf(findings), isNot(contains('parity.h1-differs')));
+    });
+
+    test('punctuation and typography are not content differences', () {
+      for (final (ssr, app) in [
+        ('Flutter Web richtig indexieren', 'Flutter Web richtig indexieren!'),
+        ('Jetzt starten.', 'Jetzt starten'),
+        ('Das "beste" Werkzeug', 'Das “beste” Werkzeug'),
+      ]) {
+        final findings = compareSeoTrees(
+          path: '/',
+          ssr: [SeoNode(tag: 'p', text: ssr)],
+          app: [SeoNode(tag: 'p', text: app)],
+        );
+        expect(findings, isEmpty, reason: '"$ssr" vs "$app"');
+      }
+    });
+
+    test('genuinely missing text is still caught', () {
+      final findings = compareSeoTrees(
+        path: '/',
+        ssr: [SeoNode(tag: 'p', text: 'Nur fuer Suchmaschinen bestimmt')],
+        app: [SeoNode(tag: 'p', text: 'Etwas ganz anderes')],
+      );
+      expect(_idsOf(findings), contains('parity.ssr-only-text'));
+    });
+
     test('whitespace and case are not content differences', () {
       final findings = compareSeoTrees(
         path: '/',
@@ -138,6 +193,31 @@ void main() {
       expect(_ids(report), contains('parity.h1-differs'));
       expect(report.passes(), isFalse);
       expect(report.describe(), contains('Alter Titel'));
+    });
+
+    testWidgets('a path served by an un-enumerated :param route is checked',
+        (tester) async {
+      // It used to be skipped with a warning claiming the table does
+      // not serve it — which was untrue, and meant pagesAudited was 0
+      // while the test looked like it had passed.
+      final report = await auditSeoParity(
+        routes: [
+          SeoRoute(
+            path: '/products/:slug',
+            meta: (p) => SeoMeta(title: 'Produkt ${p['slug']} ansehen'),
+            body: (p) => [SeoNode(tag: 'h1', text: 'Produkt ${p['slug']}')],
+          ),
+        ],
+        siteBase: _base,
+        paths: const ['/products/rennrad'],
+        pump: (_) async {
+          await tester.pumpWidget(app('Produkt rennrad'));
+          await tester.pumpAndSettle();
+        },
+      );
+      expect(report.pagesAudited, 1);
+      expect(_ids(report), isNot(contains('parity.not-covered')));
+      expect(report.passes(), isTrue, reason: report.describe());
     });
 
     testWidgets('pages nobody checked are named, not silently skipped',

@@ -243,8 +243,12 @@ Iterable<SeoFinding> _auditPage(
   }
 
   // ── indexing signals that contradict each other
+  // `none` is shorthand for `noindex, nofollow` — a page using it is
+  // just as much out of the index as one saying so at length.
   final robots = meta.robots?.toLowerCase() ?? '';
-  if (robots.contains('noindex') && indexable) {
+  final noindex = robots.contains('noindex') ||
+      robots.split(',').map((d) => d.trim()).contains('none');
+  if (noindex && indexable) {
     yield SeoFinding(
       check: SeoCheck.robotsNoindexInSitemap,
       severity: SeoSeverity.error,
@@ -559,6 +563,51 @@ Iterable<SeoFinding> _auditAcrossPages(
           detail: href,
         );
       }
+    }
+  }
+
+  // Where each canonical actually lands. This needs the resolved set,
+  // so it cannot live with the per-page canonical checks — and it is
+  // the case the README calls the flagship one: a page that
+  // canonicalises itself onto a 410 or a redirect asks Google to index
+  // something that is not there.
+  for (final page in indexable) {
+    final canonical = page.document?.meta.canonicalUrl;
+    if (canonical == null || canonical.isEmpty) continue;
+    final target = _internalTarget(canonical, base);
+    if (target == null || target == page.path) continue;
+    final resolved = byPath[target];
+    if (resolved == null) continue; // unknown paths are reported already
+
+    final document = resolved.document;
+    if (document == null) {
+      yield SeoFinding(
+        check: SeoCheck.canonicalNonIndexable,
+        severity: SeoSeverity.error,
+        path: page.path,
+        message: 'the canonical points at a URL that redirects; Google '
+            'follows the redirect and the signal is wasted',
+        detail: canonical,
+      );
+    } else if (document.statusCode != 200) {
+      yield SeoFinding(
+        check: SeoCheck.canonicalNonIndexable,
+        severity: SeoSeverity.error,
+        path: page.path,
+        message: 'the canonical points at a page that resolves to '
+            '${document.statusCode} — this page asks to be indexed as one '
+            'that is not there',
+        detail: canonical,
+      );
+    } else if (!resolved.isIndexable) {
+      yield SeoFinding(
+        check: SeoCheck.canonicalNonIndexable,
+        severity: SeoSeverity.error,
+        path: page.path,
+        message: 'the canonical points at a page excluded from the index, '
+            'so neither URL can rank',
+        detail: canonical,
+      );
     }
   }
 
