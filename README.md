@@ -504,8 +504,9 @@ separate check for them:
 ```dart
 // test/seo_audit_test.dart — runs in the CI you already have
 test('the site has no SEO errors', () async {
-  final report = await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase);
-  expect(report.passes(), isTrue, reason: '\n${report.describe()}');
+  assertSeoHealthy(
+    await auditSeoRoutes(routes: seoRoutes, siteBase: siteBase),
+  );
 });
 ```
 
@@ -534,6 +535,11 @@ than if you had set nothing; a schema value JSON cannot encode, which
 otherwise throws when the page renders rather than when you write it;
 and hreflang clusters that are not reciprocal, which Google discards
 without telling anyone.
+
+`assertSeoHealthy` throws with the whole report in the message, and it
+owns the comparison — a hand-written check against `describe()` is easy
+to get wrong in a way that always passes, which is exactly what an
+earlier version of this README recommended.
 
 Severity is the contract: `error` is something measurably wrong,
 `warning` is very likely wrong but a real site can look like that
@@ -574,7 +580,7 @@ testWidgets('bots and users see the same pages', (tester) async {
       await tester.pumpAndSettle();
     },
   );
-  expect(report.passes(), isTrue, reason: '\n${report.describe()}');
+  assertSeoHealthy(report);
 });
 ```
 
@@ -784,7 +790,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 471 unit and widget
+Young package under active development, covered by 485 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
