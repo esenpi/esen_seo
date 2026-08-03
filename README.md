@@ -555,6 +555,46 @@ Prefer running it from a script instead of a test? Same shape as the
 prerenderer — a few lines in `bin/seo_audit.dart` that import your own
 route table, then `exit(report.passes() ? 0 : 1)`.
 
+### Parity — do bots and visitors see the same page?
+
+Everything above reads the route table, so on its own it can only
+confirm that the table agrees with itself. The check that matters most
+compares it against the widget tree a visitor actually sees:
+
+```dart
+import 'package:esen_seo/testing.dart';
+
+testWidgets('bots and users see the same pages', (tester) async {
+  final report = await auditSeoParity(
+    routes: seoRoutes,
+    siteBase: siteBase,
+    paths: const ['/', '/docs'],
+    pump: (path) async {
+      await tester.pumpWidget(MyApp(initialRoute: path));
+      await tester.pumpAndSettle();
+    },
+  );
+  expect(report.passes(), isTrue, reason: '\n${report.describe()}');
+});
+```
+
+The failure it exists for is mundane: somebody renames a headline in
+the widget and forgets the route body. From then on crawlers and
+visitors read different pages — and nothing else in the package can
+notice, because the two trees come from different code.
+
+Text that reaches crawlers but never appears in the app is an
+**error**; that is cloaking, whatever the intent. A differing `<h1>` is
+an error too. A heading only the app shows is a warning, since an app
+legitimately shows more than a crawler needs. Links are off by default:
+navigation usually lives in the Flutter shell, so the route body will
+never carry it. And pages your sample did not cover are named in the
+report, so a sample that quietly shrank to one route cannot pass for
+coverage.
+
+`testing.dart` is a separate import on purpose — it is test-time
+scaffolding and has no business in a release build.
+
 ## Static prerendering — SEO without any server
 
 No Dart server on your host? Bake the same route table directly into
@@ -744,7 +784,7 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 424 unit and widget
+Young package under active development, covered by 454 unit and widget
 tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.

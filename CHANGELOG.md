@@ -32,11 +32,34 @@ actually correct, not just render it.
   **skipped** rather than guessed, since "this title is unique" is
   unprovable with a page missing.
 
-### Not yet
+### Parity — `package:esen_seo/testing.dart`
 
-The SSR **parity** check — does the Flutter widget tree render what the
-route's `SeoNode`s claim? — needs a `WidgetTester` and therefore cannot
-live in the pure-Dart engine. It lands separately.
+* `auditSeoParity` compares the route table against the widget tree a
+  visitor actually sees. The engine alone can only confirm the table
+  agrees with itself; this is the check the whole approach rests on,
+  since serving crawlers a separately built body is defensible only
+  while the two say the same thing. The realistic failure is mundane —
+  a headline renamed in the widget, the route body forgotten — and
+  nothing else in the package can notice it.
+* Split along the constraint: comparison is pure Dart
+  (`compareSeoTrees`), so the logic is testable without pumping
+  anything; only capturing the app's tree needs Flutter. The
+  `WidgetTester` stays in your test behind a `pump` callback, so the
+  package never depends on `flutter_test`.
+* Text that reaches crawlers but not the app is an **error** — that is
+  cloaking, however accidental. A differing `<h1>` is an error. A
+  heading only the app shows is a warning, since an app legitimately
+  shows more. Links are off by default: navigation lives in the Flutter
+  shell, so the route body will never carry it.
+* Pages the sample did not cover are named in the report, so a sample
+  that shrank to one route cannot pass for coverage.
+
+### Also
+
+* `tool/check_pure_dart.dart` replaces CI's hand-written file list with
+  an import-graph walk. The list had fallen behind — two files exported
+  by `core.dart` were never in it — and could not see a Flutter import
+  reached indirectly at all. 26 files are covered where 12 were named.
 
 ## 0.7.0
 
