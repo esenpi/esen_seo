@@ -10,14 +10,20 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Der Standard-Token kann sonst schreiben. Kein Job hier braucht mehr
+# als Lesen — und ein kompromittierter Schritt soll auch nicht mehr
+# bekommen.
+permissions:
+  contents: read
+
 jobs:
   package:
     name: analyze & test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
@@ -42,9 +48,9 @@ jobs:
     name: example app
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
@@ -96,13 +102,13 @@ jobs:
     name: server path without Flutter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Kein Flutter, nur das Dart-SDK: der Server-/Core-Teil soll
       # Flutter-frei sein, und das ist die einzige Prüfung, die es
       # beweist statt behauptet. Schlägt sie fehl, hat sich ein
       # Flutter-Import in einen geteilten Pfad geschlichen.
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           sdk: stable
 
