@@ -237,6 +237,57 @@ that survived verification are fixed, each with a regression test.
   walked tree of exactly maxDepth+1 levels no longer claims its own
   findings were incomplete.
 
+### A fifth pass — the server paths under the same lens
+
+The audit rounds kept finding the same families on the runtime paths,
+so those were hardened too. Four of these change published behavior —
+read the breaking notes before upgrading.
+
+* **Breaking: `seoRedirectMiddleware(forceHttps:)` no longer reads
+  `x-forwarded-proto` by default.** The header is caller-controlled on
+  any server reachable directly, so trusting it unconditionally let a
+  request pick its own redirect scheme. Behind a reverse proxy —
+  where the backend sees plain http — set `trustProxy: true` when
+  upgrading, or `forceHttps` will loop: the proxy keeps fetching over
+  http and every fetch redirects.
+* **Breaking: entries in `seoRedirectMiddleware(redirects:)` are
+  validated at construction.** A target that is neither an http(s) URL
+  with a host nor an absolute path throws an `ArgumentError`
+  immediately, instead of being emitted into a `Location` header at
+  request time. Path-only redirects now send a relative `Location`, so
+  a request-controlled `Host` header is never reflected — and mapped
+  redirects preserve the query string.
+* **Breaking: `no-referrer-when-downgrade` is no longer an accepted
+  `referrerpolicy`.** It hands the full URL — path and query — to
+  third-party hosts on same-scheme navigation, which is exactly what
+  the allow list exists to prevent; it should never have been on it.
+  `SeoMeta.extraMeta` entries named `referrer` pass through the same
+  policy now, closing the one remaining way to emit an unsafe global
+  referrer rule.
+* **Breaking: `matchSeoRoute` percent-decodes path segments.** A route
+  declared `/über` is now reachable as `/%C3%BCber`, and a `:param`
+  resolver receives the decoded value (`café`, or `a/b` for an encoded
+  slash) instead of the raw escape sequence. Decoding happens per
+  segment, so `%2F` cannot create a route boundary.
+* A dot in the last path segment no longer marks a URL as a static
+  asset. `/page.html` is a page and `/releases/v1.2` is a slug; the
+  middleware serves bots SSR for both now, and the audit checks links
+  into them. Known page extensions and version-shaped segments decide,
+  one shared rule (`looksLikeSeoPagePath`) for both consumers.
+* The hreflang code check validates against a snapshot of the IANA
+  registry instead of a shape regex — per Google's documentation only
+  ISO 639-1 languages and ISO 3166-1 Alpha-2 regions are supported,
+  and Google's own example of an unsupported code, `es-419`, now
+  fails the audit exactly as it fails in Search.
+* Parity requires the SSR passage as one contiguous token sequence in
+  the app's text, closing the overlapping-pairs gap (`buy now free`
+  passing against `buy now … now free`). The base-path mapping from
+  the audit round now also applies to `seoBotMiddleware` and
+  `SeoRouteObserver`, hash-router fragments (`#/docs`) are told apart
+  from in-page anchors (`/docs#install`), and `prerenderSite` refuses
+  templates missing `<html>`/`</head>`/`<body>` and route pairs that
+  collide on case-insensitive file systems.
+
 ### Also
 
 * CI runs the example app's own test suite, which audits a real grown
