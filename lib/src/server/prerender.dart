@@ -79,9 +79,10 @@ Future<List<String>> prerenderSite({
     );
   }
   final template = await templateFile.readAsString();
+  _validateTemplate(template, buildDir);
   // Der Root-Pfad überschreibt index.html — ein zweiter Lauf würde die
   // eigene Ausgabe als Template lesen und alles doppelt einbauen.
-  if (template.contains('id="$seoContainerId"')) {
+  if (_seoContainerMarker.hasMatch(template)) {
     throw StateError(
       '$buildDir/index.html is already prerendered — run '
       '`flutter build web` again for a clean template. Prerendering an '
@@ -125,8 +126,19 @@ Future<List<String>> prerenderSite({
   // Validate EVERY output path — including the ones an enumerator
   // produced, which is the first time untrusted strings become file
   // paths — before a single file is written.
+  final outputPaths = <String, String>{};
   for (final page in pages) {
     _checkedPath(page.path, reserved);
+    final portableKey = page.path.toLowerCase();
+    final first = outputPaths[portableKey];
+    if (first != null && first != page.path) {
+      throw ArgumentError.value(
+        page.path,
+        'path',
+        'collides with "$first" on a case-insensitive file system',
+      );
+    }
+    outputPaths[portableKey] = page.path;
   }
 
   final written = <String>[];
@@ -279,10 +291,38 @@ const Set<String> _reservedOutputNames = {
   '/index.html',
 };
 
-final RegExp _templateTitle = RegExp(r'\s*<title>.*?</title>', dotAll: true);
-final RegExp _templateDescription =
-    RegExp(r'\s*<meta name="description"[^>]*>');
-final RegExp _bodyOpenTag = RegExp(r'<body[^>]*>');
+final RegExp _templateTitle = RegExp(
+  r'\s*<title\b[^>]*>.*?</title\s*>',
+  caseSensitive: false,
+  dotAll: true,
+);
+final RegExp _metaTag = RegExp(r'<meta\b[^>]*>', caseSensitive: false);
+final RegExp _descriptionMetaName = RegExp(
+  r'''\bname\s*=\s*(?:"description"|'description'|description(?=[\s/>]))''',
+  caseSensitive: false,
+);
+final RegExp _htmlOpenTag = RegExp(r'<html\b([^>]*)>', caseSensitive: false);
+final RegExp _langAttribute = RegExp(r'''\blang\s*=''', caseSensitive: false);
+final RegExp _headCloseTag = RegExp(r'</head\s*>', caseSensitive: false);
+final RegExp _bodyOpenTag = RegExp(r'<body\b[^>]*>', caseSensitive: false);
+final RegExp _seoContainerMarker = RegExp(
+  r'''\bid\s*=\s*(["'])''' + RegExp.escape(seoContainerId) + r'''\1''',
+  caseSensitive: false,
+);
+
+void _validateTemplate(String template, String buildDir) {
+  final missing = <String>[
+    if (!_htmlOpenTag.hasMatch(template)) '<html>',
+    if (!_headCloseTag.hasMatch(template)) '</head>',
+    if (!_bodyOpenTag.hasMatch(template)) '<body>',
+  ];
+  if (missing.isNotEmpty) {
+    throw StateError(
+      '$buildDir/index.html is not a complete HTML template; missing '
+      '${missing.join(', ')}.',
+    );
+  }
+}
 
 String _applyTemplate(
   String template,
@@ -295,11 +335,18 @@ String _applyTemplate(
   var html = template;
   // Template-Duplikate entfernen — die Route liefert die echten Werte.
   html = html.replaceFirst(_templateTitle, '');
-  html = html.replaceAll(_templateDescription, '');
+  html = html.replaceAllMapped(
+    _metaTag,
+    (match) => _descriptionMetaName.hasMatch(match[0]!) ? '' : match[0]!,
+  );
   // lang setzen, sofern das Template keines definiert.
-  html = html.replaceFirst(
-    '<html>',
-    '<html lang="${HtmlRenderer.escapeAttribute(lang)}">',
+  html = html.replaceFirstMapped(
+    _htmlOpenTag,
+    (match) {
+      final attributes = match[1] ?? '';
+      if (_langAttribute.hasMatch(attributes)) return match[0]!;
+      return '<html$attributes lang="${HtmlRenderer.escapeAttribute(lang)}">';
+    },
   );
 
   // Kritisches CSS gehört inline in den Head: Der Shell soll malen,
@@ -309,9 +356,17 @@ String _applyTemplate(
     head.write(seoStyleTagHtml(stylesheet));
   }
 
-  html = html.replaceFirst('</head>', '$head\n</head>');
-  return html.replaceFirstMapped(
+  html = html.replaceFirstMapped(
+    _headCloseTag,
+    (match) => '$head\n${match[0]}',
+  );
+  final result = html.replaceFirstMapped(
     _bodyOpenTag,
     (m) => '${m[0]}\n${seoContainerHtml(bodyHtml, mode: renderMode)}',
   );
+  if (!_seoContainerMarker.hasMatch(result)) {
+    throw StateError(
+        'Prerendering failed to inject the SEO content container.');
+  }
+  return result;
 }

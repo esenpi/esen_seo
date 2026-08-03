@@ -77,6 +77,21 @@ void main() {
       expect(matchSeoRoute(_routes(), '/blog/'), isNull);
     });
 
+    test('route declarations reject ambiguous patterns', () {
+      SeoRoute make(String path) =>
+          SeoRoute(path: path, meta: (_) => const SeoMeta());
+
+      for (final path in [
+        '/compare/:id/:id',
+        '/missing/:',
+        '/a//b',
+        '/search?q=x',
+        '/page#section',
+      ]) {
+        expect(() => make(path), throwsArgumentError, reason: path);
+      }
+    });
+
     test('derives canonical from base when route sets none', () {
       final routes = _routes();
       expect(

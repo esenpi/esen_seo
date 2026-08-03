@@ -3,6 +3,7 @@ import '../renderer/tag_policy.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
+import '../routing/seo_path_kind.dart';
 import 'hreflang_codes.dart';
 import 'node_walk.dart';
 import 'seo_audit_policy.dart';
@@ -132,7 +133,8 @@ Iterable<SeoFinding> _auditRouteTable(
   for (var i = 0; i < routes.length; i++) {
     final route = routes[i];
 
-    final firstAt = seen[route.path];
+    final identity = _decodePath(route.path);
+    final firstAt = seen[identity];
     if (firstAt != null) {
       yield SeoFinding(
         check: SeoCheck.routeDuplicatePath,
@@ -145,7 +147,7 @@ Iterable<SeoFinding> _auditRouteTable(
       // the identical pattern a second time.
       continue;
     }
-    seen[route.path] = i;
+    seen[identity] = i;
 
     // A concrete path declared after a pattern that swallows it never
     // runs. matchSeoRoute takes the FIRST match, so /blog/:slug before
@@ -271,9 +273,7 @@ Iterable<SeoFinding> _auditPage(
   // ── indexing signals that contradict each other
   // `none` is shorthand for `noindex, nofollow` — a page using it is
   // just as much out of the index as one saying so at length.
-  final robots = meta.robots?.toLowerCase() ?? '';
-  final noindex = robots.contains('noindex') ||
-      robots.split(',').map((d) => d.trim()).contains('none');
+  final noindex = _isNoindex(doc);
   if (noindex && indexable) {
     yield SeoFinding(
       check: SeoCheck.robotsNoindexInSitemap,
@@ -759,8 +759,17 @@ Iterable<SeoFinding> _auditSchemas(
     // A rating supplied as a one-element list is legal JSON-LD; the
     // offers check above already accepts that shape.
     final ratings = schema.properties['aggregateRating'];
-    for (final rating in ratings is List ? ratings : [ratings]) {
-      if (rating is! Map) continue;
+    final ratingValues = ratings is List ? ratings : [ratings];
+    if (!_isBlank(ratings) && ratingValues.any((rating) => rating is! Map)) {
+      yield SeoFinding(
+        check: SeoCheck.schemaMissingRequired,
+        severity: SeoSeverity.error,
+        path: path,
+        message: '${schema.type}.aggregateRating must be an '
+            'AggregateRating object or a list of AggregateRating objects',
+      );
+    }
+    for (final rating in ratingValues.whereType<Map>()) {
       if (_isBlank(rating['ratingValue'])) {
         yield SeoFinding(
           check: SeoCheck.schemaMissingRequired,
@@ -841,7 +850,7 @@ Iterable<SeoFinding> _auditAcrossPages(
         // served by the static handler and were never meant to match a
         // route — the same rule the middleware uses to decide what is
         // a page path at all.
-        if (!_looksLikePage(target)) continue;
+        if (!looksLikeSeoPagePath(target)) continue;
         yield SeoFinding(
           check: SeoCheck.linkBroken,
           severity: SeoSeverity.error,
@@ -903,7 +912,7 @@ Iterable<SeoFinding> _auditAcrossPages(
             'that is not there',
         detail: canonical,
       );
-    } else if (_isNoindex(document.meta)) {
+    } else if (_isNoindex(document)) {
       // Judged by the robots signal, not by sitemap membership: a page
       // deliberately kept out of sitemap.xml is still perfectly
       // indexable, and canonicalising onto it is legitimate.
@@ -1041,11 +1050,6 @@ Iterable<SeoFinding> _duplicates(
 String _stripSlash(String url) =>
     url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
-/// Whether a path is a page rather than an asset — the same rule
-/// `seoBotMiddleware` uses: a dot in the last segment means
-/// `main.dart.js`, `favicon.png`, `whitepaper.pdf`.
-bool _looksLikePage(String path) => !path.split('/').last.contains('.');
-
 /// Whether a schema property is effectively absent — missing, or
 /// present as an empty string, which JSON-LD consumers treat the same.
 bool _isBlank(Object? value) =>
@@ -1062,8 +1066,11 @@ List<Map> _schemaMaps(Object? value) => [
 /// URL schemes are case-insensitive — `HTTPS://` is as absolute as
 /// `https://`, and crawlers treat it so.
 bool _isAbsolute(String url) {
-  final lower = url.toLowerCase();
-  return lower.startsWith('http://') || lower.startsWith('https://');
+  final parsed = Uri.tryParse(url);
+  return parsed != null &&
+      (parsed.scheme == 'http' || parsed.scheme == 'https') &&
+      parsed.hasAuthority &&
+      parsed.host.isNotEmpty;
 }
 
 /// Whether the pattern [general] matches every URL [specific] could
@@ -1185,11 +1192,34 @@ String? _stripBasePrefix(String path, String base) {
   return null;
 }
 
-/// The robots signal, not sitemap membership: `noindex` or `none`.
-bool _isNoindex(SeoMeta meta) {
-  final robots = meta.robots?.toLowerCase() ?? '';
-  return robots.contains('noindex') ||
-      robots.split(',').map((d) => d.trim()).contains('none');
+/// The effective robots signal, not sitemap membership: `noindex` or `none`.
+/// A valid `X-Robots-Tag` header has the same indexing effect as the HTML
+/// meta tag and therefore belongs in every contradiction check.
+bool _isNoindex(SeoDocument document) {
+  if (_robotsValueIsNoindex(document.meta.robots)) return true;
+
+  String? header;
+  for (final entry in document.headers.entries) {
+    if (entry.key.trim().toLowerCase() != 'x-robots-tag') continue;
+    final value = entry.value;
+    if (value.codeUnits.any((c) => c != 0x09 && (c < 0x20 || c > 0x7e))) {
+      continue;
+    }
+    header = value;
+  }
+  return _robotsValueIsNoindex(header);
+}
+
+bool _robotsValueIsNoindex(String? value) {
+  if (value == null) return false;
+  for (final rawDirective in value.split(',')) {
+    final lower = rawDirective.trim().toLowerCase();
+    final directive = lower.contains(':')
+        ? lower.substring(lower.lastIndexOf(':') + 1).trim()
+        : lower;
+    if (directive == 'noindex' || directive == 'none') return true;
+  }
+  return false;
 }
 
 bool _sameUrl(String url, String selfUrl, String base, String path) {

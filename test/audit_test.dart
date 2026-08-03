@@ -58,6 +58,27 @@ void main() {
       expect(xml, contains('/geheim'));
     });
 
+    test('X-Robots-Tag noindex is the same indexing contradiction', () async {
+      final report = await _audit([
+        SeoRoute.dynamic(
+          path: '/header-noindex',
+          resolve: (_) async => SeoDocument(
+            meta: const SeoMeta(
+              title: 'A page excluded through its response header',
+              description: 'A description long enough to sit inside the '
+                  'window that search engines actually show to a reader.',
+            ),
+            body: [SeoNode(tag: 'h1', text: 'Header noindex')],
+            headers: const {
+              'X-Robots-Tag': 'googlebot: noindex, nofollow',
+            },
+          ),
+        ),
+      ]);
+
+      expect(_ids(report), contains('robots.noindex-in-sitemap'));
+    });
+
     test('a concrete route shadowed by an earlier :param pattern', () async {
       final routes = [
         SeoRoute(
@@ -407,9 +428,34 @@ void main() {
           SeoNode(tag: 'h1', text: 'Start'),
           SeoNode(tag: 'a', text: 'PDF', attributes: {'href': '/x.pdf'}),
           SeoNode(tag: 'a', text: 'Logo', attributes: {'href': '/logo.png'}),
+          SeoNode(tag: 'a', text: 'App', attributes: {'href': '/app.dmg'}),
+          SeoNode(tag: 'a', text: 'Text', attributes: {'href': '/notes.md'}),
         ]),
       ]);
       expect(_ids(report), isNot(contains('link.broken')));
+    });
+
+    test('a missing .html URL and a dotted slug are still pages', () async {
+      final report = await _audit([
+        _ok('/', body: [
+          SeoNode(tag: 'h1', text: 'Start'),
+          SeoNode(
+            tag: 'a',
+            text: 'Legacy page',
+            attributes: {'href': '/missing.html'},
+          ),
+          SeoNode(
+            tag: 'a',
+            text: 'Version page',
+            attributes: {'href': '/releases/v1.2'},
+          ),
+        ]),
+      ]);
+      final broken = report.findings
+          .where((finding) => finding.check == SeoCheck.linkBroken)
+          .toList();
+
+      expect(broken, hasLength(2), reason: report.describe());
     });
 
     test('a canonical with a query string or fragment', () async {
@@ -1031,6 +1077,22 @@ void main() {
           reason: report.describe());
     });
 
+    test('an http scheme without a host is not an absolute URL', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/',
+          meta: (_) => const SeoMeta(
+            title: 'Eine ganz normale Startseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            openGraph: OpenGraphMeta(image: 'https://'),
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Start')],
+        ),
+      ]);
+      expect(_ids(report), contains('schema.relative-url'));
+    });
+
     test('a wider pattern swallows a later, narrower one', () async {
       // `/:section/:slug` before `/blog/:slug` leaves the second route
       // just as dead as an identically shaped pattern would — and the
@@ -1258,6 +1320,15 @@ void main() {
           reason: report.describe());
     });
 
+    test('encoded and decoded route spellings are duplicate URLs', () async {
+      final report = await _audit([
+        _ok('/über', title: 'Die erste Schreibweise dieser Seite'),
+        _ok('/%C3%BCber', title: 'Die zweite Schreibweise dieser Seite'),
+      ]);
+
+      expect(_ids(report), contains('route.duplicate-path'));
+    });
+
     test('a product-snippet price without currency is a warning', () async {
       final report = await _audit([
         SeoRoute(
@@ -1388,6 +1459,29 @@ void main() {
       ]);
       expect(report.describe(), contains('ratingValue'));
       expect(report.passes(), isFalse);
+    });
+
+    test('a non-object aggregateRating cannot satisfy Product', () async {
+      final report = await _audit([
+        SeoRoute(
+          path: '/p',
+          meta: (_) => SeoMeta(
+            title: 'Eine ganz normale Produktseite',
+            description: 'Eine Beschreibung, die bequem in das Fenster passt, '
+                'das Suchmaschinen tatsaechlich anzeigen und darstellen.',
+            schemas: [
+              SeoSchema('Product', const {
+                'name': 'Ding',
+                'aggregateRating': 'five stars',
+              }),
+            ],
+          ),
+          body: (_) => [SeoNode(tag: 'h1', text: 'Ding')],
+        ),
+      ]);
+
+      expect(report.passes(), isFalse);
+      expect(report.describe(), contains('AggregateRating object'));
     });
 
     test('a canonical chain is reported, one hop is not', () async {

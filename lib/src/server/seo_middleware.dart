@@ -7,6 +7,7 @@ import '../renderer/seo_node.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
+import '../routing/seo_path_kind.dart';
 import 'bot_detector.dart';
 import 'llms_txt.dart';
 import 'seo_page.dart';
@@ -212,6 +213,12 @@ Middleware seoBotMiddleware({
     }
 
     return (Request request) async {
+      // SEO representations are read-only. A User-Agent is entirely
+      // caller-controlled, so letting it divert POST/PUT/DELETE would bypass
+      // the application's method-specific handler on the same path.
+      if (request.method != 'GET' && request.method != 'HEAD') {
+        return inner(request);
+      }
       final path = _routePath(request.url.path, siteBase);
 
       // Infrastruktur-Dateien — für alle Clients, nicht nur Bots.
@@ -445,7 +452,7 @@ Middleware seoBotMiddleware({
       if (routes != null &&
           !routeExists &&
           unknownRoutesAs404 &&
-          _looksLikePage(path)) {
+          looksLikeSeoPagePath(path)) {
         return _htmlResponse(_notFoundPage(), status: 404);
       }
 
@@ -607,10 +614,6 @@ Future<Response> _appResponse(Handler inner, Request request) async {
     'vary': values.join(', '),
   });
 }
-
-/// Asset requests (`/main.dart.js`, `/favicon.png`) carry a file
-/// extension in their last segment — everything else is a page path.
-bool _looksLikePage(String path) => !path.split('/').last.contains('.');
 
 /// A title for an error page whose resolver supplied none.
 String _statusTitle(int status) => switch (status) {

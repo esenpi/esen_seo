@@ -172,6 +172,17 @@ void main() {
       expect(html, contains('<meta name="theme-color" content="#0a0f1e"/>'));
     });
 
+    test('extraMeta refuses an unsafe referrer policy', () {
+      const unsafe = SeoMeta(extraMeta: {'referrer': 'unsafe-url'});
+      const safe = SeoMeta(extraMeta: {'Referrer': 'strict-origin'});
+
+      expect(unsafe.toHtml(), isNot(contains('referrer')));
+      expect(
+        safe.toHtml(),
+        contains('<meta name="Referrer" content="strict-origin"/>'),
+      );
+    });
+
     test('copyWith keeps extraMeta', () {
       const meta = SeoMeta(extraMeta: {'theme-color': '#fff'});
       expect(

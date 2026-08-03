@@ -138,7 +138,10 @@ void main() {
   group('seoRedirectMiddleware', () {
     Future<Response> call(String forwardedProto) async {
       final handler = const Pipeline()
-          .addMiddleware(seoRedirectMiddleware(canonicalHost: 'x.dev'))
+          .addMiddleware(seoRedirectMiddleware(
+            canonicalHost: 'x.dev',
+            trustProxy: true,
+          ))
           .addHandler((_) => Response.ok('app'));
       return handler(Request(
         'GET',
@@ -198,6 +201,31 @@ void main() {
         routes: [SeoRoute(path: '/', meta: (_) => const SeoMeta())],
       );
       expect(response.statusCode, 404);
+    });
+
+    test('unknown dotted pages are 404 while assets reach the app', () async {
+      for (final page in ['/missing.html', '/releases/v1.2']) {
+        final response = await ask(
+          page,
+          routes: [SeoRoute(path: '/', meta: (_) => const SeoMeta())],
+        );
+        expect(response.statusCode, 404, reason: page);
+      }
+
+      for (final asset in [
+        '/main.dart.js',
+        '/favicon.png',
+        '/files/x.pdf',
+        '/downloads/app.dmg',
+        '/downloads/guide.docx',
+      ]) {
+        final response = await ask(
+          asset,
+          routes: [SeoRoute(path: '/', meta: (_) => const SeoMeta())],
+        );
+        expect(response.statusCode, 200, reason: asset);
+        expect(await response.readAsString(), 'app');
+      }
     });
 
     test('every answer says it depends on the User-Agent', () async {
@@ -328,6 +356,34 @@ void main() {
         throwsArgumentError,
       );
       expect(File('${buildDir.path}/sitemap.xml').existsSync(), isFalse);
+    });
+
+    test('case-colliding pages fail before either output is written', () async {
+      await expectLater(
+        prerenderSite(
+          routes: [
+            SeoRoute(
+              path: '/About',
+              meta: (_) => const SeoMeta(title: 'Upper'),
+              body: (_) => [SeoNode(tag: 'h1', text: 'Upper')],
+            ),
+            SeoRoute(
+              path: '/about',
+              meta: (_) => const SeoMeta(title: 'Lower'),
+              body: (_) => [SeoNode(tag: 'h1', text: 'Lower')],
+            ),
+          ],
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+        ),
+        throwsArgumentError,
+      );
+      expect(Directory('${buildDir.path}/About').existsSync(), isFalse);
+      expect(Directory('${buildDir.path}/about').existsSync(), isFalse);
+      expect(
+        File('${buildDir.path}/index.html').readAsStringSync(),
+        _template,
+      );
     });
 
     test('a valid key still writes its file', () async {

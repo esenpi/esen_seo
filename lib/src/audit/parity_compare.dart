@@ -31,8 +31,8 @@ class SeoParityPolicy {
   final bool compareHeadings;
 
   /// Text present on the server but missing in the app is reported.
-  /// The reverse (app-only text) is only a warning: an app legitimately
-  /// shows things a crawler need not see, like a cookie banner.
+  /// The reverse is deliberately not reported: an app legitimately shows
+  /// things a crawler need not see, such as a cookie banner.
   final bool compareText;
 
   /// Off by default: navigation lives in the Flutter shell on most
@@ -74,8 +74,12 @@ List<SeoFinding> compareSeoTrees({
   }
 
   if (policy.compareHeadings) {
-    final ssrH1 = _headings(ssrFacts, 1);
-    final appH1 = _headings(appFacts, 1);
+    final ssrH1 = _headings(ssrFacts, 1)
+        .where((heading) => !_ignored(heading, policy))
+        .toList();
+    final appH1 = _headings(appFacts, 1)
+        .where((heading) => !_ignored(heading, policy))
+        .toList();
 
     // Ask whether the server's headline appears in the app at all, not
     // whether it comes first. Comparing first-to-first failed on two
@@ -132,16 +136,25 @@ List<SeoFinding> compareSeoTrees({
     // A passage split across adjacent spans therefore still matches, while
     // repeated pairs scattered across navigation and other paragraphs do not.
     final appSequence = [
-      for (final run in appFacts.textRuns) ..._tokens(run),
+      for (final run in appFacts.textRuns)
+        if (!_ignored(run, policy)) ..._tokens(run),
     ];
     final appWords = appSequence.toSet();
+    final claimed = List<bool>.filled(appSequence.length, false);
     final missing = <String>[];
     final reordered = <String>[];
     for (final run in ssrFacts.textRuns) {
       if (_ignored(run, policy)) continue;
       final words = _tokens(run);
       if (words.isEmpty) continue;
+      if (_claimSequence(appSequence, words, claimed)) {
+        continue;
+      }
+      // The passage exists, but only in a range already used by an earlier
+      // SSR passage. One app occurrence cannot account for two copies sent
+      // to crawlers; that is a real multiplicity mismatch, not reordering.
       if (_containsSequence(appSequence, words)) {
+        missing.add(run);
         continue;
       }
       // Graded: words absent means the content is gone — the cloaking
@@ -216,6 +229,27 @@ bool _containsSequence(List<String> words, List<String> passage) {
   return false;
 }
 
+bool _claimSequence(
+  List<String> words,
+  List<String> passage,
+  List<bool> claimed,
+) {
+  if (passage.isEmpty) return true;
+  if (passage.length > words.length) return false;
+  outer:
+  for (var start = 0; start <= words.length - passage.length; start++) {
+    for (var offset = 0; offset < passage.length; offset++) {
+      final index = start + offset;
+      if (claimed[index] || words[index] != passage[offset]) continue outer;
+    }
+    for (var offset = 0; offset < passage.length; offset++) {
+      claimed[start + offset] = true;
+    }
+    return true;
+  }
+  return false;
+}
+
 /// Characters that carry no meaning for this comparison.
 ///
 /// Punctuation is the difference between a copywriter adding an
@@ -241,8 +275,13 @@ String _normalize(String text) => text
 
 bool _same(String a, String b) => _normalize(a) == _normalize(b);
 
-bool _ignored(String text, SeoParityPolicy policy) =>
-    policy.ignoreText.any((i) => _normalize(text).contains(_normalize(i)));
+bool _ignored(String text, SeoParityPolicy policy) {
+  final normalized = _normalize(text);
+  return policy.ignoreText.any((ignored) {
+    final needle = _normalize(ignored);
+    return needle.isNotEmpty && normalized.contains(needle);
+  });
+}
 
 String _clip(String text) =>
     text.length <= 60 ? text : '${text.substring(0, 57)}…';

@@ -201,7 +201,6 @@ const Set<String> _safeReferrerPolicies = {
   'same-origin',
   'origin',
   'strict-origin',
-  'no-referrer-when-downgrade',
   'origin-when-cross-origin',
   'strict-origin-when-cross-origin',
 };
