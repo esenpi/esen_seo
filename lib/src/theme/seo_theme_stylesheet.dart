@@ -43,9 +43,11 @@ import '../renderer/seo_theme_css.dart';
 /// visitors with a light OS preference get a light shell and a visible
 /// palette flip when Flutter takes over.
 ///
-/// [scriptCategory] feeds Material's typography geometry — pass
-/// [ScriptCategory.dense] or [ScriptCategory.tall] for CJK/Thai apps,
-/// or the shell's metrics will quietly be the English ones.
+/// [scriptCategory] feeds Material's typography geometry. Under
+/// Material 3 the three categories differ only in text baseline (which
+/// has no CSS equivalent), so the generated sizes are identical — the
+/// parameter matters only for Material 2 typography, where the
+/// per-category scales genuinely differ.
 String seoStylesheetFromTheme(
   ThemeData theme, {
   ThemeData? darkTheme,
@@ -170,15 +172,33 @@ SeoThemeTokens _tokensFrom(ThemeData raw, ScriptCategory script) {
   // so without the chain the shell would silently render in the
   // browser's default serif. Names are validated (and Apple's
   // dot-prefixed platform names dropped) by the pure generator.
-  final bodyStyle = text.bodyLarge ?? text.bodyMedium;
-  properties['--esen-font-sans'] = [
-    if (bodyStyle?.fontFamily != null) bodyStyle!.fontFamily!,
-    ...?bodyStyle?.fontFamilyFallback,
+  //
+  // The leading family is skipped when it is already in the static
+  // chain. That keeps the output platform-independent: an app with no
+  // `fontFamily` inherits the platform default — Roboto on
+  // Android/Linux, '.SF…' on Apple — and generating the committed
+  // g.dart on a dev Mac must produce the same bytes as CI on Linux, or
+  // the drift guard fires on the toolchain instead of the theme.
+  // Roboto is in the chain (skipped), '.SF…' is dropped downstream, so
+  // both default to `system-ui,…` — identical everywhere. A real
+  // custom font is not in the chain and leads as intended; the skip
+  // also removes the plain duplicate when someone sets fontFamily:
+  // 'Roboto' explicitly.
+  const staticChain = [
     'system-ui',
     '-apple-system',
     'Segoe UI',
     'Roboto',
     'sans-serif',
+  ];
+  bool inChain(String f) =>
+      staticChain.any((s) => s.toLowerCase() == f.toLowerCase());
+  final bodyStyle = text.bodyLarge ?? text.bodyMedium;
+  final family = bodyStyle?.fontFamily;
+  properties['--esen-font-sans'] = [
+    if (family != null && !inChain(family)) family,
+    ...?bodyStyle?.fontFamilyFallback,
+    ...staticChain,
   ].join(',');
   // ThemeData has no monospace slot; the token exists so developer CSS
   // can override it in one place.

@@ -106,5 +106,18 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('a Dart reserved word is refused — it would not compile', () {
+      // 'class' matches the identifier shape but `const String class ='
+      // is a syntax error in the file that imports the g.dart.
+      for (final word in ['class', 'const', 'void']) {
+        expect(
+          () => checkOrUpdateSeoThemeCss('a{b:c}',
+              path: path, variable: word, update: true),
+          throwsArgumentError,
+          reason: word,
+        );
+      }
+    });
   });
 }
