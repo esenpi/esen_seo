@@ -43,7 +43,10 @@ The theme bridge: the visible shell in your app's design.
   weight (Material 3 headings are regular, not bold), `h4`–`h6` are
   styled for the first time, and paragraphs default to `bodyLarge`
   (16 px) rather than Flutter's 14 px `bodyMedium` — `bodyRole:` gives
-  1:1 parity. Elevation, shapes and ink effects are not mirrored.
+  1:1 parity. The chosen body role is applied completely: size,
+  weight, line height, letter spacing and the font family all come
+  from the same role. Elevation, shapes and ink effects are not
+  mirrored.
 * The layout skeleton is now a single shared source
   (`seo_theme_css.dart`) used by both `seoDefaultStylesheet` and the
   bridge — a grid fix in one stylesheet cannot quietly miss the other.
@@ -53,6 +56,24 @@ The theme bridge: the visible shell in your app's design.
   (default / themed / custom / none) — the guard watches the generated
   file, this line watches the last link of the chain: a stylesheet
   that is generated, committed and then never passed.
+
+### The mirror follows SPA navigation
+
+* After a `Navigator.push`, the mirror kept serving the **previous**
+  page: the refresh fired during the route transition, while the
+  outgoing route was still onstage, and nothing fired again when the
+  transition settled. URL, title and canonical said `/demo`; the
+  semantic body still said the home page — stale content with every
+  signal claiming otherwise. Every `.seo()` marker now listens to its
+  own route's animation and refreshes the mirror once the transition
+  settles.
+* Underneath sat an older gap: the Navigator never puts inactive
+  routes in `Offstage` — the Overlay keeps them mounted, skips them in
+  paint and disables their tickers. The walk skipped only `Offstage`,
+  so **previous pages leaked into the mirror alongside the current
+  one**. `TickerMode(enabled: false)` — the framework's own "kept but
+  not shown" signal, which `Offstage` itself is built on — is skipped
+  the same way now.
 
 ### Breaking
 
