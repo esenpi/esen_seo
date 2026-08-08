@@ -678,9 +678,66 @@ Column(children: [...]).seo(SeoContainerTag.section, {'class': 'card'});
 The CSS is inlined into the `<head>` of every prerendered file — an
 external stylesheet would cost a round trip and give away exactly the
 head start the shell is for. `seoDefaultStylesheet` is a ~1 KB
-classless baseline scoped to the container; pass your own CSS to match
-your app's look. Give it an opaque `background` — otherwise Flutter's
-still-empty surface shows through while it boots.
+classless baseline scoped to the container. Give any custom CSS an
+opaque `background` — otherwise Flutter's still-empty surface shows
+through while it boots.
+
+### The theme bridge — the shell in your app's design
+
+Hand-written shell CSS drifts: you change the app theme, the CSS keeps
+last month's colors. The theme bridge generates the stylesheet **from
+your `ThemeData`** instead — colors, the Material type scale, weights
+and the font family — and guards it against drift in the CI you
+already have:
+
+```dart
+// lib/theme.dart — the ONE theme source, used by the app AND the test
+ThemeData buildLightTheme() => ThemeData(colorSchemeSeed: Colors.teal);
+ThemeData buildDarkTheme() =>
+    ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark);
+
+// test/seo_theme_css_test.dart — verifies on every run, regenerates on
+// --dart-define=esenSeoUpdate=true
+test('the shell stylesheet matches the app theme', () {
+  checkOrUpdateSeoThemeCss(   // from package:esen_seo/testing.dart
+    seoStylesheetFromTheme(buildLightTheme(), darkTheme: buildDarkTheme()),
+  );
+});
+
+// bin/prerender.dart — pure Dart, imports the generated constant
+prerenderSite(routes: seoRoutes, siteBase: siteBase,
+    renderMode: SeoRenderMode.visibleShell, stylesheet: seoThemeCss);
+```
+
+The generated `lib/seo_theme.g.dart` is a plain committed constant —
+the same shared-file pattern as your route table, and the reason this
+works at all: `ThemeData` needs Flutter, `prerenderSite` runs without
+it, and a string is the one thing both sides can hold. Change the theme
+without regenerating and the guard test fails with the exact command to
+run. The result **replaces** `seoDefaultStylesheet` — pass one or the
+other, never both.
+
+Your dark theme rides along as a `prefers-color-scheme` block (only
+the tokens that differ). An app that forces `themeMode` passes
+`mode: SeoThemeMode.dark` (or `.light`) — that flag lives on
+`MaterialApp`, not on `ThemeData`, so the bridge cannot read it.
+Every value is validated against an allow list before it becomes CSS;
+what fails validation is dropped and the shell degrades to the default
+look rather than breaking.
+
+Deliberate deviations, so nothing surprises you: headings follow your
+Material scale, which means `h2`/`h3` render a step larger than the
+default stylesheet and keep the theme's weight — Material 3 headings
+are regular, not bold. `h4`–`h6` get rules for the first time.
+Paragraphs read as `bodyLarge` (16 px, the browser baseline) rather
+than Flutter's 14 px default text; pass `bodyRole:
+SeoBodyRole.bodyMedium` for 1:1 parity. Your bundled font is named
+first in a system-font fallback chain, but the browser has not loaded
+its file — if you want the real face during boot, add your own
+`@font-face` pointing at the font asset the web build ships anyway
+(`assets/fonts/…`), with `font-display: swap`, and append it to the
+generated CSS. What the bridge does **not** mirror: elevation, shapes,
+ink effects — the shell is a document, not a widget tree.
 
 **Honest limits:** this is a handoff, not React-style hydration —
 Flutter renders to canvas, so it can never adopt the DOM. The shell

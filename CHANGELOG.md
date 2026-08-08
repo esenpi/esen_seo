@@ -1,3 +1,61 @@
+## 0.9.0
+
+The theme bridge: the visible shell in your app's design.
+
+### `seoStylesheetFromTheme`
+
+* Generates the shell stylesheet **from your `ThemeData`** — the full
+  Material 3 color roles as CSS custom properties (`--esen-color-*`),
+  the type scale (`--esen-type-*`), and the font family with a
+  system-font fallback chain. The heading chain follows the Material
+  scale (`h1` ← `headlineLarge`, which lands at exactly the default
+  stylesheet's 2 rem); the dark theme rides along as a
+  `prefers-color-scheme` block carrying only the tokens that differ.
+* `ThemeData` exists only where Flutter runs; `prerenderSite` runs
+  without Flutter. The bridge crosses that gap the same way the route
+  table does: `checkOrUpdateSeoThemeCss` (in
+  `package:esen_seo/testing.dart`) writes a committed
+  `lib/seo_theme.g.dart` with one `const String` — app and prerender
+  script import it, and every ordinary `flutter test` run verifies it
+  against the live theme. Theme changed without regenerating? The
+  build goes red with the exact command to run. Regeneration is only
+  ever explicit (`--dart-define=esenSeoUpdate=true`) — deliberately no
+  environment-variable switch, which an ambient CI variable could
+  flip into silent write-mode.
+* Every token value passes an allow list before it becomes CSS —
+  colors must be hex, sizes `rem`, font family names
+  `[A-Za-z][A-Za-z0-9 -]*` (which drops Apple's dot-prefixed platform
+  names and every CSS breakout payload with the same rule). What fails
+  validation is dropped; the element rules carry fallbacks, so the
+  shell degrades to the default look instead of breaking. The shell
+  background is forced opaque — a translucent one would let Flutter's
+  empty boot surface shine through.
+* Material 2 themes (`useMaterial3: false`) mirror what M2 widgets
+  actually paint: the divider comes from `dividerColor`, surfaces from
+  `cardColor` — the scheme's M3 fallbacks would be quasi-black lines
+  and flat surfaces the app never shows.
+* Documented deviations: `h2`/`h3` render a step larger than the
+  default stylesheet (Material scale), headings keep the theme's
+  weight (Material 3 headings are regular, not bold), `h4`–`h6` are
+  styled for the first time, and paragraphs default to `bodyLarge`
+  (16 px) rather than Flutter's 14 px `bodyMedium` — `bodyRole:` gives
+  1:1 parity. Elevation, shapes and ink effects are not mirrored.
+* The layout skeleton is now a single shared source
+  (`seo_theme_css.dart`) used by both `seoDefaultStylesheet` and the
+  bridge — a grid fix in one stylesheet cannot quietly miss the other.
+  As part of the unification the default stylesheet spaces `h4`–`h6`
+  like the other headings.
+* `prerenderSite` prints one line naming the stylesheet it embeds
+  (default / themed / custom / none) — the guard watches the generated
+  file, this line watches the last link of the chain: a stylesheet
+  that is generated, committed and then never passed.
+
+### Breaking
+
+* **Flutter minimum is now `>=3.27.0`** (was `>=3.22.0`). The color
+  conversion uses the float channel accessors introduced in 3.27 —
+  `.value` is deprecated there, and `toARGB32()` does not exist yet.
+
 ## 0.8.0
 
 An SEO audit — the package can now tell you whether your site is
