@@ -35,6 +35,14 @@ enum SeoMode {
 /// Calling [init] is optional — the pipeline starts automatically as soon
 /// as the first `.seo()` widget is mounted. Use [init] to pick a [SeoMode]
 /// or to cover apps that rely purely on smart defaults.
+///
+/// **Navigation needs a hook.** [init] mirrors the first page; nothing
+/// in Flutter tells the package that a `Navigator.push` happened later.
+/// Register a `SeoRouteObserver` on your navigator — it refreshes the
+/// mirror (and applies the route's meta) on every navigation. Widgets
+/// tagged with `.seo()` also trigger the refresh themselves, but a page
+/// built purely from smart defaults has no markers: without the
+/// observer its mirror keeps serving the previous page after a push.
 class EsenSeo {
   const EsenSeo._();
 
@@ -285,6 +293,10 @@ class SeoController {
     // heuristic silently emptied the mirror for such content.
     if (widget is Offstage && widget.offstage) return const [];
     if (widget is Visibility && !widget.visible) return const [];
+    // Its sliver twin hides the same way (maintainSize keeps the child
+    // onstage behind SliverOpacity 0) and was missed the first time —
+    // the box widget alone is not the class.
+    if (widget is SliverVisibility && !widget.visible) return const [];
 
     if (widget is SeoWidget) {
       final attributes = state.resolveAttributes(widget.attributes);

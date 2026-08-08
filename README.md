@@ -108,6 +108,24 @@ Column(
 ).section
 ```
 
+For a multi-page app, register the route observer — **it is what keeps
+the mirror and the meta tags following navigation**. Without it, a page
+built purely from smart defaults keeps serving the previous page's
+mirror (and title, and canonical) after a `Navigator.push`:
+
+```dart
+MaterialApp(
+  navigatorObservers: [
+    SeoRouteObserver(routes: seoRoutes, canonicalBase: siteBase),
+  ],
+  // go_router: pass it to GoRouter(observers: [...]) instead.
+);
+```
+
+(Widgets tagged with `.seo()` also refresh the mirror on navigation by
+themselves — but the observer is the supported setup and the only one
+that updates title and canonical too.)
+
 On web, the semantic mirror is injected as `#esen-seo-content` next to
 the Flutter canvas (invisible, `aria-hidden`, zero size); on mobile and
 desktop every `.seo()` call is a no-op that returns the original widget.

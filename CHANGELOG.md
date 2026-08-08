@@ -67,7 +67,12 @@ The theme bridge: the visible shell in your app's design.
   refresh window at both route-level (`SeoRouteObserver`, which also
   covers apps running purely on smart defaults with no `.seo()`
   markers at all) and marker-level (every `SeoWidget` listens to its
-  own route's animation). The window refreshes across the next few
+  own route's animation). Stated plainly, in the quick start and on
+  `EsenSeo.init`/`SeoRouteObserver` both: **the observer is the
+  navigation hook**. Nothing in Flutter tells the package about a
+  push, so a pure smart-defaults app without the observer keeps
+  serving the previous page's mirror — exactly as its title and
+  canonical already behaved. That contract is pinned by a test. The window refreshes across the next few
   frames rather than betting on one — the Navigator applies the
   visibility flip in an Overlay rebuild whose exact frame is an
   implementation detail, `ModalRoute.animation` is a proxy that fires
@@ -86,7 +91,9 @@ The theme bridge: the visible shell in your app's design.
   traversal, pinned by a regression test.
 * `Visibility(visible: false, maintainSize: true)` hides its child
   behind `Opacity(0)` — invisible but onstage, so no traversal can
-  know. The widget itself is checked now. And explicitly NOT checked:
+  know. The widget itself is checked now, and so is its sliver twin
+  `SliverVisibility` — the box widget alone was not the class. And
+  explicitly NOT checked:
   `TickerMode(enabled: false)` — Flutter defines it as "pause the
   tickers", nothing more; perfectly visible content sits inside it,
   and an intermediate version of this fix that treated it as an

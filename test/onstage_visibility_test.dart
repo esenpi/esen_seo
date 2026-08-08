@@ -69,6 +69,28 @@ void main() {
     expect(html, isNot(contains('Versteckt hinter Opacity null')));
   });
 
+  testWidgets(
+      'SliverVisibility(visible: false, maintainSize: true) is hidden — '
+      'the box widget alone was not the class', (tester) async {
+    final html = await mirror(
+      tester,
+      CustomScrollView(slivers: [
+        SliverToBoxAdapter(child: Text('Sichtbares Sliver').h1),
+        SliverVisibility(
+          visible: false,
+          maintainState: true,
+          maintainAnimation: true,
+          maintainSize: true,
+          sliver: SliverToBoxAdapter(
+            child: Text('Verstecktes gepflegtes Sliver').p,
+          ),
+        ),
+      ]),
+    );
+    expect(html, contains('Sichtbares Sliver'));
+    expect(html, isNot(contains('Verstecktes gepflegtes Sliver')));
+  });
+
   testWidgets('Offstage stays hidden', (tester) async {
     final html = await mirror(
       tester,
