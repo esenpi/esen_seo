@@ -42,6 +42,40 @@ import 'dart:io';
 
 final RegExp _dartIdentifier = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$');
 
+/// Reserved words that match the identifier shape but cannot be a
+/// top-level variable name — writing `const String class = …` produces
+/// a file that will not compile. Not exhaustive by grammar, just the
+/// ones a caller might plausibly reach for.
+const Set<String> _dartReservedWords = {
+  'class',
+  'const',
+  'var',
+  'void',
+  'final',
+  'new',
+  'true',
+  'false',
+  'null',
+  'enum',
+  'extends',
+  'super',
+  'this',
+  'return',
+  'if',
+  'else',
+  'for',
+  'while',
+  'switch',
+  'default',
+  'is',
+  'as',
+  'in',
+  'do',
+  'try',
+  'catch',
+  'throw',
+};
+
 /// Verifies that [css] matches the committed generated file — or, in
 /// update mode (`--dart-define=esenSeoUpdate=true`), (re)writes it.
 ///
@@ -60,7 +94,8 @@ void checkOrUpdateSeoThemeCss(
   // The variable name is interpolated into generated Dart source —
   // the same rule as every other value this package writes somewhere:
   // validate, don't hope.
-  if (!_dartIdentifier.hasMatch(variable)) {
+  if (!_dartIdentifier.hasMatch(variable) ||
+      _dartReservedWords.contains(variable)) {
     throw ArgumentError.value(
         variable, 'variable', 'must be a valid Dart identifier');
   }

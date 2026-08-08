@@ -141,6 +141,58 @@ void main() {
       expect(css, isNot(contains('@media')));
       expect(css, contains('color-scheme:light;'));
     });
+
+    test(
+        'a darkTheme built without Brightness.dark is a light palette — '
+        'the media block must not claim color-scheme:dark over it', () {
+      // The common Flutter slip: colorSchemeSeed without brightness, so
+      // theme.brightness is light. Keying the block on !light.dark used
+      // to emit color-scheme:dark over those light colors.
+      final fakeDark = ThemeData(colorSchemeSeed: Colors.orange);
+      final css = seoStylesheetFromTheme(light, darkTheme: fakeDark);
+      expect(fakeDark.brightness, Brightness.light);
+      if (css.contains('@media (prefers-color-scheme:dark)')) {
+        final block = css.split('@media (prefers-color-scheme:dark)').last;
+        expect(block, isNot(contains('color-scheme:dark')));
+      }
+    });
+
+    test('two identical light palettes produce no bare color-scheme flip', () {
+      final css = seoStylesheetFromTheme(light, darkTheme: light);
+      // No differing tokens and no brightness change: nothing to say
+      // under prefers-dark, so no lone `color-scheme:dark` over light.
+      if (css.contains('@media')) {
+        final block = css.split('@media (prefers-color-scheme:dark)').last;
+        expect(block, isNot(contains('color-scheme:dark')));
+      }
+    });
+  });
+
+  group('platform-independent output — the guard runs on both dev and CI', () {
+    test('an app with no fontFamily generates the same chain everywhere', () {
+      // The platform default (Roboto on Linux, .SF… on Apple) must not
+      // leak into the committed file, or the drift guard fires on the
+      // toolchain. Roboto is in the static chain (skipped), .SF… is
+      // dropped — both collapse to a system-ui-leading chain.
+      final css = seoStylesheetFromTheme(ThemeData());
+      expect(css, contains('--esen-font-sans:system-ui,'));
+      // Roboto appears at most once — the skip also dedupes it.
+      final chain =
+          RegExp('--esen-font-sans:([^;]*)').firstMatch(css)!.group(1)!;
+      expect('Roboto'.allMatches(chain).length, lessThanOrEqualTo(1));
+    });
+
+    test('a real custom font still leads the chain', () {
+      final css = seoStylesheetFromTheme(ThemeData(fontFamily: 'Inter'));
+      expect(css, contains('--esen-font-sans:Inter,system-ui,'));
+    });
+
+    test('setting fontFamily to a chain member does not duplicate it', () {
+      final css = seoStylesheetFromTheme(ThemeData(fontFamily: 'Roboto'));
+      final chain =
+          RegExp('--esen-font-sans:([^;]*)').firstMatch(css)!.group(1)!;
+      expect('Roboto'.allMatches(chain).length, 1);
+    });
   });
 
   group('the choke point — hostile token values', () {
@@ -199,8 +251,10 @@ void main() {
 
     test('every rule is scoped to the container', () {
       // String scan, not a rendering proof: each selector must start
-      // with the container id (or be the media wrapper around one).
-      final rules = RegExp(r'(^|\n|\})([^@{}]+)\{').allMatches(css);
+      // with the container id. The media block opens with `{` before
+      // its inner selector, so `{` is an anchor too — otherwise a
+      // future unscoped rule inside @media would slip past this check.
+      final rules = RegExp(r'(^|[\n}{])([^@{}]+)\{').allMatches(css);
       for (final rule in rules) {
         final selector = rule.group(2)!.trim();
         if (selector.isEmpty) continue;

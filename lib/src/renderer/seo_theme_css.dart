@@ -272,10 +272,20 @@ String seoThemeCss({
     darkTokens.forEach((name, value) {
       if (baseTokens[name] != value) diff[name] = value;
     });
-    if (diff.isNotEmpty || !light.dark) {
+    // The block earns its place when the two palettes actually differ —
+    // either in a token value or in brightness. Keying this on
+    // `!light.dark` instead let a `darkTheme` built without
+    // `Brightness.dark` (a common Flutter slip, so its palette is
+    // really light) emit `color-scheme:dark` over light colors, and
+    // made a light-vs-identical-light pair produce a bare
+    // `color-scheme:dark` flip. And color-scheme follows the dark
+    // palette's own brightness, not a hardcoded `dark` — the base
+    // block already derives it that way.
+    final flips = dark.dark != base.dark;
+    if (diff.isNotEmpty || flips) {
       buffer.write('@media (prefers-color-scheme:dark){#$seoContainerId{');
       diff.forEach((name, value) => buffer.write('$name:$value;'));
-      buffer.write('color-scheme:dark}}\n');
+      buffer.write('color-scheme:${dark.dark ? 'dark' : 'light'}}}\n');
     }
   }
 
