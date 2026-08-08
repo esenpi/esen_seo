@@ -45,6 +45,33 @@ void main() {
     );
   });
 
+  testWidgets(
+      'smart-defaults pages without any .seo() marker follow '
+      'navigation too, via the route observer', (tester) async {
+    // The route-animation listener lives in SeoWidget — an app running
+    // purely on smart defaults has no markers and therefore no
+    // listener. The observer is the route-level hook such an app
+    // already registers; it must refresh the mirror as well.
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+      navigatorKey: navigator,
+      navigatorObservers: [SeoRouteObserver(routes: const [])],
+      routes: {
+        '/': (_) => const Scaffold(body: Text('Plain start page')),
+        '/demo': (_) => const Scaffold(body: Text('Plain demo page')),
+      },
+    ));
+    await tester.pumpAndSettle();
+    EsenSeo.refresh();
+    expect(EsenSeo.currentHtml, contains('Plain start page'));
+
+    navigator.currentState!.pushNamed('/demo');
+    await tester.pumpAndSettle();
+
+    expect(EsenSeo.currentHtml, contains('Plain demo page'));
+    expect(EsenSeo.currentHtml, isNot(contains('Plain start page')));
+  });
+
   testWidgets('after pop the mirror returns to the previous page',
       (tester) async {
     final navigator = GlobalKey<NavigatorState>();

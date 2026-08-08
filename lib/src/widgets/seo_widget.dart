@@ -92,18 +92,15 @@ class _SeoWidgetState extends State<SeoWidget> {
   }
 
   void _onRouteAnimationStatus(AnimationStatus status) {
+    // Every settle notification re-arms the refresh window — including
+    // the spurious `completed` the route's animation proxy fires during
+    // the Navigator's offstage warm-up. Idempotent by design, and this
+    // listener's lifetime is managed by didChangeDependencies/dispose,
+    // never by self-removal (a self-removing listener went deaf on the
+    // spurious event once already).
     if (status == AnimationStatus.completed ||
         status == AnimationStatus.dismissed) {
-      // Not markDirty directly: the Navigator applies the Offstage flip
-      // to the outgoing route in the Overlay rebuild one frame AFTER
-      // the animation settles. A refresh at the end of THIS frame still
-      // sees both routes onstage and mirrors both pages. Hop one frame
-      // — the callback registered during this frame's post-frame phase
-      // runs at the end of the next one, after the Overlay has rebuilt.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        SeoController.instance.markDirty();
-      });
-      WidgetsBinding.instance.scheduleFrame();
+      SeoController.instance.refreshAfterNavigation();
     }
   }
 

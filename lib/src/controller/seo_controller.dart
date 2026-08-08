@@ -93,6 +93,8 @@ class SeoController {
   SeoMeta? _meta;
   bool _regenerationScheduled = false;
   bool _hasInjected = false;
+  int _postNavigationRefreshes = 0;
+  bool _postNavigationScheduled = false;
 
   /// The most recently generated HTML fragment.
   String get lastHtml => _lastHtml;
@@ -131,6 +133,8 @@ class SeoController {
     _meta = null;
     _regenerationScheduled = false;
     _hasInjected = false;
+    _postNavigationRefreshes = 0;
+    _postNavigationScheduled = false;
   }
 
   /// Schedules a regeneration for the end of the current frame.
@@ -144,6 +148,54 @@ class SeoController {
       _regenerationScheduled = false;
       refresh();
     });
+    // A post-frame callback only fires if a frame actually comes.
+    // Every original caller ran during build (a mounting SeoWidget), so
+    // one always did — but the navigation listeners call this AFTER the
+    // transition's last frame, when nothing else is scheduled, and the
+    // refresh silently never happened. Idempotent when a frame is
+    // already pending.
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  /// Refreshes once the Navigator has finished applying a route
+  /// transition — the shared path for every navigation listener
+  /// (SeoWidget's route-animation hook and SeoRouteObserver).
+  ///
+  /// Not [markDirty], for two load-bearing reasons. First, the timing:
+  /// the Navigator flips the outgoing route's visibility in an Overlay
+  /// rebuild some frames after the notification — measured at settle+1
+  /// in tests, but the exact choreography is an implementation detail
+  /// that three hand-counted attempts got wrong in review. Second, the
+  /// coalescing: [markDirty] collapses into an already-pending
+  /// regeneration, and that pending one may run BEFORE the flip,
+  /// swallowing the refresh entirely (observed, not theorized). So no
+  /// frame counting: refresh directly — past the coalescing — on each
+  /// of the next few frames. The unchanged-HTML dedup in [refresh]
+  /// makes every extra walk write-free, and the walks themselves are
+  /// cheap and bounded.
+  void refreshAfterNavigation() {
+    if (!enabled) return;
+    // (Re-)arm the window. A settle listener re-arming an already
+    // running window extends it past the transition's end.
+    _postNavigationRefreshes = 4;
+    if (_postNavigationScheduled) return;
+    _postNavigationScheduled = true;
+    _schedulePostNavigationRefresh();
+  }
+
+  void _schedulePostNavigationRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      refresh();
+      _postNavigationRefreshes--;
+      if (_postNavigationRefreshes > 0) {
+        _schedulePostNavigationRefresh();
+      } else {
+        _postNavigationScheduled = false;
+      }
+    });
+    // Post-frame callbacks only fire if a frame comes; after a settled
+    // transition nothing else schedules one.
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   /// Walks the element tree, renders the HTML and injects it into the DOM.
@@ -182,9 +234,34 @@ class SeoController {
     required bool inLink,
   }) {
     final nodes = <SeoNode>[];
-    element.visitChildren((child) {
+    void visit(Element child) {
       nodes.addAll(_visit(child, state, inLink: inLink));
-    });
+    }
+
+    // Descend the way the framework itself defines "onstage".
+    // `visitChildren` sees every mounted child — including overlay
+    // entries the Navigator keeps below the current route and inactive
+    // IndexedStack children, none of which are marked with any public
+    // widget. Their elements know: `debugVisitOnstageChildren` is
+    // overridden exactly there (Offstage, the Overlay's theatre,
+    // IndexedStack, SliverOffstage) and falls back to `visitChildren`
+    // everywhere else. The debug prefix means "meant for tooling", not
+    // "debug-mode only" — the overrides are plain logic with no
+    // debug-only state, and the widget-inspector relies on them the
+    // same way.
+    //
+    // The one place the onstage definition is WRONG for a crawler
+    // mirror is scrolling: viewports and lazy lists filter by visual
+    // visibility, and content that is merely scrolled out of view is
+    // still page content. Those keep the full traversal.
+    final widget = element.widget;
+    if (widget is Viewport ||
+        widget is ShrinkWrappingViewport ||
+        widget is SliverMultiBoxAdaptorWidget) {
+      element.visitChildren(visit);
+    } else {
+      element.debugVisitOnstageChildren(visit);
+    }
     return nodes;
   }
 
@@ -196,17 +273,18 @@ class SeoController {
     final widget = element.widget;
 
     // Widgets that are kept in the tree but not shown must not leak
-    // into the page's HTML. Offstage is the explicit form — but the
-    // Navigator does NOT use it for inactive routes: the Overlay keeps
-    // them mounted, merely skips them in paint and disables their
-    // tickers via TickerMode. Skipping only Offstage therefore mirrored
-    // the previous page alongside the current one after every push —
-    // stale content under a URL, title and canonical that all said
-    // otherwise. TickerMode(enabled: false) is the framework's own
-    // "kept but not shown" signal (Offstage itself is built on it), so
-    // it is skipped the same way.
+    // into the page's HTML. Most of that is handled structurally by the
+    // onstage traversal in [_childrenOf]; two cases need the widget
+    // itself. Visibility(visible: false, maintainSize: true) hides its
+    // child behind Opacity(0) — the child stays onstage, laid out and
+    // invisible, so no traversal can know. And NOT on this list:
+    // TickerMode. An earlier fix skipped TickerMode(enabled: false) as
+    // an offstage signal — but Flutter defines it as "pause the
+    // tickers", nothing more, and perfectly visible content sits
+    // inside it (an app pausing animations to save battery). That
+    // heuristic silently emptied the mirror for such content.
     if (widget is Offstage && widget.offstage) return const [];
-    if (widget is TickerMode && !widget.enabled) return const [];
+    if (widget is Visibility && !widget.visible) return const [];
 
     if (widget is SeoWidget) {
       final attributes = state.resolveAttributes(widget.attributes);
