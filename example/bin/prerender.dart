@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:esen_seo/server.dart';
 import 'package:example/seo_routes.dart';
+import 'package:example/seo_theme.g.dart';
 
 Future<void> main(List<String> args) async {
   final visible = args.contains('--visible');
@@ -21,7 +22,10 @@ Future<void> main(List<String> args) async {
     routes: seoRoutes,
     siteBase: siteBase,
     renderMode: visible ? SeoRenderMode.visibleShell : SeoRenderMode.seoOnly,
-    stylesheet: visible ? seoDefaultStylesheet : null,
+    // Das generierte Theme-CSS aus lib/seo_theme.g.dart — bewacht vom
+    // Test in test/seo_theme_css_test.dart. seoDefaultStylesheet bleibt
+    // der Fallback für Apps ohne Theme-Brücke.
+    stylesheet: visible ? seoThemeCss : null,
   );
   stdout.writeln('Prerendered ${files.length} files:');
   for (final file in files) {

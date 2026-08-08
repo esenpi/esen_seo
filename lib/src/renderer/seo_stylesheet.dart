@@ -6,6 +6,7 @@
 library;
 
 import 'seo_container.dart';
+import 'seo_theme_css.dart';
 
 /// Marks the shell stylesheet as managed by esen_seo.
 ///
@@ -38,27 +39,28 @@ String escapeStylesheet(String css) => css.replaceAll(_styleClose, r'\3c ');
 ///
 /// Scoped to the shell container, so it can never interfere with the
 /// rest of the document. Deliberately opinion-free: system fonts, a
-/// readable measure, sane spacing. Pass your own CSS instead (or in
-/// addition) to make the shell match your app — and give it an opaque
-/// `background`, otherwise Flutter's still-empty surface shows through
-/// while it boots.
+/// readable measure, sane spacing. To make the shell match your app,
+/// generate a themed replacement with `seoStylesheetFromTheme` (or
+/// pass your own CSS) — and give it an opaque `background`, otherwise
+/// Flutter's still-empty surface shows through while it boots.
+///
+/// The layout skeleton is shared with the theme bridge
+/// (`seo_theme_css.dart`): one source for the geometry, so a grid fix
+/// in one stylesheet cannot quietly miss the other. Look — colors and
+/// the type scale — stays separate by design: this file is the
+/// opinion-free web scale (2/1.5/1.25 rem), the bridge mirrors the
+/// app's Material scale.
 ///
 /// The grid gives every block a centred, readable measure without
 /// fighting the element margins below over specificity.
 const String seoDefaultStylesheet = '''
-#$seoContainerId{display:grid;grid-template-columns:1fr min(44rem,100%) 1fr;align-content:start;background:#fff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6;padding:2rem 1.25rem}
-#$seoContainerId>*{grid-column:2}
-#$seoContainerId *{box-sizing:border-box}
-#$seoContainerId h1,#$seoContainerId h2,#$seoContainerId h3{line-height:1.25;margin:2rem 0 .75rem}
-#$seoContainerId h1{font-size:2rem;margin-top:0}
+#$seoContainerId{$seoLayoutDeclarations;background:#fff;color:#1a1a1a;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6}
+$seoLayoutChildRules$seoLayoutSpacingRules#$seoContainerId h1,#$seoContainerId h2,#$seoContainerId h3{line-height:1.25}
+#$seoContainerId h1{font-size:2rem}
 #$seoContainerId h2{font-size:1.5rem}
 #$seoContainerId h3{font-size:1.25rem}
-#$seoContainerId p,#$seoContainerId ul,#$seoContainerId ol{margin:0 0 1rem}
-#$seoContainerId ul,#$seoContainerId ol{padding-left:1.5rem}
-#$seoContainerId li{margin:.25rem 0}
 #$seoContainerId a{color:#0b57d0;text-decoration:underline}
-#$seoContainerId img{max-width:100%;height:auto}
-#$seoContainerId blockquote{margin:0 0 1rem;padding-left:1rem;border-left:3px solid #d0d0d0;color:#4a4a4a}
+#$seoContainerId blockquote{border-left:3px solid #d0d0d0;color:#4a4a4a}
 #$seoContainerId code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
 @media (prefers-color-scheme:dark){
 #$seoContainerId{background:#111;color:#e8e8e8}
