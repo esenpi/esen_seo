@@ -63,10 +63,48 @@ class SeoWidget extends StatefulWidget {
 }
 
 class _SeoWidgetState extends State<SeoWidget> {
+  ModalRoute<dynamic>? _route;
+
   @override
   void initState() {
     super.initState();
     SeoController.instance.markDirty();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Mount, update and dispose all mark the mirror dirty — but none of
+    // them fires when a route TRANSITION finishes. The refresh after a
+    // push runs during the transition, while the outgoing route is
+    // still onstage; only at the end does the Navigator put it
+    // Offstage, and at that moment no widget mounts, updates or
+    // disposes. The mirror then serves the old page under the new URL
+    // — cloaking by timing. So every marker listens to its own route's
+    // animation and marks dirty once more when it settles; the
+    // controller collapses the flood into one refresh per frame.
+    final route = ModalRoute.of(context);
+    if (route != _route) {
+      _route?.animation?.removeStatusListener(_onRouteAnimationStatus);
+      _route = route;
+      route?.animation?.addStatusListener(_onRouteAnimationStatus);
+    }
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      // Not markDirty directly: the Navigator applies the Offstage flip
+      // to the outgoing route in the Overlay rebuild one frame AFTER
+      // the animation settles. A refresh at the end of THIS frame still
+      // sees both routes onstage and mirrors both pages. Hop one frame
+      // — the callback registered during this frame's post-frame phase
+      // runs at the end of the next one, after the Overlay has rebuilt.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SeoController.instance.markDirty();
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    }
   }
 
   @override
@@ -77,6 +115,7 @@ class _SeoWidgetState extends State<SeoWidget> {
 
   @override
   void dispose() {
+    _route?.animation?.removeStatusListener(_onRouteAnimationStatus);
     SeoController.instance.markDirty();
     super.dispose();
   }

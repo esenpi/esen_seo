@@ -195,9 +195,18 @@ class SeoController {
   }) {
     final widget = element.widget;
 
-    // Widgets that are kept in the tree but not shown (e.g. inactive
-    // navigator routes) must not leak into the page's HTML.
+    // Widgets that are kept in the tree but not shown must not leak
+    // into the page's HTML. Offstage is the explicit form — but the
+    // Navigator does NOT use it for inactive routes: the Overlay keeps
+    // them mounted, merely skips them in paint and disables their
+    // tickers via TickerMode. Skipping only Offstage therefore mirrored
+    // the previous page alongside the current one after every push —
+    // stale content under a URL, title and canonical that all said
+    // otherwise. TickerMode(enabled: false) is the framework's own
+    // "kept but not shown" signal (Offstage itself is built on it), so
+    // it is skipped the same way.
     if (widget is Offstage && widget.offstage) return const [];
+    if (widget is TickerMode && !widget.enabled) return const [];
 
     if (widget is SeoWidget) {
       final attributes = state.resolveAttributes(widget.attributes);
