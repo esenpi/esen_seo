@@ -171,14 +171,13 @@ class SeoController {
   ///
   /// Not [markDirty], for two load-bearing reasons. First, the timing:
   /// the Navigator flips the outgoing route's visibility in an Overlay
-  /// rebuild some frames after the notification — measured at settle+1
-  /// in tests, but the exact choreography is an implementation detail
-  /// that three hand-counted attempts got wrong in review. Second, the
-  /// coalescing: [markDirty] collapses into an already-pending
-  /// regeneration, and that pending one may run BEFORE the flip,
-  /// swallowing the refresh entirely (observed, not theorized). So no
-  /// frame counting: refresh directly — past the coalescing — on each
-  /// of the next few frames. The unchanged-HTML dedup in [refresh]
+  /// rebuild some frames after the notification — the exact
+  /// choreography is an implementation detail and easy to get wrong by
+  /// counting frames. Second, the coalescing: [markDirty] collapses
+  /// into an already-pending regeneration, and that pending one may
+  /// run BEFORE the flip, swallowing the refresh entirely. So no frame
+  /// counting: refresh directly — past the coalescing — on each of the
+  /// next few frames. The unchanged-HTML dedup in [refresh]
   /// makes every extra walk write-free, and the walks themselves are
   /// cheap and bounded.
   void refreshAfterNavigation() {
@@ -282,15 +281,15 @@ class SeoController {
 
     // Widgets that are kept in the tree but not shown must not leak
     // into the page's HTML. Most of that is handled structurally by the
-    // onstage traversal in [_childrenOf]; two cases need the widget
+    // onstage traversal in [_childrenOf]; a few cases need the widget
     // itself. Visibility(visible: false, maintainSize: true) hides its
     // child behind Opacity(0) — the child stays onstage, laid out and
-    // invisible, so no traversal can know. And NOT on this list:
-    // TickerMode. An earlier fix skipped TickerMode(enabled: false) as
-    // an offstage signal — but Flutter defines it as "pause the
-    // tickers", nothing more, and perfectly visible content sits
-    // inside it (an app pausing animations to save battery). That
-    // heuristic silently emptied the mirror for such content.
+    // invisible, so no traversal can know. And deliberately NOT on
+    // this list: TickerMode. Flutter defines it as "pause the
+    // tickers", nothing more — perfectly visible content sits inside
+    // it (an app pausing animations to save battery), and skipping it
+    // as an offstage signal would silently empty the mirror for
+    // exactly that content.
     if (widget is Offstage && widget.offstage) return const [];
     if (widget is Visibility && !widget.visible) return const [];
     // Its sliver twin hides the same way (maintainSize keeps the child

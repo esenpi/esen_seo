@@ -735,6 +735,13 @@ without regenerating and the guard test fails with the exact command to
 run. The result **replaces** `seoDefaultStylesheet` — pass one or the
 other, never both.
 
+One assumption to know about: the generated CSS is a function of the
+**Flutter version** (Material color roles and type values shift between
+releases), so dev and CI should run the same pinned Flutter — which
+disciplined teams do anyway. After an SDK upgrade, regenerate; the
+guard's error message tells both toolchains apart from a real theme
+change.
+
 Your dark theme rides along as a `prefers-color-scheme` block (only
 the tokens that differ). An app that forces `themeMode` passes
 `mode: SeoThemeMode.dark` (or `.light`) — that flag lives on

@@ -100,10 +100,10 @@ class SeoThemeTokens {
 // ───────────────────────── value validation ─────────────────────────
 //
 // Allow lists per token kind. What does not match is dropped; the
-// element rules fall back via `var(--x, fallback)`. Escaping free
-// strings instead was rejected in review: a block list of dangerous
-// characters loses the moment one is missed — the project's oldest
-// lesson, applied to the eighth list.
+// element rules fall back via `var(--x, fallback)`. Deliberately not
+// escaping free strings instead: a block list of dangerous characters
+// loses the moment one is missed — the project's oldest lesson,
+// applied to the eighth list.
 
 final RegExp _hexColor = RegExp(r'^#[0-9a-f]{6}([0-9a-f]{2})?$');
 final RegExp _remSize = RegExp(r'^\d+(\.\d+)?rem$');
