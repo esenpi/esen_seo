@@ -204,19 +204,75 @@ class SeoRouteObserver extends NavigatorObserver {
     return path;
   }
 
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _apply(route);
+  /// Refreshes the body mirror once [route]'s transition has settled.
+  ///
+  /// The meta half of navigation is [_apply]; this is the body half.
+  /// SeoWidget carries its own route-animation listener, but an app
+  /// running purely on smart defaults has no markers and therefore no
+  /// listener — after a push its mirror kept serving the previous
+  /// page. The observer is the route-level hook such an app already
+  /// registers, so it triggers the refresh for everyone.
+  ///
+  /// One frame late on purpose: the Navigator applies the visibility
+  /// flip to the outgoing route in the Overlay rebuild AFTER the
+  /// animation completes — a refresh in the settling frame still sees
+  /// both routes onstage.
+  void _refreshMirrorAfterTransition(Route<dynamic>? route) {
+    if (!SeoController.enabled) return;
+    // Refresh right away — the best-effort state during the transition
+    // — AND once the transition settles. The status at the did* moment
+    // says nothing about being settled: at didPush the animation still
+    // reads `dismissed` because it has not STARTED yet, and treating
+    // that as "already done" refreshed exactly once, mid-transition
+    // with both routes onstage, and then never again — the stale
+    // mirror this hook exists to prevent.
+    SeoController.instance.refreshAfterNavigation();
+    // Only TransitionRoute carries an animation — a bare Route (custom
+    // navigation without transitions) is fully covered by the call
+    // above.
+    final animation =
+        route is TransitionRoute<dynamic> ? route.animation : null;
+    if (animation == null) return;
+    // NOT self-removing on the first settle. ModalRoute.animation is a
+    // proxy, and the Navigator swaps its parent to an always-complete
+    // animation during the offstage warm-up of a fresh route — which
+    // fires a spurious `completed` in the very first frame. A listener
+    // that removes itself on that consumed the one event it existed
+    // for and went deaf before the real transition ended. Re-arming
+    // the refresh window is idempotent, so every settle notification —
+    // spurious or real — simply extends it; the listener dies with the
+    // route's animation.
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed ||
+          status == AnimationStatus.dismissed) {
+        SeoController.instance.refreshAfterNavigation();
+      }
+    });
+  }
 
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _apply(previousRoute);
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _refreshMirrorAfterTransition(route);
+    _apply(route);
+  }
 
   @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
-      _apply(newRoute);
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    // The POPPED route is the one animating (out) — its dismissal is
+    // the moment the previous page is alone on stage again.
+    _refreshMirrorAfterTransition(route);
+    _apply(previousRoute);
+  }
 
   @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _apply(previousRoute);
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _refreshMirrorAfterTransition(newRoute);
+    _apply(newRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _refreshMirrorAfterTransition(previousRoute);
+    _apply(previousRoute);
+  }
 }

@@ -57,23 +57,40 @@ The theme bridge: the visible shell in your app's design.
   file, this line watches the last link of the chain: a stylesheet
   that is generated, committed and then never passed.
 
-### The mirror follows SPA navigation
+### The mirror follows SPA navigation, and "not shown" means not shown
 
 * After a `Navigator.push`, the mirror kept serving the **previous**
-  page: the refresh fired during the route transition, while the
-  outgoing route was still onstage, and nothing fired again when the
-  transition settled. URL, title and canonical said `/demo`; the
-  semantic body still said the home page — stale content with every
-  signal claiming otherwise. Every `.seo()` marker now listens to its
-  own route's animation and refreshes the mirror once the transition
-  settles.
+  page: the refresh fired during the route transition, and nothing
+  fired again when it settled. URL, title and canonical said `/demo`;
+  the semantic body still said the home page — stale content with
+  every signal claiming otherwise. Navigation now re-arms a short
+  refresh window at both route-level (`SeoRouteObserver`, which also
+  covers apps running purely on smart defaults with no `.seo()`
+  markers at all) and marker-level (every `SeoWidget` listens to its
+  own route's animation). The window refreshes across the next few
+  frames rather than betting on one — the Navigator applies the
+  visibility flip in an Overlay rebuild whose exact frame is an
+  implementation detail, `ModalRoute.animation` is a proxy that fires
+  a spurious `completed` during the offstage warm-up of a fresh route,
+  and the unchanged-HTML dedup makes the extra walks write-free.
 * Underneath sat an older gap: the Navigator never puts inactive
-  routes in `Offstage` — the Overlay keeps them mounted, skips them in
-  paint and disables their tickers. The walk skipped only `Offstage`,
-  so **previous pages leaked into the mirror alongside the current
-  one**. `TickerMode(enabled: false)` — the framework's own "kept but
-  not shown" signal, which `Offstage` itself is built on — is skipped
-  the same way now.
+  routes in `Offstage` — the Overlay keeps them mounted and merely
+  skips them in paint. The walk skipped only `Offstage`, so **previous
+  pages leaked into the mirror alongside the current one**. The walk
+  now descends the way the framework itself defines "onstage"
+  (`debugVisitOnstageChildren` — plain logic, the same thing the
+  widget inspector relies on), which also stops inactive
+  `IndexedStack` children from leaking. Deliberate exception: viewports
+  and lazy lists filter by *visual* visibility there, and scrolled-away
+  content is still page content — scroll machinery keeps the full
+  traversal, pinned by a regression test.
+* `Visibility(visible: false, maintainSize: true)` hides its child
+  behind `Opacity(0)` — invisible but onstage, so no traversal can
+  know. The widget itself is checked now. And explicitly NOT checked:
+  `TickerMode(enabled: false)` — Flutter defines it as "pause the
+  tickers", nothing more; perfectly visible content sits inside it,
+  and an intermediate version of this fix that treated it as an
+  offstage signal emptied the mirror for exactly that content.
 
 ### Breaking
 
