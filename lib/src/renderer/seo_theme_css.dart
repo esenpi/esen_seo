@@ -228,7 +228,15 @@ String seoThemeCss({
     ..write('background:var($_backgroundToken,#fff);')
     ..write('color:var(--esen-color-on-surface,#1a1a1a);')
     ..write('font-family:var(--esen-font-sans,$_sansFallback);')
+    // The chosen body role, applied COMPLETELY. Consuming only size and
+    // line-height silently dropped a themed body weight and even the
+    // standard Material tracking (bodyLarge carries 0.5px) — tokens
+    // that were generated and then never used. Headings and table
+    // cells set their own weight/tracking rules, so they override this
+    // inheritance exactly like the app's per-role styles do.
     ..write('font-size:var(--esen-type-$body-size,1rem);')
+    ..write('font-weight:var(--esen-type-$body-weight,400);')
+    ..write('letter-spacing:var(--esen-type-$body-tracking,0);')
     ..write('line-height:var(--esen-type-$body-line,1.5)}\n')
     ..write(seoLayoutChildRules)
     ..write(seoLayoutSpacingRules)

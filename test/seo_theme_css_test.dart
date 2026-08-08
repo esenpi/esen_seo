@@ -97,6 +97,69 @@ void main() {
       );
       expect(medium, contains('font-size:var(--esen-type-body-medium-size'));
     });
+
+    test('the body role is applied completely — weight and tracking too', () {
+      // Generating the tokens and consuming only size/line silently
+      // dropped a themed body weight — and even standard Material
+      // tracking (bodyLarge carries 0.5px).
+      final theme = ThemeData(
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 2),
+        ),
+      );
+      final css = seoStylesheetFromTheme(theme);
+      expect(css, contains('--esen-type-body-large-weight:700'));
+      expect(css, contains('--esen-type-body-large-tracking:2px'));
+      expect(css, contains('font-weight:var(--esen-type-body-large-weight'));
+      expect(
+        css,
+        contains('letter-spacing:var(--esen-type-body-large-tracking'),
+      );
+      // And the plain default: M3 bodyLarge tracking 0.5px reaches the
+      // container instead of sitting unused in the token block.
+      final plain = seoStylesheetFromTheme(ThemeData());
+      expect(plain, contains('--esen-type-body-large-tracking:0.5px'));
+      expect(
+        plain,
+        contains('letter-spacing:var(--esen-type-body-large-tracking'),
+      );
+    });
+
+    test('bodyRole: bodyMedium sources the font family from bodyMedium', () {
+      // Metrics from bodyMedium but the family from bodyLarge was a
+      // half-applied role — the documented 1:1 parity has to mean the
+      // whole role.
+      final theme = ThemeData(
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontFamily: 'LargeFont'),
+          bodyMedium: TextStyle(fontFamily: 'MediumFont'),
+        ),
+      );
+      final medium = seoStylesheetFromTheme(
+        theme,
+        bodyRole: SeoBodyRole.bodyMedium,
+      );
+      expect(medium, contains('--esen-font-sans:MediumFont,'));
+      expect(medium, isNot(contains('LargeFont')));
+      final large = seoStylesheetFromTheme(theme);
+      expect(large, contains('--esen-font-sans:LargeFont,'));
+    });
+
+    test(
+        'a dark theme with different body typography lands in the '
+        'media block', () {
+      final light = ThemeData(colorSchemeSeed: Colors.teal);
+      final dark = ThemeData(
+        colorSchemeSeed: Colors.teal,
+        brightness: Brightness.dark,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontWeight: FontWeight.w300),
+        ),
+      );
+      final css = seoStylesheetFromTheme(light, darkTheme: dark);
+      final block = css.split('@media (prefers-color-scheme:dark)').last;
+      expect(block, contains('--esen-type-body-large-weight:300'));
+    });
   });
 
   group('the dark palette', () {
