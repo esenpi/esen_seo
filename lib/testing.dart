@@ -27,8 +27,13 @@
 /// ```
 ///
 /// This library also carries the theme bridge's drift guard,
-/// [checkOrUpdateSeoThemeCss] — which brings `dart:io` into this entry
-/// point, so it runs in host tests only, not in web tests.
+/// [checkOrUpdateSeoThemeCss]. The guard needs `dart:io`, so it is
+/// exported conditionally: on the host VM (the normal place for it)
+/// you get the real one; compiled for the web — someone running their
+/// parity suite with `--platform chrome` — the entry point still
+/// compiles, and only actually *calling* the guard throws. An
+/// unconditional export would have made every consumer of this library
+/// VM-only for the sake of one function they may never use.
 ///
 /// Kept out of `esen_seo.dart` on purpose: this is test-time
 /// scaffolding and has no business in an app's release build.
@@ -38,4 +43,6 @@ export 'audit.dart';
 export 'src/audit/parity_compare.dart' show SeoParityPolicy, compareSeoTrees;
 export 'src/testing/parity.dart'
     show auditSeoParity, captureSeoNodes, enableSeoForParity;
-export 'src/testing/theme_guard.dart' show checkOrUpdateSeoThemeCss;
+export 'src/testing/theme_guard_stub.dart'
+    if (dart.library.io) 'src/testing/theme_guard.dart'
+    show checkOrUpdateSeoThemeCss;

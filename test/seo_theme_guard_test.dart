@@ -109,8 +109,9 @@ void main() {
 
     test('a Dart reserved word is refused — it would not compile', () {
       // 'class' matches the identifier shape but `const String class ='
-      // is a syntax error in the file that imports the g.dart.
-      for (final word in ['class', 'const', 'void']) {
+      // is a syntax error in the file that imports the g.dart. 'break'
+      // is the one review reached for when the list was hand-picked.
+      for (final word in ['class', 'const', 'void', 'break', 'with', 'await']) {
         expect(
           () => checkOrUpdateSeoThemeCss('a{b:c}',
               path: path, variable: word, update: true),
@@ -118,6 +119,23 @@ void main() {
           reason: word,
         );
       }
+    });
+
+    test('a changed variable name is drift — the import site would break', () {
+      // Comparing only the CSS literal let this pass: the file still
+      // declares oldThemeCss, the caller now asks for newThemeCss, and
+      // the guard vouched for a file whose import is about to fail.
+      checkOrUpdateSeoThemeCss('a{b:c}',
+          path: path, variable: 'oldThemeCss', update: true);
+      expect(
+        () => checkOrUpdateSeoThemeCss('a{b:c}',
+            path: path, variable: 'newThemeCss', update: false),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('does not match'),
+        )),
+      );
     });
   });
 }

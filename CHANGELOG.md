@@ -21,7 +21,11 @@ The theme bridge: the visible shell in your app's design.
   build goes red with the exact command to run. Regeneration is only
   ever explicit (`--dart-define=esenSeoUpdate=true`) — deliberately no
   environment-variable switch, which an ambient CI variable could
-  flip into silent write-mode.
+  flip into silent write-mode. The guard is exported conditionally, so
+  `testing.dart` still compiles under `flutter test --platform chrome`
+  for parity users — on the web only *calling* the guard throws. The
+  comparison covers the declared variable name, not just the CSS
+  literal, and the generated file survives `dart format` untouched.
 * Every token value passes an allow list before it becomes CSS —
   colors must be hex, sizes `rem`, font family names
   `[A-Za-z][A-Za-z0-9 -]*` (which drops Apple's dot-prefixed platform
