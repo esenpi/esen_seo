@@ -42,38 +42,17 @@ import 'dart:io';
 
 final RegExp _dartIdentifier = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$');
 
-/// Reserved words that match the identifier shape but cannot be a
-/// top-level variable name — writing `const String class = …` produces
-/// a file that will not compile. Not exhaustive by grammar, just the
-/// ones a caller might plausibly reach for.
+/// The complete reserved-word list from the Dart language spec, plus
+/// `await`/`yield`. Each matches the identifier shape but cannot be a
+/// top-level variable name — writing `const String break = …` produces
+/// a file that will not compile. A hand-picked subset held exactly
+/// until review reached for a word that was not on it.
 const Set<String> _dartReservedWords = {
-  'class',
-  'const',
-  'var',
-  'void',
-  'final',
-  'new',
-  'true',
-  'false',
-  'null',
-  'enum',
-  'extends',
-  'super',
-  'this',
-  'return',
-  'if',
-  'else',
-  'for',
-  'while',
-  'switch',
-  'default',
-  'is',
-  'as',
-  'in',
-  'do',
-  'try',
-  'catch',
-  'throw',
+  'assert', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue',
+  'default', 'do', 'else', 'enum', 'extends', 'false', 'final', 'finally',
+  'for', 'if', 'in', 'is', 'new', 'null', 'rethrow', 'return', 'super',
+  'switch', 'this', 'throw', 'true', 'try', 'var', 'void', 'while', 'with',
+  'yield', //
 };
 
 /// Verifies that [css] matches the committed generated file — or, in
@@ -157,19 +136,28 @@ String _generatedFile(String css, String variable) {
       "const String $variable =\n    '$encoded';\n";
 }
 
-final RegExp _stringLiteral = RegExp(r"=\s*'(.*)';", dotAll: true);
+final RegExp _declaration = RegExp(
+  r"String\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*'(.*)';",
+  dotAll: true,
+);
 
-/// The comparison payload: the encoded CSS literal itself.
+/// The comparison payload: the declared variable name plus the encoded
+/// CSS literal.
 ///
 /// Compared instead of file bytes because formatters rewrap the code
 /// AROUND the literal — the guard's own first catch in the wild was
 /// `dart format` reflowing the assignment, which is not drift. String
-/// literal *contents* are the one thing no formatter touches. Files
-/// where no literal can be found fall back to a whole-text comparison
-/// minus the informational toolchain line.
+/// literal *contents* are the one thing no formatter touches. The name
+/// is part of the payload: comparing the literal alone let a caller
+/// switch `variable:` and stay green while the file still declared the
+/// old name — and the import site would break, with the guard vouching
+/// for the file. Files where no declaration can be found fall back to
+/// a whole-text comparison minus the informational toolchain line.
 String _payload(String content) {
-  final literal = _stringLiteral.firstMatch(content);
-  if (literal != null) return literal.group(1)!;
+  final declaration = _declaration.firstMatch(content);
+  if (declaration != null) {
+    return '${declaration.group(1)}|${declaration.group(2)}';
+  }
   return content
       .split('\n')
       .where((line) => !line.startsWith('// Toolchain:'))
