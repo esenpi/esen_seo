@@ -56,13 +56,19 @@ String seoStylesheetFromTheme(
   ScriptCategory scriptCategory = ScriptCategory.englishLike,
 }) =>
     seoThemeCss(
-      light: _tokensFrom(theme, scriptCategory),
-      dark: darkTheme == null ? null : _tokensFrom(darkTheme, scriptCategory),
+      light: _tokensFrom(theme, scriptCategory, bodyRole),
+      dark: darkTheme == null
+          ? null
+          : _tokensFrom(darkTheme, scriptCategory, bodyRole),
       mode: mode,
       bodyRole: bodyRole,
     );
 
-SeoThemeTokens _tokensFrom(ThemeData raw, ScriptCategory script) {
+SeoThemeTokens _tokensFrom(
+  ThemeData raw,
+  ScriptCategory script,
+  SeoBodyRole bodyRole,
+) {
   // Raw ThemeData carries NO text geometry — fontSize is null until
   // the theme is localized against a typography geometry. Reading the
   // roles without this step emits a stylesheet with no sizes at all.
@@ -193,7 +199,13 @@ SeoThemeTokens _tokensFrom(ThemeData raw, ScriptCategory script) {
   ];
   bool inChain(String f) =>
       staticChain.any((s) => s.toLowerCase() == f.toLowerCase());
-  final bodyStyle = text.bodyLarge ?? text.bodyMedium;
+  // The family comes from the SAME role the container reads its
+  // size/weight/tracking from — sourcing it from bodyLarge regardless
+  // meant `bodyRole: bodyMedium` mixed bodyMedium metrics with
+  // bodyLarge's family, breaking the documented 1:1-parity promise.
+  final bodyStyle = bodyRole == SeoBodyRole.bodyMedium
+      ? (text.bodyMedium ?? text.bodyLarge)
+      : (text.bodyLarge ?? text.bodyMedium);
   final family = bodyStyle?.fontFamily;
   properties['--esen-font-sans'] = [
     if (family != null && !inChain(family)) family,
