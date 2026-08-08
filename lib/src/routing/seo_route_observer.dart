@@ -9,7 +9,12 @@ import 'seo_resolution.dart';
 import 'seo_route.dart';
 
 /// Applies the matching [SeoRoute]'s metadata automatically on every
-/// navigation — no `EsenSeo.setMeta()` boilerplate per page.
+/// navigation — no `EsenSeo.setMeta()` boilerplate per page — and
+/// refreshes the semantic body mirror once the route transition has
+/// settled. The second half is load-bearing: a page built purely from
+/// smart defaults has no `.seo()` markers and therefore no other
+/// navigation hook — without this observer its mirror keeps serving
+/// the previous page after a `Navigator.push`.
 ///
 /// Works with the classic Navigator **and** with router packages like
 /// go_router, beamer or auto_route:

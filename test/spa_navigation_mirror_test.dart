@@ -72,6 +72,33 @@ void main() {
     expect(EsenSeo.currentHtml, isNot(contains('Plain start page')));
   });
 
+  testWidgets(
+      'WITHOUT the observer, a marker-less app does not follow '
+      'navigation — the documented contract', (tester) async {
+    // Deliberately pinned, not a bug: nothing in Flutter tells the
+    // package about a push, so the navigation hook is either a .seo()
+    // marker's route listener or the SeoRouteObserver — and a pure
+    // smart-defaults app has no markers. README quick start,
+    // EsenSeo.init and SeoRouteObserver all state this. Whoever makes
+    // this work observer-less should update all three, then this test.
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+      navigatorKey: navigator,
+      routes: {
+        '/': (_) => const Scaffold(body: Text('Plain start page')),
+        '/demo': (_) => const Scaffold(body: Text('Plain demo page')),
+      },
+    ));
+    await tester.pumpAndSettle();
+    EsenSeo.refresh();
+    expect(EsenSeo.currentHtml, contains('Plain start page'));
+
+    navigator.currentState!.pushNamed('/demo');
+    await tester.pumpAndSettle();
+
+    expect(EsenSeo.currentHtml, isNot(contains('Plain demo page')));
+  });
+
   testWidgets('after pop the mirror returns to the previous page',
       (tester) async {
     final navigator = GlobalKey<NavigatorState>();
