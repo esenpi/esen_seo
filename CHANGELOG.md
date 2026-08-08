@@ -21,7 +21,10 @@ The theme bridge: the visible shell in your app's design.
   build goes red with the exact command to run. Regeneration is only
   ever explicit (`--dart-define=esenSeoUpdate=true`) — deliberately no
   environment-variable switch, which an ambient CI variable could
-  flip into silent write-mode. The guard is exported conditionally, so
+  flip into silent write-mode. The generated CSS is a function of the
+  Flutter version — pin dev and CI to the same Flutter, and regenerate
+  after SDK upgrades; the guard's message tells toolchain skew apart
+  from a real theme change. The guard is exported conditionally, so
   `testing.dart` still compiles under `flutter test --platform chrome`
   for parity users — on the web only *calling* the guard throws. The
   comparison covers the declared variable name, not just the CSS
@@ -96,8 +99,8 @@ The theme bridge: the visible shell in your app's design.
   explicitly NOT checked:
   `TickerMode(enabled: false)` — Flutter defines it as "pause the
   tickers", nothing more; perfectly visible content sits inside it,
-  and an intermediate version of this fix that treated it as an
-  offstage signal emptied the mirror for exactly that content.
+  so treating it as an offstage signal would empty the mirror for
+  exactly that content.
 
 ### Breaking
 
@@ -162,13 +165,11 @@ actually correct, not just render it.
   a green run that proved nothing — while pages the sample deliberately
   skipped are named as info, since sampling is the caller's call.
 
-### Hardened by an adversarial review
+### Fixed — errors reported on correct sites
 
-An adversarial pass built eight legitimate route tables; five failed
-the build. An error-severity false positive is the worst defect an
-auditor can have — it teaches a team to switch it off — so all of them
-are fixed, each with a regression test built from the shape that broke
-it:
+An error-severity false positive is the worst defect an auditor can
+have — it teaches a team to switch the check off. Each of these is
+fixed, with a regression test built from the shape that triggered it:
 
 * `SeoAuditPolicy(ignore: …)` was wired into 3 of 30 checks and into
   none of the error-severity ones, so the findings a team would most
@@ -194,10 +195,7 @@ it:
   implemented. `robots: 'none'` counts as noindex. A pathological
   node tree reports instead of raising `StackOverflowError`.
 
-### A second review round
-
-Eight more findings, all of the same family as the first round: a check
-that reported nothing, or one that reported the wrong thing.
+### Fixed — checks that reported nothing, or the wrong thing
 
 * **`assertSeoHealthy`** — the test this package *recommended*,
   `expect(report.describe(), isNot(contains('[error]')))`, never
@@ -236,10 +234,7 @@ that reported nothing, or one that reported the wrong thing.
   needs `offers`, `review` or `aggregateRating` to have something to
   show.
 
-### A third review round
-
-The same standard, applied once more — this time to the checks that
-were themselves added by review:
+### The audit checks the markup that actually ships
 
 * **The audit now checks the renderer's view of the tree, not the raw
   one.** The render decision (`HtmlRenderer.effectiveBodyTag`) is
@@ -275,11 +270,7 @@ were themselves added by review:
   `ratingCount`/`reviewCount`, satisfies every presence check and still
   yields nothing.
 
-### A fourth review round — the audit audited
-
-Ten adversarial reviewers were pointed at the previous round's fixes
-with one instruction: break them. Thirty findings came back; the ones
-that survived verification are fixed, each with a regression test.
+### Deployment shapes, encodings and generator fidelity
 
 * **Subpath deployments work now.** With `siteBase:
   'https://user.github.io/repo'` — the GitHub Pages shape the README
@@ -344,11 +335,10 @@ that survived verification are fixed, each with a regression test.
   walked tree of exactly maxDepth+1 levels no longer claims its own
   findings were incomplete.
 
-### A fifth pass — the server paths under the same lens
+### Server hardening
 
-The audit rounds kept finding the same families on the runtime paths,
-so those were hardened too. Four of these change published behavior —
-read the breaking notes before upgrading.
+Four of these change published behavior — read the breaking notes
+before upgrading.
 
 * **Breaking: `seoRedirectMiddleware(forceHttps:)` no longer reads
   `x-forwarded-proto` by default.** The header is caller-controlled on
@@ -400,7 +390,7 @@ read the breaking notes before upgrading.
 * CI runs the example app's own test suite, which audits a real grown
   route table with the released API. It existed but ran nowhere.
 * `tool/check_pure_dart.dart` replaces CI's hand-written file list with
-  an import-graph walk. Three holes found by the same review are closed
+  an import-graph walk. Three holes in it are closed
   and proven closed by planting each: a `package:esen_seo/…`
   self-import, a Flutter import inside a conditional-import branch, and
   a run from the wrong directory reporting a cheerful pass over a graph

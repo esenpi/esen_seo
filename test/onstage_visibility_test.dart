@@ -1,9 +1,9 @@
 // What "kept in the tree but not shown" actually means — pinned per
-// widget, because the review history here is a graveyard of wrong
-// heuristics: TickerMode(enabled: false) was treated as invisible
-// although Flutter defines it as "pause tickers" (visible content
-// inside it vanished from the mirror), while IndexedStack's inactive
-// children and Visibility(maintainSize: true) leaked INTO it.
+// widget, because wrong heuristics here are easy to reach for:
+// TickerMode(enabled: false) looks like an offstage signal but Flutter
+// defines it as "pause tickers" (visible content inside it must stay
+// in the mirror), while IndexedStack's inactive children and
+// Visibility(maintainSize: true) must stay out of it.
 import 'package:esen_seo/esen_seo.dart';
 import 'package:esen_seo/testing.dart';
 import 'package:flutter/material.dart';

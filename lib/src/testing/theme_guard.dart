@@ -45,8 +45,8 @@ final RegExp _dartIdentifier = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$');
 /// The complete reserved-word list from the Dart language spec, plus
 /// `await`/`yield`. Each matches the identifier shape but cannot be a
 /// top-level variable name — writing `const String break = …` produces
-/// a file that will not compile. A hand-picked subset held exactly
-/// until review reached for a word that was not on it.
+/// a file that will not compile. Deliberately the full list: a
+/// hand-picked subset is exactly the kind of list that misses one.
 const Set<String> _dartReservedWords = {
   'assert', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue',
   'default', 'do', 'else', 'enum', 'extends', 'false', 'final', 'finally',
@@ -148,10 +148,10 @@ final RegExp _declaration = RegExp(
 /// AROUND the literal — the guard's own first catch in the wild was
 /// `dart format` reflowing the assignment, which is not drift. String
 /// literal *contents* are the one thing no formatter touches. The name
-/// is part of the payload: comparing the literal alone let a caller
-/// switch `variable:` and stay green while the file still declared the
-/// old name — and the import site would break, with the guard vouching
-/// for the file. Files where no declaration can be found fall back to
+/// is part of the payload: comparing the literal alone would let a
+/// caller switch `variable:` and stay green while the file still
+/// declared the old name — and the import site would break, with the
+/// guard vouching for the file. Files where no declaration can be found fall back to
 /// a whole-text comparison minus the informational toolchain line.
 String _payload(String content) {
   final declaration = _declaration.firstMatch(content);

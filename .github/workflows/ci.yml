@@ -65,6 +65,17 @@ jobs:
         working-directory: example
         run: flutter analyze
 
+      # Das committete seo_theme.g.dart ist eine Funktion der
+      # Flutter-Version (Material-Farbrollen und Typo-Werte wandern
+      # zwischen Releases). Dieser Job fährt bewusst das neueste
+      # stable, die Entwicklungsmaschine nicht — ohne Regenerierung
+      # meldet der Drift-Guard die Toolchain-Lücke statt einer echten
+      # Theme-Drift. Nutzer pinnen stattdessen ihre Flutter-Version
+      # zwischen Dev und CI; dieses Repo will beide Welten.
+      - name: Regenerate the example theme stylesheet for this toolchain
+        working-directory: example
+        run: flutter test test/seo_theme_css_test.dart --dart-define=esenSeoUpdate=true
+
       # Die Example-App auditiert sich mit dem eigenen Paket — das ist
       # der einzige Lauf, der die Audit-Engine gegen eine echte,
       # gewachsene Routentabelle stellt statt gegen Testfixtures. Lief

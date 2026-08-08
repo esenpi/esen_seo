@@ -96,8 +96,8 @@ class _SeoWidgetState extends State<SeoWidget> {
     // the spurious `completed` the route's animation proxy fires during
     // the Navigator's offstage warm-up. Idempotent by design, and this
     // listener's lifetime is managed by didChangeDependencies/dispose,
-    // never by self-removal (a self-removing listener went deaf on the
-    // spurious event once already).
+    // never by self-removal — a self-removing listener would go deaf on
+    // that spurious event and miss the real one.
     if (status == AnimationStatus.completed ||
         status == AnimationStatus.dismissed) {
       SeoController.instance.refreshAfterNavigation();
