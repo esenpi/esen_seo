@@ -80,6 +80,13 @@ Future<List<String>> prerenderSite({
   }
   final template = await templateFile.readAsString();
   _validateTemplate(template, buildDir);
+
+  // Say which stylesheet is being baked in. The drift guard watches
+  // the generated file, but nothing else watches the last link of the
+  // chain — a themed stylesheet that is generated, committed and then
+  // never passed here fails silently in exactly the way this line
+  // makes visible in every build log.
+  stdout.writeln(_describeStylesheet(stylesheet, renderMode));
   // Der Root-Pfad überschreibt index.html — ein zweiter Lauf würde die
   // eigene Ausgabe als Template lesen und alles doppelt einbauen.
   if (_seoContainerMarker.hasMatch(template)) {
@@ -369,4 +376,21 @@ String _applyTemplate(
         'Prerendering failed to inject the SEO content container.');
   }
   return result;
+}
+
+/// One line for the build log: what will style the shell.
+String _describeStylesheet(String? stylesheet, SeoRenderMode mode) {
+  final css = stylesheet?.trim() ?? '';
+  final String what;
+  if (css.isEmpty) {
+    what = 'none (unstyled semantic HTML)';
+  } else if (css == seoDefaultStylesheet.trim()) {
+    what = 'seoDefaultStylesheet (opinion-free web scale)';
+  } else if (css.contains('--esen-color-')) {
+    what = 'themed (${css.length} chars, esen theme tokens)';
+  } else {
+    what = 'custom (${css.length} chars)';
+  }
+  return 'prerender stylesheet: $what'
+      '${mode == SeoRenderMode.visibleShell ? ' — visible shell' : ''}';
 }

@@ -26,6 +26,10 @@
 /// });
 /// ```
 ///
+/// This library also carries the theme bridge's drift guard,
+/// [checkOrUpdateSeoThemeCss] — which brings `dart:io` into this entry
+/// point, so it runs in host tests only, not in web tests.
+///
 /// Kept out of `esen_seo.dart` on purpose: this is test-time
 /// scaffolding and has no business in an app's release build.
 library;
@@ -34,3 +38,4 @@ export 'audit.dart';
 export 'src/audit/parity_compare.dart' show SeoParityPolicy, compareSeoTrees;
 export 'src/testing/parity.dart'
     show auditSeoParity, captureSeoNodes, enableSeoForParity;
+export 'src/testing/theme_guard.dart' show checkOrUpdateSeoThemeCss;

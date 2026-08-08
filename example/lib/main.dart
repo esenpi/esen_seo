@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'docs_page.dart';
 import 'seo_routes.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 void main() {
@@ -26,7 +27,11 @@ class EsenSeoExampleApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'esen_seo Example',
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      // Aus theme.dart — dieselbe Funktion, die der Theme-Guard-Test
+      // bewacht. Ein inline definiertes Theme könnte lautlos vom
+      // generierten Shell-CSS wegdriften.
+      theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
       // Wendet bei jeder Navigation die Meta-Daten der passenden
       // SeoRoute an — kein EsenSeo.setMeta() pro Seite nötig.
       navigatorObservers: [
