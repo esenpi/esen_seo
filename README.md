@@ -767,9 +767,11 @@ final seoRoutes = [
 
 `seoBotMiddleware` serves that route before its User-Agent split, and
 `prerenderSite` writes a standalone file without `flutter_bootstrap.js` or
-`main.dart.js`. The regular `stylesheet` input styles prerendered DOM-first
-pages; the middleware uses `domFirstStylesheet`, which defaults to
-`seoDefaultStylesheet`. `domFirstNonce` can supply a per-response CSP nonce.
+`main.dart.js`. Its `domFirstStylesheet` input styles DOM-first pages
+independently and defaults to `seoDefaultStylesheet`; `stylesheet` continues to
+belong to Flutter's visible shell. The middleware uses the same
+`domFirstStylesheet` default. `domFirstNonce` can supply a per-response CSP
+nonce.
 
 This first vertical slice deliberately supports only package-owned tabs. It
 does not translate arbitrary Flutter `State`, Cubits or callbacks. Instead,

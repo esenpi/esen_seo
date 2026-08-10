@@ -39,6 +39,10 @@ import 'sitemap.dart';
 /// `style` attribute, which a strict Content Security Policy must allow
 /// separately.
 ///
+/// DOM-first routes use [domFirstStylesheet] independently. It defaults to
+/// [seoDefaultStylesheet]; pass a generated theme stylesheet to match the
+/// Flutter presentation, or an empty string for deliberately unstyled HTML.
+///
 /// That mode **requires the app to call `EsenSeo.init()`** — without it
 /// nothing ever schedules the handoff and the shell stays on top of the
 /// running app for good. See [SeoRenderMode.visibleShell].
@@ -76,6 +80,7 @@ Future<List<String>> prerenderSite({
   String? indexNowKey,
   SeoRenderMode renderMode = SeoRenderMode.seoOnly,
   String? stylesheet,
+  String? domFirstStylesheet = seoDefaultStylesheet,
   bool enableInteractions = false,
   String? interactionNonce,
   int concurrency = 8,
@@ -103,14 +108,10 @@ Future<List<String>> prerenderSite({
   // chain — a themed stylesheet that is generated, committed and then
   // never passed here fails silently in exactly the way this line
   // makes visible in every build log.
-  stdout.writeln(
-    _describeStylesheet(
-      stylesheet,
-      renderMode,
-      hasDomFirstRoutes: routes.any((route) => route.isDomFirst),
-      hasFlutterRoutes: routes.any((route) => !route.isDomFirst),
-    ),
-  );
+  stdout.writeln(_describeStylesheet(stylesheet, renderMode));
+  if (routes.any((route) => route.isDomFirst)) {
+    stdout.writeln(_describeDomFirstStylesheet(domFirstStylesheet));
+  }
   // Der Root-Pfad überschreibt index.html — ein zweiter Lauf würde die
   // eigene Ausgabe als Template lesen und alles doppelt einbauen.
   if (_seoContainerMarker.hasMatch(template)) {
@@ -187,7 +188,7 @@ Future<List<String>> prerenderSite({
             meta: doc.meta,
             body: doc.body,
             lang: page.lang,
-            stylesheet: stylesheet ?? seoDefaultStylesheet,
+            stylesheet: domFirstStylesheet,
             features: page.route!.domFirstFeatures,
             interactionNonce: interactionNonce,
           ).toHtmlDocument()
@@ -424,18 +425,11 @@ String _applyTemplate(
 /// One line for the build log: what will style the shell.
 String _describeStylesheet(
   String? stylesheet,
-  SeoRenderMode mode, {
-  required bool hasDomFirstRoutes,
-  required bool hasFlutterRoutes,
-}) {
+  SeoRenderMode mode,
+) {
   final css = stylesheet?.trim() ?? '';
   final String what;
-  if (stylesheet == null && hasDomFirstRoutes) {
-    what = hasFlutterRoutes
-        ? 'seoDefaultStylesheet for DOM-first routes; '
-            'none for Flutter routes'
-        : 'seoDefaultStylesheet (DOM-first default)';
-  } else if (css.isEmpty) {
+  if (css.isEmpty) {
     what = 'none (unstyled semantic HTML)';
   } else if (css == seoDefaultStylesheet.trim()) {
     what = 'seoDefaultStylesheet (opinion-free web scale)';
@@ -446,4 +440,17 @@ String _describeStylesheet(
   }
   return 'prerender stylesheet: $what'
       '${mode == SeoRenderMode.visibleShell ? ' — visible shell' : ''}';
+}
+
+String _describeDomFirstStylesheet(String? stylesheet) {
+  final css = stylesheet?.trim() ?? '';
+  final what = switch (css) {
+    '' => 'none (unstyled semantic HTML)',
+    _ when css == seoDefaultStylesheet.trim() =>
+      'seoDefaultStylesheet (opinion-free web scale)',
+    _ when css.contains('--esen-color-') =>
+      'themed (${css.length} chars, esen theme tokens)',
+    _ => 'custom (${css.length} chars)',
+  };
+  return 'DOM-first stylesheet: $what';
 }

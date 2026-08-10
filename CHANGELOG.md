@@ -15,6 +15,9 @@
   navigation, and leaves the complete document readable without JavaScript.
   Application-authored transitions, effects, forms and client routing are not
   part of this first slice.
+* Added a separate `domFirstStylesheet` input to static prerendering, matching
+  the middleware API. Mixed sites can theme permanent HTML routes without
+  changing the stylesheet bytes of Flutter-delivered routes.
 * Added `SeoStepper`, a state-hidden-content bridge with lazy native Flutter
   bodies and every step present as an ordered semantic HTML list. A valid
   `interactionId` progressively adds validated step buttons, previous/next

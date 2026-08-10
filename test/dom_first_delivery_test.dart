@@ -285,5 +285,36 @@ void main() {
       expect(domHtml, contains('font-family:system-ui'));
       expect(domHtml, contains('All technical details.'));
     });
+
+    test('keeps Flutter and DOM-first stylesheets independent', () async {
+      await prerenderSite(
+        routes: [
+          SeoRoute(
+            path: '/flutter',
+            meta: (_) => const SeoMeta(title: 'Flutter page'),
+            body: (_) => [SeoNode(tag: 'h1', text: 'Flutter page')],
+          ),
+          _domRoute(),
+        ],
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        stylesheet: '#esen-seo-content{--flutter-shell-only:1}',
+        domFirstStylesheet: '#esen-seo-content{--dom-first-only:1}',
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+
+      final flutterHtml =
+          File('${buildDir.path}/flutter/index.html').readAsStringSync();
+      final domHtml =
+          File('${buildDir.path}/dom/index.html').readAsStringSync();
+
+      expect(flutterHtml, contains('--flutter-shell-only:1'));
+      expect(flutterHtml, isNot(contains('--dom-first-only:1')));
+      expect(domHtml, contains('--dom-first-only:1'));
+      expect(domHtml, isNot(contains('--flutter-shell-only:1')));
+    });
   });
 }
