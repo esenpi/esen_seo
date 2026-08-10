@@ -1,7 +1,7 @@
 # esen_seo
 
-Real semantic HTML for Flutter Web — no Puppeteer, no headless Chrome,
-no second copy of your content. Pure Dart.
+Real semantic HTML for Flutter Web — no Puppeteer, no headless Chrome.
+Pure Dart, built from your widget tree.
 
 A Flutter web app is not a document. However it renders — CanvasKit,
 WebAssembly or the DOM — what reaches the page is a widget tree, not
@@ -56,9 +56,9 @@ The HTML only exists on the web.
   with `dart run`, no browser involved.
 - **URL routing as a single source of truth**: define your routes once
   in a pure-Dart table — the app applies meta tags automatically on
-  navigation, the server renders the same pages for bots and generates
-  `sitemap.xml` (with `lastmod` and hreflang alternates), `robots.txt`,
-  canonical URLs and real HTTP 404s from the same table.
+  navigation, while the server renders the declared route bodies for
+  bots. The same table generates `sitemap.xml` (with `lastmod` and
+  hreflang alternates), `robots.txt`, canonical URLs and real HTTP 404s.
 - **Static prerendering**: bake the route table into the web build as
   static HTML files — full SEO on Firebase Hosting, GitHub Pages or any
   CDN, no server needed.
@@ -132,9 +132,10 @@ desktop every `.seo()` call is a no-op that returns the original widget.
 
 Yes, that mirror is hidden by default — but it is not the old trick of
 keeping a second, hand-maintained copy of the page in the markup. It is
-generated from the same widget tree the user sees, bots and visitors get
-the same content, and with the visible shell below it stops being hidden
-at all. One thing it is explicitly *not*: an accessibility feature.
+generated from the same widget tree the user sees, so the live mirror
+does not require a second authored content tree. With the visible shell
+below it stops being hidden at all. One thing it is explicitly *not*: an
+accessibility feature.
 `aria-hidden` keeps screen readers out of it on purpose, because Flutter
 publishes its own semantics tree and two of them would be read twice.
 Accessibility stays a matter of Flutter's `Semantics` widgets.
@@ -342,8 +343,9 @@ Future<void> main() async {
 ```
 
 `SeoMeta`, `SeoSchema`, `SeoNode` and `HtmlRenderer` are shared between
-the Flutter side and the server, so both render identical HTML. Build
-pages from `SeoNode`s as above — they pass the tag and attribute policy.
+the Flutter side and the server, so the same nodes serialize identically
+in both. Build pages from `SeoNode`s as above — they pass the tag and
+attribute policy.
 The `SeoPage(bodyHtml: …)` constructor writes its string into the
 document verbatim and exists for HTML you wrote yourself; never assemble
 it from content you do not control. See
@@ -371,6 +373,12 @@ final seoRoutes = [
   ),
 ];
 ```
+
+The live DOM mirror is derived directly from the widget tree, so it does
+not require a second authored content tree. A server-rendered route
+`body`, however, is separate unless the app and the route both derive
+from a shared pure data model. Use `auditSeoParity` to catch drift between
+independently authored trees.
 
 **In the app** — meta tags update automatically on every navigation,
 no `setMeta` boilerplate per page:
