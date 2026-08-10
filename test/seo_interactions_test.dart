@@ -10,6 +10,10 @@ void main() {
       expect(seoInteractionRuntime, isNot(contains('eval(')));
       expect(seoInteractionRuntime, isNot(contains('Function(')));
       expect(seoInteractionRuntime, isNot(contains('</script')));
+      expect(
+        seoInteractionRuntime,
+        isNot(contains("setAttribute('role', 'menu')")),
+      );
     });
 
     test('script and style wrappers escape an optional nonce', () {

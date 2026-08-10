@@ -9,6 +9,25 @@ const siteBase = 'https://esen.software';
 
 typedef DemoTabData = ({String content, String label});
 
+class DemoNavData {
+  const DemoNavData(this.label, {this.url, this.children = const []});
+
+  final String label;
+  final String? url;
+  final List<DemoNavData> children;
+}
+
+const demoNavItems = <DemoNavData>[
+  DemoNavData('Home', url: '/'),
+  DemoNavData('Documentation', url: '/docs', children: [
+    DemoNavData('Live demo', url: '/demo'),
+    DemoNavData('Full guide', url: '/docs'),
+  ]),
+  DemoNavData('More', children: [
+    DemoNavData('Dynamic routes', url: '/blog/dynamic-routes'),
+  ]),
+];
+
 const demoTabs = <DemoTabData>[
   (
     label: 'Flutter',
@@ -33,6 +52,17 @@ List<SeoTabComponentEntry> demoTabEntries() => [
       for (final tab in demoTabs)
         (label: tab.label, nodes: demoTabPanelNodes(tab)),
     ];
+
+List<SeoNode> demoNavNodes() => buildSeoNavMenuNodes(
+      items: demoNavItems,
+      itemView: (item) => (
+        label: item.label,
+        url: item.url,
+        children: item.children,
+      ),
+      label: 'Demo navigation',
+      interactionId: 'demo-nav',
+    );
 
 // A tiny in-memory "database" so the dynamic route below runs anywhere,
 // without a real backend. In a CMS this is a Postgres/Firestore read.
@@ -121,6 +151,7 @@ final seoRoutes = [
     body: (_) => [
       SeoNode(tag: 'h1', text: 'Live Demo'),
       SeoNode(tag: 'p', text: 'See esen_seo in action.'),
+      ...demoNavNodes(),
       ...buildSeoTabsNodes(
         tabs: demoTabEntries(),
         interactionId: 'demo-tabs',

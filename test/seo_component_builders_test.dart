@@ -73,9 +73,74 @@ void main() {
       expect(output, hasLength(11));
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
+      expect(output['navMenu'], isNot(contains('data-esen-component')));
+      expect(output['navMenu'], isNot(contains('<button')));
       expect(output['tabs'], contains('<section><h3>Overview</h3>'));
       expect(output['tabs'], isNot(contains('data-esen-component')));
       expect(output['tabs'], isNot(contains('<button')));
+    });
+
+    test('nav menu opts in with stable branch ids and complete links', () {
+      const navItems = [
+        _NavItem('Home', url: '/'),
+        _NavItem('Products', url: '/products', children: [
+          _NavItem('Apps', url: '/products/apps'),
+          _NavItem('More', children: [
+            _NavItem('Consulting', url: '/products/consulting'),
+          ]),
+        ]),
+      ];
+      final html = renderer.render(buildSeoNavMenuNodes(
+        items: navItems,
+        itemView: (item) => (
+          label: item.label,
+          url: item.url,
+          children: item.children,
+        ),
+        label: 'Primary navigation',
+        interactionId: 'primary-nav',
+      ));
+
+      expect(
+        html,
+        startsWith('<nav class="esen-seo-nav" '
+            'aria-label="Primary navigation" id="primary-nav" '
+            'data-esen-component="nav-menu">'
+            '<ul data-esen-nav-root-list="">'),
+      );
+      expect(html, contains('id="primary-nav-submenu-1"'));
+      expect(html, contains('id="primary-nav-submenu-1-1"'));
+      expect('data-esen-nav-branch=""'.allMatches(html), hasLength(2));
+      expect('data-esen-nav-submenu=""'.allMatches(html), hasLength(2));
+      expect(html, contains('<a href="/products/apps">Apps</a>'));
+      expect(html, contains('<a href="/products/consulting">Consulting</a>'));
+      expect(html, isNot(contains('<button')));
+      expect(html, isNot(contains(' hidden')));
+    });
+
+    test('invalid interaction ids leave nav menus byte-identical', () {
+      const navItems = [
+        _NavItem('Products', children: [
+          _NavItem('Apps', url: '/apps'),
+        ]),
+      ];
+      final html = renderer.render(buildSeoNavMenuNodes(
+        items: navItems,
+        itemView: (item) => (
+          label: item.label,
+          url: item.url,
+          children: item.children,
+        ),
+        interactionId: 'invalid id',
+      ));
+
+      expect(
+        html,
+        '<nav class="esen-seo-nav" aria-label="Hauptnavigation"><ul>'
+        '<li><span>Products</span><ul>'
+        '<li><a href="/apps">Apps</a></li>'
+        '</ul></li></ul></nav>',
+      );
     });
 
     test('tabs opt in with stable declarative markup and complete content', () {

@@ -52,12 +52,18 @@ class SeoNavItem {
 /// //       <ul><li><a href="/leistungen/apps">Flutter Apps</a></li>…</ul>
 /// //     </li></ul></nav>
 /// ```
+///
+/// Supplying a valid [interactionId] marks the complete semantic tree for
+/// optional, package-owned disclosure controls in a visible HTML page. Links
+/// keep their native behavior and all nested entries remain readable without
+/// JavaScript.
 class SeoNavMenu extends StatefulWidget {
   const SeoNavMenu({
     super.key,
     required this.items,
     this.onTap,
     this.label = 'Hauptnavigation',
+    this.interactionId,
     this.direction = Axis.horizontal,
     this.textStyle,
     this.linkStyle,
@@ -72,6 +78,14 @@ class SeoNavMenu extends StatefulWidget {
   /// Accessible name of the `<nav>` landmark — a page may hold several
   /// navigations, and they need to be tellable apart.
   final String label;
+
+  /// Stable DOM id that opts a visible semantic page into navigation
+  /// disclosure controls.
+  ///
+  /// It must start with an ASCII letter and then contain only letters,
+  /// digits, `_` or `-`, up to 128 characters. Invalid values leave the
+  /// complete navigation tree static and visible.
+  final String? interactionId;
 
   /// Whether the top level runs across (a bar) or down (a sidebar).
   final Axis direction;
@@ -235,5 +249,6 @@ class _SeoNavMenuState extends State<SeoNavMenu>
           children: item.children,
         ),
         label: widget.label,
+        interactionId: widget.interactionId,
       );
 }

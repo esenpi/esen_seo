@@ -275,8 +275,13 @@ List<SeoNode> buildSeoNavMenuNodes<T>({
   required List<T> items,
   required SeoNavComponentItem<T> Function(T item) itemView,
   String label = 'Hauptnavigation',
+  String? interactionId,
 }) {
   if (items.isEmpty) return const [];
+  final candidate = interactionId?.trim();
+  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+      ? candidate
+      : null;
 
   SeoNode entryNode(SeoNavComponentItem<T> item) {
     final value = item.url?.trim();
@@ -285,25 +290,63 @@ List<SeoNode> buildSeoNavMenuNodes<T>({
     return SeoNode(tag: 'a', text: item.label, attributes: {'href': href});
   }
 
-  SeoNode listNode(List<T> entries) {
+  SeoNode listNode(
+    List<T> entries,
+    String parentPath, {
+    Map<String, String> attributes = const {},
+  }) {
     final children = <SeoNode>[];
-    for (final entry in entries) {
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
       final item = itemView(entry);
-      children.add(SeoNode(tag: 'li', children: [
-        entryNode(item),
-        // A submenu belongs inside its parent's list item.
-        if (item.children.isNotEmpty) listNode(item.children),
-      ]));
+      final path = parentPath.isEmpty ? '$index' : '$parentPath-$index';
+      final hasChildren = item.children.isNotEmpty;
+      children.add(SeoNode(
+        tag: 'li',
+        attributes: {
+          if (id != null && hasChildren) 'data-esen-nav-branch': '',
+        },
+        children: [
+          entryNode(item),
+          // A submenu belongs inside its parent's list item.
+          if (hasChildren)
+            listNode(
+              item.children,
+              path,
+              attributes: {
+                if (id != null) ...{
+                  'id': '$id-submenu-$path',
+                  'data-esen-nav-submenu': '',
+                },
+              },
+            ),
+        ],
+      ));
     }
-    return SeoNode(tag: 'ul', children: children);
+    return SeoNode(tag: 'ul', attributes: attributes, children: children);
   }
 
   return [
     // Paragraphs cannot carry an ARIA name; the visible text is complete.
     SeoNode(
       tag: 'nav',
-      attributes: {'class': 'esen-seo-nav', 'aria-label': label},
-      children: [listNode(items)],
+      attributes: {
+        'class': 'esen-seo-nav',
+        'aria-label': label,
+        if (id != null) ...{
+          'id': id,
+          'data-esen-component': 'nav-menu',
+        },
+      },
+      children: [
+        listNode(
+          items,
+          '',
+          attributes: {
+            if (id != null) 'data-esen-nav-root-list': '',
+          },
+        ),
+      ],
     ),
   ];
 }

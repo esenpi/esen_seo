@@ -187,6 +187,12 @@ class DemoPage extends StatelessWidget {
               ),
             ],
           ),
+          SeoNavMenu(
+            items: [for (final item in demoNavItems) _demoNavItem(item)],
+            label: 'Demo navigation',
+            interactionId: 'demo-nav',
+            onTap: (item) => Navigator.pushNamed(context, item.href!),
+          ),
           SeoTabs(
             interactionId: 'demo-tabs',
             interactionLabel: 'Rendering targets',
@@ -204,3 +210,9 @@ class DemoPage extends StatelessWidget {
     );
   }
 }
+
+SeoNavItem _demoNavItem(DemoNavData item) => SeoNavItem(
+      item.label,
+      url: item.url,
+      children: [for (final child in item.children) _demoNavItem(child)],
+    );

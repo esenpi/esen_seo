@@ -1,5 +1,11 @@
 ## Unreleased
 
+* `SeoNavMenu(interactionId: ...)` now supports the same opt-in progressive
+  enhancement as tabs. The complete nested link tree stays in the source;
+  validated branches gain native disclosure buttons with `aria-expanded`,
+  `aria-controls` and Escape-to-close focus return. Linked parent entries keep
+  a separate navigation link, while unlinked labels become the toggle only
+  after enhancement.
 * `SeoTabs(interactionId: ...)` can now opt a visible semantic page into
   package-owned progressive enhancement. All panels remain in the source;
   vanilla JavaScript adds validated ARIA tab controls, click handling, roving

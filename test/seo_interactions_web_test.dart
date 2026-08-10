@@ -88,6 +88,122 @@ void main() {
     expect(outsideRoot.querySelectorAll('button').length, 0);
     script.remove();
   });
+
+  test('nav progressively enhances disclosures and preserves links', () {
+    final shell = web.document.createElement('div')
+      ..id = 'esen-seo-content'
+      ..setAttribute('data-esen-seo-shell', 'visible');
+    fixture.appendChild(shell);
+    final root = _appendNav(shell, 'primary-nav');
+
+    final malformed = _appendNav(shell, 'malformed-nav');
+    malformed
+        .querySelector('[data-esen-nav-branch]')
+        ?.appendChild(web.document.createElement('div'));
+    final duplicate = _appendNav(shell, 'duplicate-nav');
+    shell.appendChild(
+      web.document.createElement('div')..id = 'duplicate-nav-submenu-0',
+    );
+    final emptyLabel = _appendNav(shell, 'empty-label-nav');
+    emptyLabel.querySelector('a')?.textContent = '   ';
+    final outside = _appendNav(fixture, 'outside-nav');
+
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.querySelectorAll('a').length, 3);
+
+    final script = web.document.createElement('script')
+      ..textContent = seoInteractionRuntime;
+    web.document.body?.appendChild(script);
+
+    final toggles = root.querySelectorAll('[data-esen-nav-toggle]');
+    final submenus = root.querySelectorAll('[data-esen-nav-submenu]');
+    final productToggle = toggles.item(0)! as web.Element;
+    final moreToggle = toggles.item(1)! as web.Element;
+    final productSubmenu = submenus.item(0)! as web.Element;
+    final moreSubmenu = submenus.item(1)! as web.Element;
+    final productLink = root.querySelector('a[href="/products"]')!;
+    final deepLink = root.querySelector('a[href="/consulting"]')!;
+
+    expect(toggles.length, 2);
+    expect(productLink.textContent, 'Products');
+    expect(productLink.getAttribute('href'), '/products');
+    expect(productToggle.getAttribute('aria-label'), 'Products');
+    expect(productToggle.getAttribute('aria-expanded'), 'false');
+    expect(
+      productToggle.getAttribute('aria-controls'),
+      productSubmenu.id,
+    );
+    expect(productSubmenu.hasAttribute('hidden'), isTrue);
+    expect(moreSubmenu.hasAttribute('hidden'), isTrue);
+    expect(root.querySelector('span[hidden]')?.textContent, 'More');
+    expect(moreToggle.textContent, contains('More'));
+
+    productToggle.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(productToggle.getAttribute('aria-expanded'), 'true');
+    expect(productSubmenu.hasAttribute('hidden'), isFalse);
+
+    productToggle.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: 'Enter', bubbles: true),
+      ),
+    );
+    expect(productToggle.getAttribute('aria-expanded'), 'false');
+    productToggle.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: ' ', bubbles: true),
+      ),
+    );
+    expect(productToggle.getAttribute('aria-expanded'), 'true');
+    productToggle.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: ' ', repeat: true, bubbles: true),
+      ),
+    );
+    expect(productToggle.getAttribute('aria-expanded'), 'true');
+
+    moreToggle.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(moreToggle.getAttribute('aria-expanded'), 'true');
+    expect(moreSubmenu.hasAttribute('hidden'), isFalse);
+
+    moreToggle.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: 'Escape', bubbles: true),
+      ),
+    );
+    expect(moreToggle.getAttribute('aria-expanded'), 'false');
+    expect(moreSubmenu.hasAttribute('hidden'), isTrue);
+    expect(web.document.activeElement?.id, moreToggle.id);
+
+    moreToggle.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    deepLink.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: 'Escape', bubbles: true),
+      ),
+    );
+    expect(moreToggle.getAttribute('aria-expanded'), 'false');
+    expect(moreSubmenu.hasAttribute('hidden'), isTrue);
+    expect(web.document.activeElement?.id, moreToggle.id);
+    expect(productToggle.getAttribute('aria-expanded'), 'true');
+
+    expect(malformed.querySelectorAll('button').length, 0);
+    expect(duplicate.querySelectorAll('button').length, 0);
+    expect(emptyLabel.querySelectorAll('button').length, 0);
+    expect(outside.querySelectorAll('button').length, 0);
+    script.remove();
+  });
 }
 
 void _keydown(web.Element element, String key) {
@@ -115,6 +231,49 @@ web.Element _appendTabs(web.Element parent, String id) {
       ..textContent = index == 0 ? 'Overview content' : 'Details content');
     root.appendChild(panel);
   }
+  parent.appendChild(root);
+  return root;
+}
+
+web.Element _appendNav(web.Element parent, String id) {
+  final root = web.document.createElement('nav')
+    ..id = id
+    ..setAttribute('data-esen-component', 'nav-menu')
+    ..setAttribute('aria-label', 'Primary navigation');
+  final rootList = web.document.createElement('ul')
+    ..setAttribute('data-esen-nav-root-list', '');
+  final products = web.document.createElement('li')
+    ..setAttribute('data-esen-nav-branch', '');
+  products.appendChild(web.document.createElement('a')
+    ..setAttribute('href', '/products')
+    ..textContent = 'Products');
+
+  final productSubmenu = web.document.createElement('ul')
+    ..id = '$id-submenu-0'
+    ..setAttribute('data-esen-nav-submenu', '');
+  final apps = web.document.createElement('li');
+  apps.appendChild(web.document.createElement('a')
+    ..setAttribute('href', '/apps')
+    ..textContent = 'Apps');
+  productSubmenu.appendChild(apps);
+
+  final more = web.document.createElement('li')
+    ..setAttribute('data-esen-nav-branch', '');
+  more.appendChild(web.document.createElement('span')..textContent = 'More');
+  final moreSubmenu = web.document.createElement('ul')
+    ..id = '$id-submenu-0-1'
+    ..setAttribute('data-esen-nav-submenu', '');
+  final consulting = web.document.createElement('li');
+  consulting.appendChild(web.document.createElement('a')
+    ..setAttribute('href', '/consulting')
+    ..textContent = 'Consulting');
+  moreSubmenu.appendChild(consulting);
+  more.appendChild(moreSubmenu);
+  productSubmenu.appendChild(more);
+
+  products.appendChild(productSubmenu);
+  rootList.appendChild(products);
+  root.appendChild(rootList);
   parent.appendChild(root);
   return root;
 }

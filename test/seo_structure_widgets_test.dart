@@ -45,6 +45,26 @@ void main() {
       expect(EsenSeo.currentHtml, closed);
     });
 
+    testWidgets('interaction opt-in preserves Flutter and marks the full tree',
+        (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoNavMenu(
+          items: items,
+          interactionId: 'primary-nav',
+        ),
+      );
+
+      expect(find.text('Flutter Apps'), findsNothing);
+      expect(EsenSeo.currentHtml, contains('id="primary-nav"'));
+      expect(
+        EsenSeo.currentHtml,
+        contains('id="primary-nav-submenu-1"'),
+      );
+      expect(EsenSeo.currentHtml, contains('href="/leistungen/apps"'));
+      expect(EsenSeo.currentHtml, isNot(contains('<button')));
+    });
+
     testWidgets('entries without a URL become plain text', (tester) async {
       await pumpSeo(
         tester,

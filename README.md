@@ -695,16 +695,22 @@ loads (slow network, JS error), the user simply keeps a readable page.
 
 ### Progressive interactions
 
-Visible HTML can opt into package-owned progressive enhancement. The first
-supported component is `SeoTabs`: Flutter keeps its native stateful widget on
-iOS, Android and in the running web app, while the visible semantic page gains
-accessible tab controls from a small vanilla JavaScript runtime.
+Visible HTML can opt into package-owned progressive enhancement. `SeoTabs` and
+`SeoNavMenu` are currently supported: Flutter keeps its native stateful widgets
+on iOS, Android and in the running web app, while the visible semantic page
+gains accessible controls from a small vanilla JavaScript runtime.
 
 ```dart
 SeoTabs(
   interactionId: 'product-tabs', // stable DOM id: enables enhancement
   interactionLabel: 'Product information',
   tabs: productTabs,
+);
+
+SeoNavMenu(
+  interactionId: 'primary-nav',
+  label: 'Primary navigation',
+  items: navigationItems,
 );
 
 await prerenderSite(
@@ -721,8 +727,11 @@ The source contains every panel as ordinary sections and headings. JavaScript
 creates controls only after validating that structure, uses `textContent` for
 labels, and skips the invisible `inert` mirror after Flutter takes over. With
 JavaScript disabled, nothing disappears and every link and paragraph remains
-readable. This is an explicit component contract, not a compiler that attempts
-to translate arbitrary Dart callbacks or application state into JavaScript.
+readable. Navigation remains a native list of links rather than becoming an
+ARIA application menu: only branches receive disclosure buttons, and linked
+parents keep a separate navigation target. This is an explicit component
+contract, not a compiler that attempts to translate arbitrary Dart callbacks
+or application state into JavaScript.
 
 For a standalone semantic page with no Flutter bootstrap, use
 `SeoPage.visibleFromNodes(...)`; it applies the same default stylesheet and
