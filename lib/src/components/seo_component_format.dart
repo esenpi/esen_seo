@@ -1,6 +1,14 @@
 /// Shared formatting used by the pure SEO component builders.
 library;
 
+final RegExp _seoInteractionId = RegExp(r'^[A-Za-z][A-Za-z0-9_-]{0,127}$');
+
+/// Whether [value] is safe to use as a package interaction identifier.
+///
+/// The closed ASCII form is valid in HTML ids and can be extended with fixed
+/// package-owned suffixes without turning application data into a selector.
+bool isValidSeoInteractionId(String value) => _seoInteractionId.hasMatch(value);
+
 /// Normalizes chart input data so invalid and negative values become zero.
 double safeChartValue(double value) => value.isFinite && value > 0 ? value : 0;
 

@@ -33,8 +33,6 @@ typedef SeoTabComponentEntry = ({String label, List<SeoNode> nodes});
 /// Pure input for one step in [buildSeoStepperNodes].
 typedef SeoStepperComponentEntry = ({String label, List<SeoNode> nodes});
 
-final RegExp _validInteractionId = RegExp(r'^[A-Za-z][A-Za-z0-9_-]{0,127}$');
-
 /// Default ARGB palette used by [buildSeoPieChartNodes].
 const List<int> seoPieChartDefaultPaletteArgb = [
   0xFF2563EB,
@@ -164,7 +162,7 @@ List<SeoNode> buildSeoCarouselNodes({
   if (slides.isEmpty) return const [];
   final level = headingLevel.clamp(1, 6);
   final candidate = interactionId?.trim();
-  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+  final id = candidate != null && isValidSeoInteractionId(candidate)
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, slides.length - 1);
@@ -336,7 +334,7 @@ List<SeoNode> buildSeoNavMenuNodes<T>({
 }) {
   if (items.isEmpty) return const [];
   final candidate = interactionId?.trim();
-  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+  final id = candidate != null && isValidSeoInteractionId(candidate)
       ? candidate
       : null;
 
@@ -520,7 +518,7 @@ List<SeoNode> buildSeoStepperNodes({
   if (steps.isEmpty) return const [];
   final level = headingLevel.clamp(1, 6);
   final candidate = interactionId?.trim();
-  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+  final id = candidate != null && isValidSeoInteractionId(candidate)
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, steps.length - 1);
@@ -587,7 +585,7 @@ List<SeoNode> buildSeoTabsNodes({
   if (tabs.isEmpty) return const [];
   final level = headingLevel.clamp(1, 6);
   final candidate = interactionId?.trim();
-  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+  final id = candidate != null && isValidSeoInteractionId(candidate)
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, tabs.length - 1);

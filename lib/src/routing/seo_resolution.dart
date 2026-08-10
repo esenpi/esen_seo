@@ -157,8 +157,9 @@ final class SeoDocument extends SeoResolution {
   /// `seoBotMiddleware` emits these through a filter, because a value
   /// here may ultimately come from a CMS. The names are an **allow
   /// list** — `cache-control`, `expires`, `etag`, `last-modified`,
-  /// `age`, `x-robots-tag`, `link`, `content-language`, plus `vary`,
-  /// which is merged with `User-Agent` rather than replacing it.
+  /// `age`, `x-robots-tag`, `link`, `content-language`, plus `vary`.
+  /// Flutter-delivered SSR responses merge it with `User-Agent`; DOM-first
+  /// responses do not vary by User-Agent and preserve only declared variants.
   /// Anything else is dropped, as is a name that is not a valid HTTP
   /// token or a value outside printable ASCII.
   ///

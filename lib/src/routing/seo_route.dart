@@ -8,6 +8,7 @@ import 'dart:async';
 import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
 import 'seo_resolution.dart';
+import 'seo_route_delivery.dart';
 
 /// Builds the [SeoMeta] for a matched route.
 ///
@@ -71,9 +72,15 @@ class SeoRoute {
     this.lang = 'en',
     this.includeInSitemap = true,
     this.lastModified,
+    this.delivery = SeoRouteDelivery.flutter,
+    Set<SeoDomFirstFeature> domFirstFeatures = const {},
   })  : path = _validatedSeoRoutePath(path),
         isDynamic = false,
-        resolve = _staticResolver(meta, body);
+        resolve = _staticResolver(meta, body),
+        domFirstFeatures = _validatedDomFirstFeatures(
+          delivery,
+          domFirstFeatures,
+        );
 
   /// The database form: one [resolve] read produces metadata **and**
   /// body for a concrete URL, so the two can never describe different
@@ -102,10 +109,16 @@ class SeoRoute {
     this.lang = 'en',
     this.includeInSitemap = true,
     this.lastModified,
+    this.delivery = SeoRouteDelivery.flutter,
+    Set<SeoDomFirstFeature> domFirstFeatures = const {},
   })  : path = _validatedSeoRoutePath(path),
         meta = null,
         body = null,
-        isDynamic = true;
+        isDynamic = true,
+        domFirstFeatures = _validatedDomFirstFeatures(
+          delivery,
+          domFirstFeatures,
+        );
 
   /// The URL path pattern, e.g. `/` or `/blog/:slug`.
   /// Segments starting with `:` capture the value as a parameter.
@@ -121,6 +134,20 @@ class SeoRoute {
   /// synchronous generators use it to refuse a table they cannot resolve
   /// without awaiting.
   final bool isDynamic;
+
+  /// Which presentation owns this route for human web requests.
+  ///
+  /// The default preserves the existing Flutter delivery byte for byte.
+  final SeoRouteDelivery delivery;
+
+  /// Package-owned browser behaviour enabled for a DOM-first route.
+  ///
+  /// Features are rejected on Flutter-delivered routes instead of being
+  /// silently ignored, so a misplaced opt-in cannot appear to work.
+  final Set<SeoDomFirstFeature> domFirstFeatures;
+
+  /// Whether the semantic document permanently owns the web route.
+  bool get isDomFirst => delivery == SeoRouteDelivery.domFirst;
 
   /// Lists the concrete URLs of a `:param` route for enumeration
   /// (sitemap, llms.txt, prerender). Optional; without it a `:param`
@@ -185,6 +212,20 @@ class SeoRoute {
     }
     return params;
   }
+}
+
+Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
+  SeoRouteDelivery delivery,
+  Set<SeoDomFirstFeature> features,
+) {
+  if (delivery != SeoRouteDelivery.domFirst && features.isNotEmpty) {
+    throw ArgumentError.value(
+      features,
+      'domFirstFeatures',
+      'require delivery: SeoRouteDelivery.domFirst',
+    );
+  }
+  return Set<SeoDomFirstFeature>.unmodifiable(features);
 }
 
 /// Wraps the convenience [SeoRoute]'s two builders into a single

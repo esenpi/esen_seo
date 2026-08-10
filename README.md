@@ -68,6 +68,9 @@ The HTML only exists on the web.
 - **Visible shell (optional)**: let the prerendered HTML *be* the first
   frame — styled, readable content before the Flutter engine has
   loaded, with Flutter taking the screen over on its first frame.
+- **DOM-first routes (opt-in)**: let a pure route body remain the permanent
+  page without loading Flutter Web. The first slice supports `SeoTabs` through
+  one transition compiled from the same pure Dart source used by Flutter.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -534,7 +537,9 @@ A resolver may also return response headers via `SeoDocument.headers`.
 The names are an **allow list** — `cache-control`, `expires`, `etag`,
 `last-modified`, `age`, `x-robots-tag`, `link` and `content-language`,
 plus `vary`, which is merged with `User-Agent` rather than replacing
-it. Everything else is dropped, as is any name that is not a valid
+it on Flutter-delivered SSR responses. DOM-first responses do not vary by
+User-Agent and preserve only the variants you declare. Everything else is
+dropped, as is any name that is not a valid
 HTTP token and any value outside printable ASCII. That is deliberately narrow: a page's content should not be
 able to set a cookie, claim a content encoding, or decide your CORS and
 CSP posture. For headers beyond that list, put your own shelf
@@ -726,7 +731,60 @@ empty surface stays hidden during boot — the user sees content, then
 the finished app, and never the loading in between. If the engine never
 loads (slow network, JS error), the user simply keeps a readable page.
 
-### Progressive interactions
+## DOM-first routes — permanent HTML without Flutter Web
+
+A route whose entire body comes from the pure component layer can opt out of
+the Flutter browser runtime. Humans and crawlers then receive the same
+standalone semantic document; there is no canvas, takeover or hidden app.
+Navigation is ordinary multi-page navigation, and every indexable panel stays
+in the delivered HTML when JavaScript is unavailable.
+
+```dart
+final productTabs = <SeoTabComponentEntry>[
+  (
+    label: 'Overview',
+    nodes: [SeoNode(tag: 'p', text: 'Everything at a glance.')],
+  ),
+  (
+    label: 'Details',
+    nodes: [SeoNode(tag: 'p', text: 'All technical details.')],
+  ),
+];
+
+final seoRoutes = [
+  SeoRoute(
+    path: '/product',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: const {SeoDomFirstFeature.tabs},
+    meta: (_) => const SeoMeta(title: 'Product'),
+    body: (_) => buildSeoTabsNodes(
+      tabs: productTabs,
+      interactionId: 'product-tabs',
+    ),
+  ),
+];
+```
+
+`seoBotMiddleware` serves that route before its User-Agent split, and
+`prerenderSite` writes a standalone file without `flutter_bootstrap.js` or
+`main.dart.js`. The regular `stylesheet` input styles prerendered DOM-first
+pages; the middleware uses `domFirstStylesheet`, which defaults to
+`seoDefaultStylesheet`. `domFirstNonce` can supply a per-response CSP nonce.
+
+This first vertical slice deliberately supports only package-owned tabs. It
+does not translate arbitrary Flutter `State`, Cubits or callbacks. Instead,
+`SeoTabs` and the browser adapter execute the same pure transition while each
+presentation owns its current state. Custom application transitions, effects,
+forms and client-side routing require later, separately designed build and
+security boundaries.
+
+On a DOM-first route a resolver result is final because no Flutter app exists
+there as a fallback. Therefore every `SeoRedirect` and every error document is
+served to humans and crawlers even when `applyResolverRedirects` is
+`SeoRedirectScope.botsOnly` or `.off`. `auditSeoParity` excludes these routes:
+the route body is the presentation, not a second tree to compare with Flutter.
+
+## Progressive interactions
 
 Visible HTML can opt into package-owned progressive enhancement. `SeoTabs`,
 `SeoNavMenu`, `SeoCarousel` and `SeoStepper` are currently supported: Flutter

@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart';
 
 import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
+import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
@@ -26,10 +27,9 @@ typedef SeoPageResolver = FutureOr<SeoPage?> Function(Request request);
 /// static table never takes the branch, since a static resolution can
 /// never be a redirect.
 ///
-/// Note this governs only *redirects*. Error statuses (404, 410) stay
-/// bot-only regardless — a human hitting a missing page keeps the
-/// Flutter app rather than an SSR stub, and the app's own router owns
-/// what they see.
+/// This scope only governs Flutter-delivered routes. A DOM-first route has no
+/// application fallback, so every resolver redirect and error document is
+/// delivered to every requester regardless of this setting.
 enum SeoRedirectScope {
   /// Redirect both humans and bots (the anti-cloaking default).
   all,
@@ -104,6 +104,16 @@ Middleware seoBotMiddleware({
   bool unknownRoutesAs404 = true,
   BotDetector detector = const BotDetector(),
   SeoRedirectScope applyResolverRedirects = SeoRedirectScope.all,
+
+  /// CSS embedded in every DOM-first document. Pass an empty string for an
+  /// intentionally unstyled page.
+  String? domFirstStylesheet = seoDefaultStylesheet,
+
+  /// Produces an optional CSP nonce for one DOM-first response.
+  ///
+  /// The callback runs for the matched route only. It does not affect the
+  /// semantic content and is never consulted for Flutter-delivered routes.
+  String? Function(Request request)? domFirstNonce,
   Duration? infrastructureCacheTtl = seoAutoInfrastructureCacheTtl,
 
   /// Called when a route resolver fails.
@@ -326,6 +336,54 @@ Middleware seoBotMiddleware({
         );
       }
 
+      // DOM-first is a route property, not a User-Agent representation. It
+      // resolves before bot detection and every outcome is final because
+      // there is no Flutter application on this route to fall back to.
+      if (routes != null) {
+        final match = matchSeoRoute(routes, path);
+        if (match != null && match.route.isDomFirst) {
+          final SeoResolution resolution;
+          try {
+            resolution = await match.resolve(
+              canonicalBase: siteBase,
+              onWarning: (p, w) => report(p, StateError(w), StackTrace.current),
+            );
+          } catch (error, stack) {
+            report(path, error, stack);
+            rethrow;
+          }
+          switch (resolution) {
+            case SeoRedirect(:final location, :final statusCode):
+              return Response(statusCode, headers: {'location': location});
+            case SeoDocument(
+                :final statusCode,
+                :final body,
+                :final meta,
+                :final headers,
+              ):
+              final pageBody = statusCode >= 400 && body.isEmpty
+                  ? _statusBody(statusCode)
+                  : body;
+              return _htmlResponse(
+                SeoPage.domFirstFromNodes(
+                  meta: statusCode >= 400 && meta.title == null
+                      ? meta.copyWith(title: _statusTitle(statusCode))
+                      : meta,
+                  body: pageBody,
+                  lang: resolution.lang ?? match.route.lang,
+                  stylesheet: domFirstStylesheet,
+                  features: match.route.domFirstFeatures,
+                  interactionNonce: domFirstNonce?.call(request),
+                ),
+                status: statusCode,
+                extraHeaders: _safeHeaders(headers, varyUserAgent: false),
+                varyUserAgent: false,
+                surface: 'dom-first',
+              );
+          }
+        }
+      }
+
       final isBot = detector.isBot(request.headers['user-agent']);
 
       // A resolver redirect applies to humans too by default — a 301
@@ -483,6 +541,8 @@ Response _htmlResponse(
   SeoPage page, {
   int status = 200,
   Map<String, String>? extraHeaders,
+  bool varyUserAgent = true,
+  String surface = 'ssr',
 }) =>
     Response(
       status,
@@ -490,10 +550,10 @@ Response _htmlResponse(
       headers: {
         'content-type': 'text/html; charset=utf-8',
         // Kennzeichnet SSR-Antworten, z.B. zum Debuggen mit curl.
-        'x-esen-seo': 'ssr',
-        // extraHeaders (from _safeHeaders) already carries a merged
-        // `vary` including User-Agent; without it, the plain vary applies.
-        ...(extraHeaders ?? _varyHeader),
+        'x-esen-seo': surface,
+        // extraHeaders already carries the policy-selected `vary`; without it,
+        // Flutter delivery uses the User-Agent fork's default.
+        ...(extraHeaders ?? (varyUserAgent ? _varyHeader : const {})),
       },
     );
 
@@ -520,13 +580,16 @@ Response _htmlResponse(
 ///    the renderer applies to URLs, so safety never depends on how a
 ///    particular shelf adapter treats a stray NUL, vertical tab or
 ///    U+2028.
-///  * `vary` is **merged** with `User-Agent`, never replaced — the CDN
-///    correctness of this middleware rests on `vary: User-Agent`, and a
-///    resolver that also varies on `Accept-Language` must add to it, not
-///    overwrite it.
-Map<String, String> _safeHeaders(Map<String, String> headers) {
+///  * On Flutter-delivered routes `vary` is **merged** with `User-Agent`,
+///    never replaced — the CDN correctness of the bot fork rests on it. A
+///    DOM-first route has no such fork, so it retains declared variants without
+///    adding a false User-Agent dependency.
+Map<String, String> _safeHeaders(
+  Map<String, String> headers, {
+  bool varyUserAgent = true,
+}) {
   final safe = <String, String>{};
-  final vary = <String>{'User-Agent'};
+  final vary = <String>{if (varyUserAgent) 'User-Agent'};
   headers.forEach((rawName, value) {
     final name = rawName.trim().toLowerCase();
     if (!_validHeaderName.hasMatch(name) ||
@@ -544,7 +607,7 @@ Map<String, String> _safeHeaders(Map<String, String> headers) {
     }
     safe[name] = value;
   });
-  safe['vary'] = vary.join(', ');
+  if (vary.isNotEmpty) safe['vary'] = vary.join(', ');
   return safe;
 }
 

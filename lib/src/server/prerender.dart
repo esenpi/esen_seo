@@ -9,6 +9,7 @@ import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 import 'llms_txt.dart';
+import 'seo_page.dart';
 import 'sitemap.dart';
 
 /// Bakes the SEO route table into the built Flutter web app as static
@@ -102,7 +103,14 @@ Future<List<String>> prerenderSite({
   // chain — a themed stylesheet that is generated, committed and then
   // never passed here fails silently in exactly the way this line
   // makes visible in every build log.
-  stdout.writeln(_describeStylesheet(stylesheet, renderMode));
+  stdout.writeln(
+    _describeStylesheet(
+      stylesheet,
+      renderMode,
+      hasDomFirstRoutes: routes.any((route) => route.isDomFirst),
+      hasFlutterRoutes: routes.any((route) => !route.isDomFirst),
+    ),
+  );
   // Der Root-Pfad überschreibt index.html — ein zweiter Lauf würde die
   // eigene Ausgabe als Template lesen und alles doppelt einbauen.
   if (_seoContainerMarker.hasMatch(template)) {
@@ -174,16 +182,25 @@ Future<List<String>> prerenderSite({
       onSkipped?.call(page.path, page.resolution);
       continue;
     }
-    final html = _applyTemplate(
-      template,
-      doc.meta,
-      const HtmlRenderer().render(doc.body),
-      page.lang,
-      renderMode,
-      stylesheet,
-      enableInteractions,
-      interactionNonce,
-    );
+    final html = page.route?.isDomFirst ?? false
+        ? SeoPage.domFirstFromNodes(
+            meta: doc.meta,
+            body: doc.body,
+            lang: page.lang,
+            stylesheet: stylesheet ?? seoDefaultStylesheet,
+            features: page.route!.domFirstFeatures,
+            interactionNonce: interactionNonce,
+          ).toHtmlDocument()
+        : _applyTemplate(
+            template,
+            doc.meta,
+            const HtmlRenderer().render(doc.body),
+            page.lang,
+            renderMode,
+            stylesheet,
+            enableInteractions,
+            interactionNonce,
+          );
     final file = File(
       page.path == '/'
           ? '$buildDir/index.html'
@@ -405,10 +422,20 @@ String _applyTemplate(
 }
 
 /// One line for the build log: what will style the shell.
-String _describeStylesheet(String? stylesheet, SeoRenderMode mode) {
+String _describeStylesheet(
+  String? stylesheet,
+  SeoRenderMode mode, {
+  required bool hasDomFirstRoutes,
+  required bool hasFlutterRoutes,
+}) {
   final css = stylesheet?.trim() ?? '';
   final String what;
-  if (css.isEmpty) {
+  if (stylesheet == null && hasDomFirstRoutes) {
+    what = hasFlutterRoutes
+        ? 'seoDefaultStylesheet for DOM-first routes; '
+            'none for Flutter routes'
+        : 'seoDefaultStylesheet (DOM-first default)';
+  } else if (css.isEmpty) {
     what = 'none (unstyled semantic HTML)';
   } else if (css == seoDefaultStylesheet.trim()) {
     what = 'seoDefaultStylesheet (opinion-free web scale)';

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../components/seo_components.dart';
+import '../components/seo_tabs_transition.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -101,9 +102,12 @@ class SeoTabs extends StatefulWidget {
 }
 
 class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
-  late int _index = widget.tabs.isEmpty
-      ? 0
-      : widget.initialIndex.clamp(0, widget.tabs.length - 1);
+  late SeoTabsState _tabsState = initialSeoTabsState(
+    count: widget.tabs.length,
+    index: widget.initialIndex,
+  );
+
+  int get _index => _tabsState.index;
 
   @override
   void didUpdateWidget(SeoTabs oldWidget) {
@@ -117,9 +121,15 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
       replaced = widget.tabs[i].label != oldWidget.tabs[i].label;
     }
     if (replaced || widget.initialIndex != oldWidget.initialIndex) {
-      _index = widget.initialIndex.clamp(0, widget.tabs.length - 1);
-    } else if (_index >= widget.tabs.length) {
-      _index = widget.tabs.length - 1;
+      _tabsState = initialSeoTabsState(
+        count: widget.tabs.length,
+        index: widget.initialIndex,
+      );
+    } else {
+      _tabsState = initialSeoTabsState(
+        count: widget.tabs.length,
+        index: _index,
+      );
     }
   }
 
@@ -149,7 +159,9 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
     final selected = index == _index;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _index = index),
+      onTap: () => setState(() {
+        _tabsState = transitionSeoTabs(_tabsState, SeoTabsSelect(index));
+      }),
       child: Container(
         padding: const EdgeInsets.only(bottom: 6),
         decoration: BoxDecoration(

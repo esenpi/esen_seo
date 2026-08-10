@@ -20,13 +20,22 @@ library;
 export 'src/components/seo_component_format.dart';
 export 'src/components/seo_components.dart';
 export 'src/components/seo_rich_text.dart';
+export 'src/components/seo_tabs_transition.dart';
 export 'src/meta/seo_meta.dart';
 export 'src/meta/seo_schema.dart';
 export 'src/renderer/html_renderer.dart';
-export 'src/renderer/seo_container.dart' show SeoRenderMode;
+export 'src/renderer/seo_container.dart'
+    show SeoRenderMode, seoDomFirstAttribute;
+export 'src/renderer/seo_dom_first.dart'
+    show
+        seoDomFirstFeatureScriptHtml,
+        seoDomFirstFeatureStyleHtml,
+        seoDomFirstScriptAttribute,
+        seoDomFirstTabsStylesheet;
 export 'src/renderer/seo_interactions.dart';
 export 'src/renderer/seo_node.dart';
 export 'src/renderer/seo_stylesheet.dart' show seoDefaultStylesheet;
 export 'src/routing/seo_resolution.dart';
 export 'src/routing/seo_resolved_page.dart';
 export 'src/routing/seo_route.dart';
+export 'src/routing/seo_route_delivery.dart';

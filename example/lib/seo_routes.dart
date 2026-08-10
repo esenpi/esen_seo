@@ -238,6 +238,36 @@ final seoRoutes = [
     ],
   ),
   SeoRoute(
+    path: '/dom-first-tabs',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: const {SeoDomFirstFeature.tabs},
+    meta: (_) => SeoMeta(
+      title: 'DOM-first Tabs — esen_seo',
+      description: 'A permanent semantic HTML route with accessible tabs '
+          'compiled from the same pure Dart transition as Flutter.',
+      schemas: [
+        SeoSchema.breadcrumbs([
+          (name: 'Home', url: '$siteBase/'),
+          (name: 'DOM-first Tabs', url: '$siteBase/dom-first-tabs'),
+        ]),
+      ],
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'DOM-first Tabs'),
+      SeoNode(
+        tag: 'p',
+        text: 'This route is complete HTML before JavaScript runs and does '
+            'not load the Flutter web engine.',
+      ),
+      ...buildSeoTabsNodes(
+        tabs: demoTabEntries(),
+        interactionId: 'dom-first-demo-tabs',
+        interactionLabel: 'Rendering targets',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
     path: '/docs',
     // Erscheint als <lastmod> in der sitemap.xml.
     lastModified: DateTime.utc(2026, 7, 31),

@@ -36,7 +36,10 @@ jobs:
       # pana bewertet die Formatierung — ein Verstoß kostet Punkte auf
       # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
       - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed lib test benchmark
+        run: >-
+          find lib test benchmark -name '*.dart'
+          ! -name 'seo_dom_first_tabs_runtime.g.dart'
+          -exec dart format --output=none --set-exit-if-changed {} +
 
       - name: Analyze package
         run: flutter analyze
@@ -108,6 +111,31 @@ jobs:
           test -s build/web/sitemap.xml
           test -s build/web/robots.txt
           echo "prerendered output looks sane"
+
+  dom-first-runtime:
+    name: generated DOM-first runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Generated JavaScript is compiler output. Pinning the producer makes a
+      # byte comparison meaningful instead of treating toolchain drift as a
+      # source change.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.27.4'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify the compiled tabs runtime is current
+        run: dart run tool/build_dom_first_tabs_runtime.dart
+
+      - name: Verify generated runtime formatting with its producer
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib/src/renderer/seo_dom_first_tabs_runtime.g.dart
 
   server:
     name: server path without Flutter

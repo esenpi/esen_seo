@@ -63,6 +63,8 @@ void enableSeoForParity() {
 /// Paths not covered by [paths] are reported once as
 /// [SeoCheck.parityNotCovered] — a shrinking sample should not quietly
 /// become no sample at all.
+/// DOM-first routes are excluded: their route body is the presentation rather
+/// than a second Flutter tree, so pumping Flutter would test the wrong owner.
 Future<SeoAuditReport> auditSeoParity({
   required List<SeoRoute> routes,
   required String siteBase,
@@ -120,6 +122,7 @@ Future<SeoAuditReport> auditSeoParity({
       ));
       continue;
     }
+    if (page.route?.isDomFirst ?? false) continue;
     final document = page.document;
     if (document == null) continue; // a redirect has no body to compare
 
@@ -144,10 +147,15 @@ Future<SeoAuditReport> auditSeoParity({
   // judgement call the caller may have made deliberately.
   final unchecked = [
     for (final page in resolved)
-      if (page.isIndexable && !paths.map(normalizeSeoPath).contains(page.path))
+      if (page.isIndexable &&
+          !(page.route?.isDomFirst ?? false) &&
+          !paths.map(normalizeSeoPath).contains(page.path))
         page.path,
   ];
-  if (covered == 0) {
+  final hasParityCandidate = resolved.any(
+    (page) => page.isIndexable && !(page.route?.isDomFirst ?? false),
+  );
+  if (covered == 0 && hasParityCandidate) {
     findings.add(SeoFinding(
       check: SeoCheck.parityNotCovered,
       severity: SeoSeverity.error,

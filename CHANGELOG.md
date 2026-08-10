@@ -1,5 +1,20 @@
 ## Unreleased
 
+* Added an opt-in DOM-first delivery slice for routes derived entirely from
+  the pure component layer. `SeoRouteDelivery.domFirst` makes the semantic
+  document the permanent page for humans and crawlers, through both shelf and
+  static prerendering, without loading a Flutter web artifact. Resolver
+  redirects and error documents are final on these routes regardless of
+  `SeoRedirectScope`; Flutter-delivered routes retain their previous bytes and
+  behaviour.
+* `SeoDomFirstFeature.tabs` compiles the package's pure Dart tabs transition
+  into a route-scoped browser runtime behind a separate opt-in. Flutter
+  `SeoTabs` now delegates selection to the same transition. The DOM control
+  validates its complete structure before mutation, creates fixed ARIA
+  controls through one apply boundary, supports pointer and Arrow/Home/End
+  navigation, and leaves the complete document readable without JavaScript.
+  Application-authored transitions, effects, forms and client routing are not
+  part of this first slice.
 * Added `SeoStepper`, a state-hidden-content bridge with lazy native Flutter
   bodies and every step present as an ordered semantic HTML list. A valid
   `interactionId` progressively adds validated step buttons, previous/next

@@ -41,10 +41,11 @@ String escapeStylesheet(String css) => css.replaceAll(_styleClose, r'\3c ');
 
 /// A minimal classless stylesheet so semantic HTML looks presentable
 /// without any work — the visual counterpart to the smart defaults.
-/// Meant for [SeoRenderMode.visibleShell]; in the invisible default
-/// mode there is nothing to style.
+/// Used by default for DOM-first pages and available for
+/// [SeoRenderMode.visibleShell]. In the invisible default mode there is
+/// nothing to style.
 ///
-/// Scoped to the shell container, so it can never interfere with the
+/// Scoped to the semantic container, so it can never interfere with the
 /// rest of the document. Deliberately opinion-free: system fonts, a
 /// readable measure, sane spacing. To make the shell match your app,
 /// generate a themed replacement with `seoStylesheetFromTheme` (or

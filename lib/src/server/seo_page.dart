@@ -1,9 +1,11 @@
 import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
+import '../renderer/seo_dom_first.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
+import '../routing/seo_route_delivery.dart';
 
 /// A complete server-rendered page: head metadata plus a semantic HTML body.
 ///
@@ -17,7 +19,8 @@ import '../renderer/seo_stylesheet.dart';
 /// The body can also be built from [SeoNode]s via [SeoPage.fromNodes] - then
 /// all text is escaped by the [HtmlRenderer], exactly like in the Flutter app.
 /// [SeoPage.visibleFromNodes] creates a standalone, visible page with optional
-/// package-owned progressive interactions.
+/// package-owned progressive interactions. [SeoPage.domFirstFromNodes] creates
+/// a permanent semantic page with separately selected compiled capabilities.
 class SeoPage {
   SeoPage({
     SeoMeta? meta,
@@ -26,7 +29,8 @@ class SeoPage {
   })  : meta = meta ?? const SeoMeta(),
         stylesheet = null,
         enableInteractions = false,
-        interactionNonce = null;
+        interactionNonce = null,
+        domFirstFeatures = const {};
 
   /// Builds the body from [SeoNode]s using the same renderer as the
   /// Flutter side.
@@ -56,7 +60,26 @@ class SeoPage {
         bodyHtml = seoContainerHtml(
           const HtmlRenderer().render(body),
           mode: SeoRenderMode.visibleShell,
-        );
+        ),
+        domFirstFeatures = const {};
+
+  /// Builds a permanent semantic page without a Flutter browser runtime.
+  ///
+  /// [features] is independent from [enableInteractions]: only the compiled
+  /// capabilities selected for this DOM-first route are included.
+  SeoPage.domFirstFromNodes({
+    SeoMeta? meta,
+    required List<SeoNode> body,
+    this.lang = 'en',
+    this.stylesheet = seoDefaultStylesheet,
+    Set<SeoDomFirstFeature> features = const {},
+    this.interactionNonce,
+  })  : meta = meta ?? const SeoMeta(),
+        bodyHtml = seoDomFirstContainerHtml(
+          const HtmlRenderer().render(body),
+        ),
+        enableInteractions = false,
+        domFirstFeatures = Set.unmodifiable(features);
 
   /// Head metadata: title, description, OpenGraph, JSON-LD schemas.
   final SeoMeta meta;
@@ -82,9 +105,13 @@ class SeoPage {
   /// content below an `inert` or `aria-hidden="true"` ancestor.
   final bool enableInteractions;
 
+  /// Compiled behaviours selected for a permanent DOM-first page.
+  final Set<SeoDomFirstFeature> domFirstFeatures;
+
   /// Optional CSP nonce placed on package-generated style and script tags.
   ///
-  /// It does not cover the visible container's inline `style` attribute.
+  /// In visible-shell mode it does not cover the container's inline `style`
+  /// attribute.
   final String? interactionNonce;
 
   /// Renders the complete HTML document.
@@ -97,9 +124,22 @@ class SeoPage {
     if (enableInteractions) {
       head.write(seoInteractionStyleHtml(nonce: interactionNonce));
     }
-    final runtime = enableInteractions
-        ? seoInteractionScriptHtml(nonce: interactionNonce)
-        : '';
+    head.write(
+      seoDomFirstFeatureStyleHtml(
+        domFirstFeatures,
+        nonce: interactionNonce,
+      ),
+    );
+    final runtime = StringBuffer();
+    if (enableInteractions) {
+      runtime.write(seoInteractionScriptHtml(nonce: interactionNonce));
+    }
+    runtime.write(
+      seoDomFirstFeatureScriptHtml(
+        domFirstFeatures,
+        nonce: interactionNonce,
+      ),
+    );
     return '<!DOCTYPE html>'
         '<html lang="$language">'
         '<head>'

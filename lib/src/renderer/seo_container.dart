@@ -46,6 +46,9 @@ const String seoContainerId = 'esen-seo-content';
 /// two sides can never drift apart.
 const String seoShellAttribute = 'data-esen-seo-shell';
 
+/// Marks a semantic container that permanently owns the browser route.
+const String seoDomFirstAttribute = 'data-esen-seo-dom-first';
+
 /// Marks the head elements the injector manages, so a repeated pass
 /// replaces its own tags and leaves everything hardcoded in
 /// `index.html` alone.
@@ -122,3 +125,7 @@ String seoContainerHtml(
   return '<div id="$seoContainerId" aria-hidden="true" $seoInertAttribute '
       'style="$seoContainerStyle">$bodyHtml</div>';
 }
+
+/// The visible container for a route delivered without a Flutter runtime.
+String seoDomFirstContainerHtml(String bodyHtml) =>
+    '<div id="$seoContainerId" $seoDomFirstAttribute="true">$bodyHtml</div>';
