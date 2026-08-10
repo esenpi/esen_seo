@@ -1,3 +1,10 @@
+## Unreleased
+
+* Semi-transparent `SeoBarChart` and `SeoPieChart` colors now preserve
+  their alpha channel in CSS as `#rrggbbaa`. Opaque colors keep their
+  existing `#rrggbb` output. Component and theme CSS now share the same
+  pure ARGB serializer.
+
 ## 0.9.0
 
 The theme bridge: the visible shell in your app's design.

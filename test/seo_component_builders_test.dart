@@ -81,7 +81,9 @@ void main() {
       expect(safeDimension(double.infinity, 180), 180);
       expect(cssNumber(54), '54');
       expect(cssPercent(1, 3), '33.3');
-      expect(cssColorArgb(0x8012ABCD), '#12abcd');
+      expect(cssColorArgb(0xFF12ABCD), '#12abcd');
+      expect(cssColorArgb(0x8012ABCD), '#12abcd80');
+      expect(cssColorArgb(0x0012ABCD), '#12abcd00');
     });
   });
 }

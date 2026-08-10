@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../components/seo_component_format.dart';
 import '../renderer/seo_theme_css.dart';
 
 /// Builds the shell stylesheet from the app's own theme.
@@ -229,13 +230,13 @@ SeoThemeTokens _tokensFrom(
 /// there and `toARGB32()` does not exist yet; this is why the package
 /// requires Flutter >=3.27.0.
 String _hex(Color color) {
-  String channel(double value) =>
-      ((value * 255.0).round().clamp(0, 255)).toRadixString(16).padLeft(2, '0');
-  final rgb = '${channel(color.r)}${channel(color.g)}${channel(color.b)}';
-  final alpha = (color.a * 255.0).round().clamp(0, 255);
-  return alpha == 255
-      ? '#$rgb'
-      : '#$rgb${alpha.toRadixString(16).padLeft(2, '0')}';
+  int channel(double value) =>
+      ((value * 255.0).round().clamp(0, 255) as num).toInt();
+  final argb = channel(color.a) << 24 |
+      channel(color.r) << 16 |
+      channel(color.g) << 8 |
+      channel(color.b);
+  return cssColorArgb(argb);
 }
 
 /// Deterministic, compact number formatting: `1.5`, not `1.50`; `2`,

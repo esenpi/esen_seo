@@ -48,6 +48,14 @@ void main() {
       expect(EsenSeo.currentHtml, contains('background:#ab12cd'));
     });
 
+    testWidgets('bar color preserves alpha in CSS order', (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoBarChart(data: _data, color: Color(0x80AB12CD)),
+      );
+      expect(EsenSeo.currentHtml, contains('background:#ab12cd80'));
+    });
+
     testWidgets('all-zero data renders without division errors',
         (tester) async {
       await pumpSeo(

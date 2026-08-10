@@ -28,9 +28,14 @@ String cssPercent(double value, double total) {
   return fixed.endsWith('.0') ? fixed.substring(0, fixed.length - 2) : fixed;
 }
 
-/// Formats an ARGB integer as CSS `#rrggbb`, intentionally ignoring alpha.
+/// Formats an ARGB integer as lowercase CSS hexadecimal.
 ///
-/// Alpha remains ignored for compatibility with the widget output before the
-/// pure component layer was introduced.
-String cssColorArgb(int argb) =>
-    '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+/// Opaque colors use `#rrggbb`; colors carrying alpha use `#rrggbbaa`,
+/// following CSS ordering rather than the input integer's ARGB ordering.
+String cssColorArgb(int argb) {
+  final rgb = (argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
+  final alpha = (argb >> 24) & 0xFF;
+  return alpha == 0xFF
+      ? '#$rgb'
+      : '#$rgb${alpha.toRadixString(16).padLeft(2, '0')}';
+}

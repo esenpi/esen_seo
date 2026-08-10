@@ -54,6 +54,16 @@ void main() {
       expect(EsenSeo.currentHtml, contains('#f59e0b 50% 100%'));
     });
 
+    testWidgets('segment colors preserve alpha in CSS order', (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoPieChart(data: [
+          SeoPieChartEntry('A', 1, color: Color(0x80112233)),
+        ]),
+      );
+      expect(EsenSeo.currentHtml, contains('#11223380 0% 100%'));
+    });
+
     testWidgets('zero total renders a neutral circle, no gradient',
         (tester) async {
       await pumpSeo(
