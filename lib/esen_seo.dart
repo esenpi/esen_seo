@@ -26,6 +26,7 @@ export 'src/tags/seo_tags.dart';
 export 'src/widgets/seo_bar_chart.dart';
 export 'src/widgets/seo_block.dart';
 export 'src/widgets/seo_breadcrumbs.dart';
+export 'src/widgets/seo_carousel.dart';
 export 'src/widgets/seo_data_table.dart';
 export 'src/widgets/seo_faq.dart';
 export 'src/widgets/seo_figure.dart';

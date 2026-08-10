@@ -19,6 +19,12 @@ const String seoInteractionStylesheet = '''
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"]{border-bottom-color:currentColor;font-weight:600}
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>section[data-esen-tab-panel][hidden]{display:none}
+#$seoContainerId [data-esen-component="carousel"]>.esen-seo-carousel-controls{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-block:.75rem}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;height:2.5rem;padding:0;cursor:pointer}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control][aria-disabled="true"]{opacity:.4;cursor:default}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-status{display:inline-block;min-width:4rem;text-align:center}
+#$seoContainerId [data-esen-component="carousel"][data-esen-enhanced="true"]>section[data-esen-carousel-slide][hidden]{display:none}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]{font:inherit;color:inherit;background:transparent;border:0;padding:.25rem;cursor:pointer}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="nav-menu"] .esen-seo-nav-toggle-label{padding:.25rem 0}
@@ -37,12 +43,20 @@ const String seoInteractionRuntime = r'''
   'use strict';
 
   var tabsSelector = '[data-esen-component="tabs"]';
+  var carouselSelector = '[data-esen-component="carousel"]';
   var navSelector = '[data-esen-component="nav-menu"]';
 
   function directPanels(root) {
     return Array.prototype.filter.call(root.children, function (child) {
       return child.tagName === 'SECTION' &&
           child.hasAttribute('data-esen-tab-panel');
+    });
+  }
+
+  function directCarouselSlides(root) {
+    return Array.prototype.filter.call(root.children, function (child) {
+      return child.tagName === 'SECTION' &&
+          child.hasAttribute('data-esen-carousel-slide');
     });
   }
 
@@ -163,6 +177,124 @@ const String seoInteractionRuntime = r'''
     activate(initial, false);
   }
 
+  function enhanceCarousel(root) {
+    if (!canEnhance(root)) return;
+
+    var slides = directCarouselSlides(root);
+    if (slides.length < 2 || slides.length !== root.children.length) return;
+
+    var label = root.getAttribute('data-esen-label') || '';
+    var previousLabel = root.getAttribute('data-esen-previous-label') || '';
+    var nextLabel = root.getAttribute('data-esen-next-label') || '';
+    if (!label.trim() || !previousLabel.trim() || !nextLabel.trim()) return;
+    var initialValue = root.getAttribute('data-esen-initial-index');
+    if (initialValue === null || !/^(0|[1-9][0-9]*)$/.test(initialValue)) {
+      return;
+    }
+    var initial = Number(initialValue);
+    if (!Number.isSafeInteger(initial) || initial >= slides.length) return;
+
+    var previousId = root.id + '-previous';
+    var nextId = root.id + '-next';
+    var statusId = root.id + '-status';
+    if (idCount(previousId) !== 0 || idCount(nextId) !== 0 ||
+        idCount(statusId) !== 0) return;
+
+    var ids = Object.create(null);
+    var valid = slides.every(function (slide) {
+      var heading = slide.firstElementChild;
+      var headingTag = heading ? heading.tagName : '';
+      var headingText = heading ? heading.textContent || '' : '';
+      if (idCount(slide.id) !== 1 || ids[slide.id] ||
+          !/^H[1-6]$/.test(headingTag) || !headingText.trim()) {
+        return false;
+      }
+      ids[slide.id] = true;
+      return true;
+    });
+    if (!valid) return;
+
+    var rtl = window.getComputedStyle(root).direction === 'rtl';
+    var controls = document.createElement('div');
+    controls.className = 'esen-seo-carousel-controls';
+    controls.setAttribute('data-esen-carousel-controls', '');
+
+    function control(id, accessibleLabel, symbol) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.id = id;
+      button.setAttribute('data-esen-carousel-control', '');
+      button.setAttribute('aria-label', accessibleLabel);
+      var icon = document.createElement('span');
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = symbol;
+      button.appendChild(icon);
+      return button;
+    }
+
+    var previous = control(previousId, previousLabel,
+        rtl ? '\u203A' : '\u2039');
+    var next = control(nextId, nextLabel, rtl ? '\u2039' : '\u203A');
+    var status = document.createElement('span');
+    status.id = statusId;
+    status.className = 'esen-seo-carousel-status';
+    status.setAttribute('data-esen-carousel-status', '');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+    controls.appendChild(previous);
+    controls.appendChild(status);
+    controls.appendChild(next);
+
+    var current = 0;
+    function activate(index) {
+      if (index < 0 || index >= slides.length) return;
+      current = index;
+      slides.forEach(function (slide, slideIndex) {
+        slide.hidden = slideIndex !== current;
+      });
+      previous.setAttribute('aria-disabled', current === 0 ? 'true' : 'false');
+      next.setAttribute(
+          'aria-disabled', current === slides.length - 1 ? 'true' : 'false');
+      status.textContent = (current + 1) + ' / ' + slides.length;
+    }
+
+    function bind(button, offset) {
+      button.addEventListener('click', function () {
+        if (button.getAttribute('aria-disabled') !== 'true') {
+          activate(current + offset);
+        }
+      });
+      button.addEventListener('keydown', function (event) {
+        var activation = event.key === 'Enter' || event.key === ' ';
+        var target = null;
+        if (activation) {
+          target = button.getAttribute('aria-disabled') === 'true'
+              ? current : current + offset;
+        } else if (event.key === 'ArrowLeft') {
+          target = current + (rtl ? 1 : -1);
+        } else if (event.key === 'ArrowRight') {
+          target = current + (rtl ? -1 : 1);
+        } else if (event.key === 'Home') {
+          target = 0;
+        } else if (event.key === 'End') {
+          target = slides.length - 1;
+        }
+        if (target === null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) activate(target);
+      });
+    }
+
+    bind(previous, -1);
+    bind(next, 1);
+    root.insertBefore(controls, root.firstChild);
+    root.setAttribute('role', 'region');
+    root.setAttribute('aria-label', label);
+    root.setAttribute('data-esen-enhanced', 'true');
+    activate(initial);
+  }
+
   function enhanceNav(root) {
     if (!canEnhance(root) || root.children.length !== 1) return;
     var rootList = root.firstElementChild;
@@ -275,6 +407,7 @@ const String seoInteractionRuntime = r'''
   function enhanceAll(scope) {
     var root = scope || document;
     enhanceSelector(root, tabsSelector, enhanceTabs);
+    enhanceSelector(root, carouselSelector, enhanceCarousel);
     enhanceSelector(root, navSelector, enhanceNav);
   }
 

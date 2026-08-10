@@ -193,6 +193,22 @@ class DemoPage extends StatelessWidget {
             interactionId: 'demo-nav',
             onTap: (item) => Navigator.pushNamed(context, item.href!),
           ),
+          SeoCarousel(
+            height: 180,
+            interactionId: 'demo-carousel',
+            interactionLabel: 'Rendering carousel',
+            slides: [
+              for (final slide in demoCarouselSlides)
+                SeoCarouselSlide(
+                  label: slide.label,
+                  content: Align(
+                    alignment: Alignment.topLeft,
+                    child: Text(slide.content),
+                  ),
+                  nodes: demoCarouselSlideNodes(slide),
+                ),
+            ],
+          ),
           SeoTabs(
             interactionId: 'demo-tabs',
             interactionLabel: 'Rendering targets',

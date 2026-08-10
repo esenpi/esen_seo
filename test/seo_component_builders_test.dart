@@ -13,7 +13,7 @@ void main() {
   const renderer = HtmlRenderer();
 
   group('pure component builders', () {
-    test('all eleven builders are available through core.dart', () {
+    test('all twelve builders are available through core.dart', () {
       const navItems = [
         _NavItem('Products', url: '/products', children: [
           _NavItem('SEO', url: '/products/seo'),
@@ -26,6 +26,14 @@ void main() {
         )),
         'breadcrumbs': renderer.render(buildSeoBreadcrumbsNodes(
           items: const [(label: 'Home', url: '/')],
+        )),
+        'carousel': renderer.render(buildSeoCarouselNodes(
+          slides: [
+            (
+              label: 'First slide',
+              nodes: [SeoNode(tag: 'p', text: 'First content')],
+            ),
+          ],
         )),
         'dataTable': renderer.render(buildSeoDataTableNodes(
           columns: const ['Name'],
@@ -70,14 +78,75 @@ void main() {
         )),
       };
 
-      expect(output, hasLength(11));
+      expect(output, hasLength(12));
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
       expect(output['navMenu'], isNot(contains('data-esen-component')));
       expect(output['navMenu'], isNot(contains('<button')));
+      expect(output['carousel'], contains('<section><h3>First slide</h3>'));
+      expect(output['carousel'], isNot(contains('data-esen-component')));
+      expect(output['carousel'], isNot(contains('<button')));
       expect(output['tabs'], contains('<section><h3>Overview</h3>'));
       expect(output['tabs'], isNot(contains('data-esen-component')));
       expect(output['tabs'], isNot(contains('<button')));
+    });
+
+    test('carousel opts in with stable ids and complete slide content', () {
+      final html = renderer.render(buildSeoCarouselNodes(
+        slides: [
+          (
+            label: 'Overview',
+            nodes: [SeoNode(tag: 'p', text: 'Complete overview')],
+          ),
+          (
+            label: 'Details',
+            nodes: [SeoNode(tag: 'p', text: 'Complete details')],
+          ),
+        ],
+        headingLevel: 9,
+        interactionId: 'product-carousel',
+        interactionLabel: 'Product gallery',
+        previousLabel: 'Previous product',
+        nextLabel: 'Next product',
+        initialIndex: 99,
+      ));
+
+      expect(
+        html,
+        startsWith('<div class="esen-seo-carousel" id="product-carousel" '
+            'data-esen-component="carousel" '
+            'data-esen-label="Product gallery" '
+            'data-esen-previous-label="Previous product" '
+            'data-esen-next-label="Next product" '
+            'data-esen-initial-index="1">'),
+      );
+      expect(html, contains('id="product-carousel-slide-0"'));
+      expect(html, contains('id="product-carousel-slide-1"'));
+      expect('data-esen-carousel-slide=""'.allMatches(html), hasLength(2));
+      expect(html, contains('<h6>Overview</h6><p>Complete overview</p>'));
+      expect(html, contains('<h6>Details</h6><p>Complete details</p>'));
+      expect(html, isNot(contains('<button')));
+      expect(html, isNot(contains('<script')));
+      expect(html, isNot(contains(' hidden')));
+    });
+
+    test('invalid interaction ids leave carousels static', () {
+      final html = renderer.render(buildSeoCarouselNodes(
+        slides: [
+          (
+            label: 'Overview',
+            nodes: [SeoNode(tag: 'p', text: 'Content')],
+          ),
+        ],
+        interactionId: 'invalid id',
+      ));
+
+      expect(
+        html,
+        '<div class="esen-seo-carousel">'
+        '<section><h3>Overview</h3><p>Content</p></section>'
+        '</div>',
+      );
     });
 
     test('nav menu opts in with stable branch ids and complete links', () {

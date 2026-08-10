@@ -204,6 +204,113 @@ void main() {
     expect(outside.querySelectorAll('button').length, 0);
     script.remove();
   });
+
+  test('carousel enhances complete slides and rejects malformed roots', () {
+    final shell = web.document.createElement('div')
+      ..id = 'esen-seo-content'
+      ..setAttribute('data-esen-seo-shell', 'visible');
+    fixture.appendChild(shell);
+    final root = _appendCarousel(shell, 'product-carousel');
+
+    final malformed = _appendCarousel(shell, 'malformed-carousel');
+    malformed.appendChild(web.document.createElement('div'));
+    final duplicate = _appendCarousel(shell, 'duplicate-carousel');
+    shell.appendChild(
+      web.document.createElement('div')..id = 'duplicate-carousel-slide-0',
+    );
+    final emptyHeading = _appendCarousel(shell, 'empty-heading-carousel');
+    emptyHeading.querySelector('h3')?.textContent = '   ';
+    final emptyControl = _appendCarousel(shell, 'empty-control-carousel');
+    emptyControl.setAttribute('data-esen-next-label', '   ');
+    final invalidInitial = _appendCarousel(shell, 'invalid-initial-carousel');
+    invalidInitial.setAttribute('data-esen-initial-index', '1oops');
+    final collision = _appendCarousel(shell, 'collision-carousel');
+    shell.appendChild(
+      web.document.createElement('div')..id = 'collision-carousel-previous',
+    );
+    final single = _appendCarousel(shell, 'single-carousel', count: 1);
+    final outside = _appendCarousel(fixture, 'outside-carousel');
+    final rtl = _appendCarousel(shell, 'rtl-carousel')
+      ..setAttribute('dir', 'rtl');
+
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.querySelectorAll('a').length, 3);
+    expect(root.textContent, contains('Slide 1 content'));
+    expect(root.textContent, contains('Slide 3 content'));
+
+    final script = web.document.createElement('script')
+      ..textContent = seoInteractionRuntime;
+    web.document.body?.appendChild(script);
+
+    final slides = root.querySelectorAll('[data-esen-carousel-slide]');
+    final controls = root.querySelectorAll('[data-esen-carousel-control]');
+    final previous = controls.item(0)! as web.Element;
+    final next = controls.item(1)! as web.Element;
+    final status = root.querySelector('[data-esen-carousel-status]')!;
+
+    expect(root.getAttribute('role'), 'region');
+    expect(root.getAttribute('aria-label'), 'Product carousel');
+    expect(controls.length, 2);
+    expect(previous.getAttribute('aria-label'), 'Previous slide');
+    expect(next.getAttribute('aria-label'), 'Next slide');
+    expect(status.getAttribute('aria-live'), 'polite');
+    expect(status.textContent, '2 / 3');
+    expect((slides.item(0)! as web.Element).hasAttribute('hidden'), isTrue);
+    expect((slides.item(1)! as web.Element).hasAttribute('hidden'), isFalse);
+    expect((slides.item(2)! as web.Element).hasAttribute('hidden'), isTrue);
+    expect(root.querySelector('a[href="/slide/2"]')?.textContent, 'Slide 3');
+
+    next.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(status.textContent, '3 / 3');
+    expect(next.getAttribute('aria-disabled'), 'true');
+    next.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(status.textContent, '3 / 3');
+
+    _keydown(next, 'Home');
+    expect(status.textContent, '1 / 3');
+    _keydown(next, 'ArrowRight');
+    expect(status.textContent, '2 / 3');
+    _keydown(next, ' ');
+    expect(status.textContent, '3 / 3');
+    next.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(key: ' ', repeat: true, bubbles: true),
+      ),
+    );
+    expect(status.textContent, '3 / 3');
+    _keydown(next, 'ArrowLeft');
+    expect(status.textContent, '2 / 3');
+
+    final rtlControls = rtl.querySelectorAll('[data-esen-carousel-control]');
+    final rtlPrevious = rtlControls.item(0)! as web.Element;
+    final rtlNext = rtlControls.item(1)! as web.Element;
+    final rtlStatus = rtl.querySelector('[data-esen-carousel-status]')!;
+    expect(rtlPrevious.textContent, '\u203a');
+    expect(rtlNext.textContent, '\u2039');
+    _keydown(rtlNext, 'ArrowLeft');
+    expect(rtlStatus.textContent, '3 / 3');
+
+    for (final rejected in [
+      malformed,
+      duplicate,
+      emptyHeading,
+      emptyControl,
+      invalidInitial,
+      collision,
+      single,
+      outside,
+    ]) {
+      expect(rejected.querySelectorAll('button').length, 0);
+      expect(rejected.querySelectorAll('[hidden]').length, 0);
+    }
+    script.remove();
+  });
 }
 
 void _keydown(web.Element element, String key) {
@@ -230,6 +337,37 @@ web.Element _appendTabs(web.Element parent, String id) {
     panel.appendChild(web.document.createElement('p')
       ..textContent = index == 0 ? 'Overview content' : 'Details content');
     root.appendChild(panel);
+  }
+  parent.appendChild(root);
+  return root;
+}
+
+web.Element _appendCarousel(
+  web.Element parent,
+  String id, {
+  int count = 3,
+  int initialIndex = 1,
+}) {
+  final root = web.document.createElement('div')
+    ..id = id
+    ..setAttribute('data-esen-component', 'carousel')
+    ..setAttribute('data-esen-label', 'Product carousel')
+    ..setAttribute('data-esen-previous-label', 'Previous slide')
+    ..setAttribute('data-esen-next-label', 'Next slide')
+    ..setAttribute('data-esen-initial-index', '$initialIndex');
+  for (var index = 0; index < count; index += 1) {
+    final slide = web.document.createElement('section')
+      ..id = '$id-slide-$index'
+      ..setAttribute('data-esen-carousel-slide', '');
+    slide.appendChild(
+      web.document.createElement('h3')..textContent = 'Slide ${index + 1}',
+    );
+    slide.appendChild(web.document.createElement('p')
+      ..textContent = 'Slide ${index + 1} content');
+    slide.appendChild(web.document.createElement('a')
+      ..setAttribute('href', '/slide/$index')
+      ..textContent = 'Slide ${index + 1}');
+    root.appendChild(slide);
   }
   parent.appendChild(root);
   return root;

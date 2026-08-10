@@ -8,6 +8,7 @@ import 'package:esen_seo/core.dart';
 const siteBase = 'https://esen.software';
 
 typedef DemoTabData = ({String content, String label});
+typedef DemoCarouselData = ({String content, String label});
 
 class DemoNavData {
   const DemoNavData(this.label, {this.url, this.children = const []});
@@ -44,6 +45,21 @@ const demoTabs = <DemoTabData>[
   ),
 ];
 
+const demoCarouselSlides = <DemoCarouselData>[
+  (
+    label: 'One source',
+    content: 'Flutter and semantic HTML are derived from the same slide data.',
+  ),
+  (
+    label: 'Complete source',
+    content: 'Every slide remains readable before JavaScript is available.',
+  ),
+  (
+    label: 'Progressive controls',
+    content: 'Vanilla JavaScript adds navigation only after validation.',
+  ),
+];
+
 List<SeoNode> demoTabPanelNodes(DemoTabData tab) => [
       SeoNode(tag: 'p', text: tab.content),
     ];
@@ -52,6 +68,21 @@ List<SeoTabComponentEntry> demoTabEntries() => [
       for (final tab in demoTabs)
         (label: tab.label, nodes: demoTabPanelNodes(tab)),
     ];
+
+List<SeoNode> demoCarouselSlideNodes(DemoCarouselData slide) => [
+      SeoNode(tag: 'p', text: slide.content),
+    ];
+
+List<SeoCarouselComponentEntry> demoCarouselEntries() => [
+      for (final slide in demoCarouselSlides)
+        (label: slide.label, nodes: demoCarouselSlideNodes(slide)),
+    ];
+
+List<SeoNode> demoCarouselNodes() => buildSeoCarouselNodes(
+      slides: demoCarouselEntries(),
+      interactionId: 'demo-carousel',
+      interactionLabel: 'Rendering carousel',
+    );
 
 List<SeoNode> demoNavNodes() => buildSeoNavMenuNodes(
       items: demoNavItems,
@@ -152,6 +183,7 @@ final seoRoutes = [
       SeoNode(tag: 'h1', text: 'Live Demo'),
       SeoNode(tag: 'p', text: 'See esen_seo in action.'),
       ...demoNavNodes(),
+      ...demoCarouselNodes(),
       ...buildSeoTabsNodes(
         tabs: demoTabEntries(),
         interactionId: 'demo-tabs',

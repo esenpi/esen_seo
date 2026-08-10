@@ -7,6 +7,9 @@ typedef SeoBarChartComponentEntry = ({String label, double value});
 /// Pure input for one step in [buildSeoBreadcrumbsNodes].
 typedef SeoBreadcrumbComponentEntry = ({String label, String? url});
 
+/// Pure input for one slide in [buildSeoCarouselNodes].
+typedef SeoCarouselComponentEntry = ({String label, List<SeoNode> nodes});
+
 /// Pure input for one question in [buildSeoFaqNodes].
 typedef SeoFaqComponentEntry = ({String answer, String question});
 
@@ -140,6 +143,57 @@ List<SeoNode> buildSeoBreadcrumbsNodes({
                 ),
             ]),
         ]),
+      ],
+    ),
+  ];
+}
+
+/// Builds the semantic mirror nodes for a complete carousel.
+List<SeoNode> buildSeoCarouselNodes({
+  required List<SeoCarouselComponentEntry> slides,
+  int headingLevel = 3,
+  String? interactionId,
+  String interactionLabel = 'Carousel',
+  String previousLabel = 'Previous slide',
+  String nextLabel = 'Next slide',
+  int initialIndex = 0,
+}) {
+  if (slides.isEmpty) return const [];
+  final level = headingLevel.clamp(1, 6);
+  final candidate = interactionId?.trim();
+  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+      ? candidate
+      : null;
+  final selectedIndex = initialIndex.clamp(0, slides.length - 1);
+  return [
+    SeoNode(
+      tag: 'div',
+      attributes: {
+        'class': 'esen-seo-carousel',
+        if (id != null) ...{
+          'id': id,
+          'data-esen-component': 'carousel',
+          'data-esen-label': interactionLabel,
+          'data-esen-previous-label': previousLabel,
+          'data-esen-next-label': nextLabel,
+          'data-esen-initial-index': '$selectedIndex',
+        },
+      },
+      children: [
+        for (var i = 0; i < slides.length; i++)
+          SeoNode(
+            tag: 'section',
+            attributes: {
+              if (id != null) ...{
+                'id': '$id-slide-$i',
+                'data-esen-carousel-slide': '',
+              },
+            },
+            children: [
+              SeoNode(tag: 'h$level', text: slides[i].label),
+              ...slides[i].nodes,
+            ],
+          ),
       ],
     ),
   ];

@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Added `SeoCarousel`, a bridge for virtualized `PageView.builder` content.
+  Flutter keeps a lazy native page view while the semantic source contains
+  every slide as a headed section. A valid `interactionId` progressively adds
+  validated previous/next controls, live position, LTR/RTL keyboard navigation
+  and complete no-script fallback; autoplay is deliberately excluded.
 * `SeoNavMenu(interactionId: ...)` now supports the same opt-in progressive
   enhancement as tabs. The complete nested link tree stays in the source;
   validated branches gain native disclosure buttons with `aria-expanded`,
