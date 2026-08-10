@@ -5,6 +5,7 @@
 /// loads, and an extra round trip would give that advantage away.
 library;
 
+import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_theme_css.dart';
 
@@ -17,8 +18,14 @@ import 'seo_theme_css.dart';
 const String seoStyleAttribute = 'data-esen-seo-style';
 
 /// Wraps [css] in a `<style>` element for the document head.
-String seoStyleTagHtml(String css) =>
-    '<style $seoStyleAttribute>${escapeStylesheet(css)}</style>';
+String seoStyleTagHtml(String css, {String? nonce}) {
+  final value = nonce?.trim();
+  final nonceAttribute = value == null || value.isEmpty
+      ? ''
+      : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
+  return '<style $seoStyleAttribute$nonceAttribute>'
+      '${escapeStylesheet(css)}</style>';
+}
 
 final RegExp _styleClose = RegExp(r'<(?=/\s*style)', caseSensitive: false);
 

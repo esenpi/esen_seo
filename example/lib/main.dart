@@ -187,6 +187,18 @@ class DemoPage extends StatelessWidget {
               ),
             ],
           ),
+          SeoTabs(
+            interactionId: 'demo-tabs',
+            interactionLabel: 'Rendering targets',
+            tabs: [
+              for (final tab in demoTabs)
+                SeoTab(
+                  label: tab.label,
+                  content: Text(tab.content),
+                  nodes: demoTabPanelNodes(tab),
+                ),
+            ],
+          ),
         ],
       ).main,
     );

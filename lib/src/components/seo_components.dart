@@ -27,6 +27,8 @@ typedef SeoPieChartComponentEntry = ({
 /// Pure input for one panel in [buildSeoTabsNodes].
 typedef SeoTabComponentEntry = ({String label, List<SeoNode> nodes});
 
+final RegExp _validInteractionId = RegExp(r'^[A-Za-z][A-Za-z0-9_-]{0,127}$');
+
 /// Default ARGB palette used by [buildSeoPieChartNodes].
 const List<int> seoPieChartDefaultPaletteArgb = [
   0xFF2563EB,
@@ -404,19 +406,44 @@ List<SeoNode> buildSeoRatingNodes({
 List<SeoNode> buildSeoTabsNodes({
   required List<SeoTabComponentEntry> tabs,
   int headingLevel = 3,
+  String? interactionId,
+  String interactionLabel = 'Tabs',
+  int initialIndex = 0,
 }) {
   if (tabs.isEmpty) return const [];
   final level = headingLevel.clamp(1, 6);
+  final candidate = interactionId?.trim();
+  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+      ? candidate
+      : null;
+  final selectedIndex = initialIndex.clamp(0, tabs.length - 1);
   return [
     SeoNode(
       tag: 'div',
-      attributes: const {'class': 'esen-seo-tabs'},
+      attributes: {
+        'class': 'esen-seo-tabs',
+        if (id != null) ...{
+          'id': id,
+          'data-esen-component': 'tabs',
+          'data-esen-label': interactionLabel,
+          'data-esen-initial-index': '$selectedIndex',
+        },
+      },
       children: [
-        for (final tab in tabs)
-          SeoNode(tag: 'section', children: [
-            SeoNode(tag: 'h$level', text: tab.label),
-            ...tab.nodes,
-          ]),
+        for (var i = 0; i < tabs.length; i++)
+          SeoNode(
+            tag: 'section',
+            attributes: {
+              if (id != null) ...{
+                'id': '$id-panel-$i',
+                'data-esen-tab-panel': '',
+              },
+            },
+            children: [
+              SeoNode(tag: 'h$level', text: tabs[i].label),
+              ...tabs[i].nodes,
+            ],
+          ),
       ],
     ),
   ];

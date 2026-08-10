@@ -693,6 +693,43 @@ empty surface stays hidden during boot — the user sees content, then
 the finished app, and never the loading in between. If the engine never
 loads (slow network, JS error), the user simply keeps a readable page.
 
+### Progressive interactions
+
+Visible HTML can opt into package-owned progressive enhancement. The first
+supported component is `SeoTabs`: Flutter keeps its native stateful widget on
+iOS, Android and in the running web app, while the visible semantic page gains
+accessible tab controls from a small vanilla JavaScript runtime.
+
+```dart
+SeoTabs(
+  interactionId: 'product-tabs', // stable DOM id: enables enhancement
+  interactionLabel: 'Product information',
+  tabs: productTabs,
+);
+
+await prerenderSite(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  renderMode: SeoRenderMode.visibleShell,
+  stylesheet: seoDefaultStylesheet,
+  enableInteractions: true,
+  interactionNonce: cspNonce, // optional
+);
+```
+
+The source contains every panel as ordinary sections and headings. JavaScript
+creates controls only after validating that structure, uses `textContent` for
+labels, and skips the invisible `inert` mirror after Flutter takes over. With
+JavaScript disabled, nothing disappears and every link and paragraph remains
+readable. This is an explicit component contract, not a compiler that attempts
+to translate arbitrary Dart callbacks or application state into JavaScript.
+
+For a standalone semantic page with no Flutter bootstrap, use
+`SeoPage.visibleFromNodes(...)`; it applies the same default stylesheet and
+interaction runtime at the trusted document boundary. `interactionNonce` is
+placed on the generated style and script tags; the visible shell's existing
+inline `style` attribute still needs to be allowed separately by a strict CSP.
+
 Styling is yours to control. `class` and `style` pass through `.seo()`
 like any other attribute, so the shell can carry your own CSS:
 

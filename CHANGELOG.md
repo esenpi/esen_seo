@@ -1,5 +1,15 @@
 ## Unreleased
 
+* `SeoTabs(interactionId: ...)` can now opt a visible semantic page into
+  package-owned progressive enhancement. All panels remain in the source;
+  vanilla JavaScript adds validated ARIA tab controls, click handling, roving
+  focus and Arrow/Home/End keyboard navigation. Invisible `inert` mirrors and
+  duplicate DOM ids are refused.
+* `prerenderSite(enableInteractions: true)` delivers the runtime only for
+  `SeoRenderMode.visibleShell`; `SeoPage.visibleFromNodes` provides the same
+  progressive HTML/CSS/JavaScript document without a Flutter bootstrap. Both
+  support an optional CSP nonce on generated style and script tags. Existing
+  rendering stays byte-compatible when interactions are disabled.
 * Semi-transparent `SeoBarChart` and `SeoPieChart` colors now preserve
   their alpha channel in CSS as `#rrggbbaa`. Opaque colors keep their
   existing `#rrggbb` output. Component and theme CSS now share the same

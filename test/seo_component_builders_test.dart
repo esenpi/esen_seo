@@ -74,6 +74,61 @@ void main() {
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
       expect(output['tabs'], contains('<section><h3>Overview</h3>'));
+      expect(output['tabs'], isNot(contains('data-esen-component')));
+      expect(output['tabs'], isNot(contains('<button')));
+    });
+
+    test('tabs opt in with stable declarative markup and complete content', () {
+      final html = renderer.render(buildSeoTabsNodes(
+        tabs: [
+          (
+            label: 'Overview',
+            nodes: [SeoNode(tag: 'p', text: 'Complete overview')],
+          ),
+          (
+            label: 'Details',
+            nodes: [SeoNode(tag: 'p', text: 'Complete details')],
+          ),
+        ],
+        interactionId: 'product-tabs',
+        interactionLabel: 'Product information',
+        initialIndex: 99,
+      ));
+
+      expect(
+        html,
+        startsWith('<div class="esen-seo-tabs" id="product-tabs" '
+            'data-esen-component="tabs" '
+            'data-esen-label="Product information" '
+            'data-esen-initial-index="1">'),
+      );
+      expect(html, contains('id="product-tabs-panel-0"'));
+      expect(html, contains('id="product-tabs-panel-1"'));
+      expect('data-esen-tab-panel=""'.allMatches(html), hasLength(2));
+      expect(html, contains('<p>Complete overview</p>'));
+      expect(html, contains('<p>Complete details</p>'));
+      expect(html, isNot(contains('<button')));
+      expect(html, isNot(contains('<script')));
+      expect(html, isNot(contains(' hidden')));
+    });
+
+    test('invalid interaction ids leave tabs static', () {
+      final html = renderer.render(buildSeoTabsNodes(
+        tabs: [
+          (
+            label: 'Overview',
+            nodes: [SeoNode(tag: 'p', text: 'Content')],
+          ),
+        ],
+        interactionId: '1 invalid id',
+      ));
+
+      expect(
+        html,
+        '<div class="esen-seo-tabs">'
+        '<section><h3>Overview</h3><p>Content</p></section>'
+        '</div>',
+      );
     });
 
     test('shared formatting retains the pre-extraction output contract', () {

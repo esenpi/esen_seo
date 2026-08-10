@@ -3,6 +3,7 @@ import 'dart:io';
 import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
+import '../renderer/seo_interactions.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
@@ -30,6 +31,12 @@ import 'sitemap.dart';
 /// the user actually sees, styled by [stylesheet], and Flutter takes the
 /// screen over as soon as it has rendered. Pass [seoDefaultStylesheet]
 /// for a presentable baseline or your own CSS to match your app.
+/// Set [enableInteractions] to progressively enhance explicitly marked
+/// components while that visible shell is active. The source HTML remains
+/// complete without JavaScript. [interactionNonce] is copied to the generated
+/// style and script tags. The visible shell also has an existing inline
+/// `style` attribute, which a strict Content Security Policy must allow
+/// separately.
 ///
 /// That mode **requires the app to call `EsenSeo.init()`** — without it
 /// nothing ever schedules the handoff and the shell stays on top of the
@@ -68,10 +75,19 @@ Future<List<String>> prerenderSite({
   String? indexNowKey,
   SeoRenderMode renderMode = SeoRenderMode.seoOnly,
   String? stylesheet,
+  bool enableInteractions = false,
+  String? interactionNonce,
   int concurrency = 8,
   void Function(String path, SeoResolution resolution)? onSkipped,
   void Function(String path, Object error, StackTrace stack)? onError,
 }) async {
+  if (enableInteractions && renderMode != SeoRenderMode.visibleShell) {
+    throw ArgumentError.value(
+      renderMode,
+      'renderMode',
+      'must be SeoRenderMode.visibleShell when interactions are enabled',
+    );
+  }
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
     throw StateError(
@@ -165,6 +181,8 @@ Future<List<String>> prerenderSite({
       page.lang,
       renderMode,
       stylesheet,
+      enableInteractions,
+      interactionNonce,
     );
     final file = File(
       page.path == '/'
@@ -207,6 +225,8 @@ Future<List<String>> prerenderSite({
       'en',
       renderMode,
       stylesheet,
+      enableInteractions,
+      interactionNonce,
     ));
     written.add(file.path);
   }
@@ -338,6 +358,8 @@ String _applyTemplate(
   String lang,
   SeoRenderMode renderMode,
   String? stylesheet,
+  bool enableInteractions,
+  String? interactionNonce,
 ) {
   var html = template;
   // Template-Duplikate entfernen — die Route liefert die echten Werte.
@@ -360,7 +382,10 @@ String _applyTemplate(
   // bevor irgendein zusätzlicher Request gelaufen ist.
   final head = StringBuffer(meta.toHtml());
   if (stylesheet != null && stylesheet.trim().isNotEmpty) {
-    head.write(seoStyleTagHtml(stylesheet));
+    head.write(seoStyleTagHtml(stylesheet, nonce: interactionNonce));
+  }
+  if (enableInteractions) {
+    head.write(seoInteractionStyleHtml(nonce: interactionNonce));
   }
 
   html = html.replaceFirstMapped(
@@ -369,7 +394,8 @@ String _applyTemplate(
   );
   final result = html.replaceFirstMapped(
     _bodyOpenTag,
-    (m) => '${m[0]}\n${seoContainerHtml(bodyHtml, mode: renderMode)}',
+    (m) => '${m[0]}\n${seoContainerHtml(bodyHtml, mode: renderMode)}'
+        '${enableInteractions ? seoInteractionScriptHtml(nonce: interactionNonce) : ''}',
   );
   if (!_seoContainerMarker.hasMatch(result)) {
     throw StateError(

@@ -23,6 +23,7 @@ export 'src/meta/seo_meta.dart';
 export 'src/meta/seo_schema.dart';
 export 'src/renderer/html_renderer.dart';
 export 'src/renderer/seo_container.dart' show SeoRenderMode;
+export 'src/renderer/seo_interactions.dart';
 export 'src/renderer/seo_node.dart';
 export 'src/renderer/seo_stylesheet.dart' show seoDefaultStylesheet;
 export 'src/routing/seo_resolution.dart';

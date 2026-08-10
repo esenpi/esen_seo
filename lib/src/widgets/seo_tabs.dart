@@ -51,16 +51,18 @@ class SeoTab {
 /// )
 /// ```
 ///
-/// The panels are mirrored as sections with headings rather than as an
-/// ARIA tab widget: the point is content a crawler can read, and a
-/// heading outline serves that better than interactive tab semantics
-/// the mirror could not make real anyway.
+/// By default the panels stay plain sections with headings. Supplying a valid
+/// [interactionId] marks that complete document structure for optional,
+/// package-owned progressive enhancement in a visible HTML page. The static
+/// source remains readable when JavaScript is unavailable.
 class SeoTabs extends StatefulWidget {
   const SeoTabs({
     super.key,
     required this.tabs,
     this.initialIndex = 0,
     this.headingLevel = 3,
+    this.interactionId,
+    this.interactionLabel = 'Tabs',
     this.labelStyle,
     this.selectedLabelStyle,
     this.indicatorColor = const Color(0xFF2563EB),
@@ -74,6 +76,16 @@ class SeoTabs extends StatefulWidget {
 
   /// Heading level of the panel headings in the mirror (`1`–`6`).
   final int headingLevel;
+
+  /// Stable DOM id that opts the semantic HTML into JavaScript enhancement.
+  ///
+  /// It must start with an ASCII letter and then contain only letters,
+  /// digits, `_` or `-`, up to 128 characters. Invalid values leave the
+  /// semantic output static and fully visible.
+  final String? interactionId;
+
+  /// Accessible label of the enhanced tab list.
+  final String interactionLabel;
 
   /// Style of the unselected tab labels.
   final TextStyle? labelStyle;
@@ -165,5 +177,8 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
           for (final tab in widget.tabs) (label: tab.label, nodes: tab.nodes),
         ],
         headingLevel: widget.headingLevel,
+        interactionId: widget.interactionId,
+        interactionLabel: widget.interactionLabel,
+        initialIndex: widget.initialIndex,
       );
 }

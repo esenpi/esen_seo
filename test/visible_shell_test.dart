@@ -32,6 +32,26 @@ List<SeoRoute> _routes() => [
       ),
     ];
 
+List<SeoRoute> _interactiveRoutes() => [
+      SeoRoute(
+        path: '/',
+        meta: (_) => const SeoMeta(title: 'Interactive tabs'),
+        body: (_) => buildSeoTabsNodes(
+          tabs: [
+            (
+              label: 'Overview',
+              nodes: [SeoNode(tag: 'p', text: 'Overview content')],
+            ),
+            (
+              label: 'Details',
+              nodes: [SeoNode(tag: 'p', text: 'Details content')],
+            ),
+          ],
+          interactionId: 'demo-tabs',
+        ),
+      ),
+    ];
+
 void main() {
   group('seoContainerHtml', () {
     test('seoOnly keeps its structure', () {
@@ -112,6 +132,14 @@ void main() {
       );
     });
 
+    test('escapes an optional CSP nonce', () {
+      expect(
+        seoStyleTagHtml('a{}', nonce: ' one"<two '),
+        '<style data-esen-seo-style nonce="one&quot;&lt;two">'
+        'a{}</style>',
+      );
+    });
+
     test('uses its own marker so setMeta cannot wipe the styles', () {
       // injectMetaNodes ersetzt alles mit data-esen-seo — der Shell darf
       // seine Styles nicht mittendrin verlieren.
@@ -162,6 +190,7 @@ void main() {
       expect(html, contains('aria-hidden="true"'));
       expect(html, isNot(contains('data-esen-seo-shell')));
       expect(html, isNot(contains('<style')));
+      expect(html, isNot(contains('data-esen-seo-interactions')));
     });
 
     test('visibleShell bakes a visible container plus inline CSS', () async {
@@ -188,6 +217,49 @@ void main() {
 
       // Die Flutter-App bootet weiterhin:
       expect(html, contains('flutter_bootstrap.js'));
+    });
+
+    test('visibleShell can opt into progressive interactions', () async {
+      await prerenderSite(
+        routes: _interactiveRoutes(),
+        siteBase: 'https://x.dev',
+        buildDir: buildDir.path,
+        renderMode: SeoRenderMode.visibleShell,
+        stylesheet: seoDefaultStylesheet,
+        enableInteractions: true,
+        interactionNonce: 'build-nonce',
+      );
+      final html = File('${buildDir.path}/index.html').readAsStringSync();
+
+      expect(html, contains('<p>Overview content</p>'));
+      expect(html, contains('<p>Details content</p>'));
+      expect(html, isNot(contains('<button')));
+      expect(
+        'nonce="build-nonce"'.allMatches(html),
+        hasLength(3),
+        reason: 'base CSS, interaction CSS and runtime share the nonce',
+      );
+      expect(html, contains('<script data-esen-seo-interactions '));
+      expect(
+        html.indexOf('<script data-esen-seo-interactions '),
+        lessThan(html.indexOf('flutter_bootstrap.js')),
+      );
+    });
+
+    test('interactions require a visible shell', () async {
+      expect(
+        () => prerenderSite(
+          routes: _interactiveRoutes(),
+          siteBase: 'https://x.dev',
+          buildDir: buildDir.path,
+          enableInteractions: true,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        File('${buildDir.path}/index.html').readAsStringSync(),
+        _template,
+      );
     });
 
     test('the 404 page follows the same mode', () async {

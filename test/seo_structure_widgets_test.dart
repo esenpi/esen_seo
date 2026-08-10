@@ -340,6 +340,27 @@ void main() {
       expect(EsenSeo.currentHtml, before);
     });
 
+    testWidgets('interaction opt-in only changes the semantic markup',
+        (tester) async {
+      await pumpSeo(
+        tester,
+        SeoTabs(
+          tabs: tabs,
+          interactionId: 'product-tabs',
+          interactionLabel: 'Product information',
+        ),
+      );
+
+      expect(find.text('8,4 kg'), findsNothing);
+      expect(EsenSeo.currentHtml, contains('id="product-tabs"'));
+      expect(
+        EsenSeo.currentHtml,
+        contains('data-esen-label="Product information"'),
+      );
+      expect(EsenSeo.currentHtml, contains('<p>Gewicht: 8,4 kg</p>'));
+      expect(EsenSeo.currentHtml, isNot(contains('<button')));
+    });
+
     testWidgets('an out-of-range initial index is clamped', (tester) async {
       await pumpSeo(tester, SeoTabs(tabs: tabs, initialIndex: 99));
       expect(tester.takeException(), isNull);

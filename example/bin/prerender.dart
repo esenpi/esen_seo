@@ -22,6 +22,7 @@ Future<void> main(List<String> args) async {
     routes: seoRoutes,
     siteBase: siteBase,
     renderMode: visible ? SeoRenderMode.visibleShell : SeoRenderMode.seoOnly,
+    enableInteractions: visible,
     // Das generierte Theme-CSS aus lib/seo_theme.g.dart — bewacht vom
     // Test in test/seo_theme_css_test.dart. seoDefaultStylesheet bleibt
     // der Fallback für Apps ohne Theme-Brücke.

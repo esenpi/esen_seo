@@ -7,6 +7,33 @@ import 'package:esen_seo/core.dart';
 
 const siteBase = 'https://esen.software';
 
+typedef DemoTabData = ({String content, String label});
+
+const demoTabs = <DemoTabData>[
+  (
+    label: 'Flutter',
+    content: 'The same data renders as a native Flutter tab on every platform.',
+  ),
+  (
+    label: 'HTML',
+    content: 'Every panel is present as semantic HTML before JavaScript runs.',
+  ),
+  (
+    label: 'JavaScript',
+    content:
+        'The visible web page progressively gains accessible tab controls.',
+  ),
+];
+
+List<SeoNode> demoTabPanelNodes(DemoTabData tab) => [
+      SeoNode(tag: 'p', text: tab.content),
+    ];
+
+List<SeoTabComponentEntry> demoTabEntries() => [
+      for (final tab in demoTabs)
+        (label: tab.label, nodes: demoTabPanelNodes(tab)),
+    ];
+
 // A tiny in-memory "database" so the dynamic route below runs anywhere,
 // without a real backend. In a CMS this is a Postgres/Firestore read.
 const _posts = <String, ({String title, String teaser, String body})>{
@@ -94,6 +121,11 @@ final seoRoutes = [
     body: (_) => [
       SeoNode(tag: 'h1', text: 'Live Demo'),
       SeoNode(tag: 'p', text: 'See esen_seo in action.'),
+      ...buildSeoTabsNodes(
+        tabs: demoTabEntries(),
+        interactionId: 'demo-tabs',
+        interactionLabel: 'Rendering targets',
+      ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],
   ),
