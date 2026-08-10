@@ -29,6 +29,9 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 build/
 coverage/
+node_modules/
+.next/
+benchmark/dom_first/fixtures/next/out/
 
 # Local-only files (not part of the repository)
 *.local.md

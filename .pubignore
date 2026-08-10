@@ -3,6 +3,9 @@ AGENTS.md
 *.code-workspace
 build/
 .dart_tool/
+node_modules/
+.next/
+benchmark/dom_first/fixtures/next/out/
 .idea/
 portfolio/
 *.iml

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tabs benchmark</title>
+  <link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+  <main>
+    <h1>Rendering targets</h1>
+    <p>One data model, three complete panels and accessible tab controls.</p>
+    <div class="esen-seo-tabs" id="benchmark-tabs">
+      <section id="benchmark-tabs-panel-0"><h2>Flutter</h2><p>The same data renders as a native Flutter tab on every platform.</p></section>
+      <section id="benchmark-tabs-panel-1"><h2>HTML</h2><p>Every panel is present as semantic HTML before JavaScript runs.</p></section>
+      <section id="benchmark-tabs-panel-2"><h2>JavaScript</h2><p>The visible web page gains accessible tab controls after validation.</p></section>
+    </div>
+  </main>
+  <script src="/tabs.js"></script>
+</body>
+</html>
