@@ -187,6 +187,10 @@ class DemoPage extends StatelessWidget {
               ),
             ],
           ),
+          SeoRichText(
+            spans: demoRichTextSpans,
+            onLinkTap: (href) => Navigator.pushNamed(context, href),
+          ),
           SeoNavMenu(
             items: [for (final item in demoNavItems) _demoNavItem(item)],
             label: 'Demo navigation',

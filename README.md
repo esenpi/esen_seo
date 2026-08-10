@@ -45,6 +45,9 @@ The HTML only exists on the web.
 - **Custom translations**: `.seoNodes()` lets any widget declare its own
   HTML, and the SEO widget library translates painted content — a
   `SeoBarChart` mirrors as CSS bars plus a real `<table>` of its data.
+- **Semantic rich text**: `SeoRichText` builds native Flutter `TextSpan`s
+  and nested `<strong>`, `<em>`, `<code>` and safe `<a>` elements from one
+  declarative span tree instead of flattening `Text.rich` to plain text.
 - **Meta tags, OpenGraph, Twitter Cards**: one `EsenSeo.setMeta()` call
   per page, with sensible fallbacks (`og:title` ← `title`, …).
 - **Schema.org JSON-LD** for rich results: typed builders for `Article`,
@@ -230,6 +233,30 @@ SeoBarChart(
   with the dimensions that keep the layout from jumping.
 - **`SeoTestimonial`** — a customer quote as `<blockquote>` with its
   attribution beside it, the way the HTML spec asks for.
+- **`SeoRichText`** — inline importance, emphasis, code and links from one
+  pure-Dart span model; Flutter and HTML keep the same text and structure.
+
+```dart
+SeoRichText(
+  spans: const [
+    SeoRichTextSpan.text('Read the '),
+    SeoRichTextSpan.link(href: '/docs', text: 'documentation'),
+    SeoRichTextSpan.text(' for '),
+    SeoRichTextSpan.strong(text: 'important details'),
+    SeoRichTextSpan.text('.'),
+  ],
+  onLinkTap: (href) => Navigator.pushNamed(context, href),
+)
+// Flutter: native TextSpan tree on iOS, Android, desktop and web
+// HTML: <p>Read the <a href="/docs">documentation</a> for
+//       <strong>important details</strong>.</p>
+```
+
+`SeoRichTextSpan` is intentionally semantic rather than a converter for
+arbitrary `TextStyle`, gesture recognizers or `WidgetSpan`. Paint details do
+not reliably identify a URL or the difference between importance and visual
+boldness. Role-specific Flutter styles remain configurable on `SeoRichText`;
+the HTML elements can be styled with ordinary CSS.
 
 Four of them close a different kind of hole: content Flutter never
 builds cannot be mirrored, because the mirror walks the widget tree.

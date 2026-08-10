@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Added `SeoRichText`, a declarative inline model shared by native Flutter
+  `TextSpan`s and semantic HTML. Strong importance, emphasis, inline code,
+  safe links and line breaks retain their meaning instead of being flattened
+  through `toPlainText()`; unsafe and nested link targets degrade to text.
 * Added `SeoCarousel`, a bridge for virtualized `PageView.builder` content.
   Flutter keeps a lazy native page view while the semantic source contains
   every slide as a headed section. A valid `interactionId` progressively adds

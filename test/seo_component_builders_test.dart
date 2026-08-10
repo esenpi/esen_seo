@@ -13,7 +13,7 @@ void main() {
   const renderer = HtmlRenderer();
 
   group('pure component builders', () {
-    test('all twelve builders are available through core.dart', () {
+    test('all thirteen builders are available through core.dart', () {
       const navItems = [
         _NavItem('Products', url: '/products', children: [
           _NavItem('SEO', url: '/products/seo'),
@@ -64,6 +64,9 @@ void main() {
           data: const [(label: 'A', value: 2, colorArgb: null)],
         )),
         'rating': renderer.render(buildSeoRatingNodes(value: 4.5)),
+        'richText': renderer.render(buildSeoRichTextNodes(
+          spans: const [SeoRichTextSpan.strong(text: 'Important')],
+        )),
         'tabs': renderer.render(buildSeoTabsNodes(
           tabs: [
             (
@@ -78,7 +81,7 @@ void main() {
         )),
       };
 
-      expect(output, hasLength(12));
+      expect(output, hasLength(13));
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
       expect(output['navMenu'], isNot(contains('data-esen-component')));
@@ -89,6 +92,7 @@ void main() {
       expect(output['tabs'], contains('<section><h3>Overview</h3>'));
       expect(output['tabs'], isNot(contains('data-esen-component')));
       expect(output['tabs'], isNot(contains('<button')));
+      expect(output['richText'], contains('<strong>Important</strong>'));
     });
 
     test('carousel opts in with stable ids and complete slide content', () {

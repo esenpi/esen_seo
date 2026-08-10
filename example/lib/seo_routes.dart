@@ -45,6 +45,18 @@ const demoTabs = <DemoTabData>[
   ),
 ];
 
+const demoRichTextSpans = <SeoRichTextSpan>[
+  SeoRichTextSpan.text('One model keeps '),
+  SeoRichTextSpan.strong(text: 'important text'),
+  SeoRichTextSpan.text(', '),
+  SeoRichTextSpan.emphasis(text: 'emphasis'),
+  SeoRichTextSpan.text(', '),
+  SeoRichTextSpan.code(text: 'inline code'),
+  SeoRichTextSpan.text(' and '),
+  SeoRichTextSpan.link(href: '/docs', text: 'real links'),
+  SeoRichTextSpan.text(' in Flutter and HTML.'),
+];
+
 const demoCarouselSlides = <DemoCarouselData>[
   (
     label: 'One source',
@@ -182,6 +194,7 @@ final seoRoutes = [
     body: (_) => [
       SeoNode(tag: 'h1', text: 'Live Demo'),
       SeoNode(tag: 'p', text: 'See esen_seo in action.'),
+      ...buildSeoRichTextNodes(spans: demoRichTextSpans),
       ...demoNavNodes(),
       ...demoCarouselNodes(),
       ...buildSeoTabsNodes(
