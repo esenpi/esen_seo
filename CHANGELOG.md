@@ -1,5 +1,13 @@
 ## Unreleased
 
+* Added an opt-in cross-platform motion pilot for `SeoBarChart`.
+  `SeoMotionPreset.gentle` drives Flutter and CSS from the same pure timing
+  model, with a capped entrance stagger and decorative pointer/press emphasis.
+  `SeoDomFirstFeature.motion` adds the fixed stylesheet without JavaScript;
+  reduced-motion preferences render the final static state immediately. The
+  default preset remains `none`, preserving previous widget behaviour and HTML
+  bytes, and the renderer's tag, attribute and inline-style policies are
+  unchanged.
 * Added an opt-in DOM-first delivery slice for routes derived entirely from
   the pure component layer. `SeoRouteDelivery.domFirst` makes the semantic
   document the permanent page for humans and crawlers, through both shelf and

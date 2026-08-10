@@ -28,7 +28,9 @@ import '../renderer/seo_theme_css.dart';
 /// system-font fallback chain, because the browser has not loaded the
 /// app's bundled font — see the README for the opt-in `@font-face`
 /// recipe). Component-level styling — elevation, shapes, ink effects —
-/// is not mirrored; the shell is a document, not a widget tree.
+/// is not inferred; the shell is a document, not a widget tree. Explicit
+/// package-owned motion is a separate opt-in through `seoMotionStylesheet` or
+/// `SeoDomFirstFeature.motion`, not an implicit consequence of ThemeData.
 ///
 /// Deliberate deviations from a raw Material reading, all documented:
 /// headings follow the Material scale (`h1` ← `headlineLarge`), which

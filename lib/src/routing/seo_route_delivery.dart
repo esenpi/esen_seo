@@ -16,4 +16,10 @@ enum SeoRouteDelivery {
 enum SeoDomFirstFeature {
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
   tabs,
+
+  /// Apply package-owned CSS motion to components carrying fixed markers.
+  ///
+  /// This feature adds no JavaScript and leaves reduced-motion users in the
+  /// final static state.
+  motion,
 }

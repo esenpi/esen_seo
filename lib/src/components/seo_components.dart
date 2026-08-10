@@ -1,5 +1,6 @@
 import '../renderer/seo_node.dart';
 import 'seo_component_format.dart';
+import 'seo_motion.dart';
 
 /// Pure input for one bar in [buildSeoBarChartNodes].
 typedef SeoBarChartComponentEntry = ({String label, double value});
@@ -49,6 +50,7 @@ List<SeoNode> buildSeoBarChartNodes({
   String? title,
   double height = 220,
   int colorArgb = 0xFF2563EB,
+  SeoMotionPreset motion = SeoMotionPreset.none,
 }) {
   final normalizedHeight = safeDimension(height, 220);
   final values = [for (final entry in data) safeChartValue(entry.value)];
@@ -56,11 +58,15 @@ List<SeoNode> buildSeoBarChartNodes({
   for (final value in values) {
     if (value > max) max = value;
   }
+  final motionMarker = seoMotionMarker(motion);
 
   return [
     SeoNode(
       tag: 'figure',
-      attributes: {'class': 'esen-seo-bar-chart'},
+      attributes: {
+        'class': 'esen-seo-bar-chart',
+        if (motionMarker != null) 'data-esen-motion': motionMarker,
+      },
       children: [
         if (title != null) SeoNode(tag: 'figcaption', text: title),
         // The bars are visual only; the table below carries the semantics.
@@ -80,6 +86,7 @@ List<SeoNode> buildSeoBarChartNodes({
                   'style': 'flex:1;border-radius:3px 3px 0 0;'
                       'background:${cssColorArgb(colorArgb)};'
                       'height:${cssPercent(values[i], max)}%',
+                  if (motionMarker != null) 'data-esen-motion-item': '',
                 },
               ),
           ],

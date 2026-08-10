@@ -5,6 +5,7 @@ import '../routing/seo_route_delivery.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
+import 'seo_motion_stylesheet.dart';
 import 'seo_stylesheet.dart';
 
 /// Marks the package-owned DOM-first runtime in a generated document.
@@ -27,6 +28,9 @@ String seoDomFirstFeatureStyleHtml(
   final css = StringBuffer();
   if (features.contains(SeoDomFirstFeature.tabs)) {
     css.write(seoDomFirstTabsStylesheet);
+  }
+  if (features.contains(SeoDomFirstFeature.motion)) {
+    css.write(seoMotionStylesheet);
   }
   return css.isEmpty ? '' : seoStyleTagHtml(css.toString(), nonce: nonce);
 }

@@ -209,6 +209,7 @@ appears in the mirror as readable HTML:
 ```dart
 SeoBarChart(
   title: 'Revenue per year',
+  motion: SeoMotionPreset.gentle,
   data: [
     SeoBarChartEntry('2024', 12),
     SeoBarChartEntry('2025', 31),
@@ -238,6 +239,15 @@ SeoBarChart(
   attribution beside it, the way the HTML spec asks for.
 - **`SeoRichText`** — inline importance, emphasis, code and links from one
   pure-Dart span model; Flutter and HTML keep the same text and structure.
+
+`SeoBarChart` motion is deliberately opt-in. `SeoMotionPreset.gentle` uses
+one pure timing model for the native Flutter growth/stagger and the browser
+CSS animation. A DOM-first route selects `SeoDomFirstFeature.motion` to add
+the fixed package stylesheet; a custom visible page can append the exported
+`seoMotionStylesheet` itself. The effect adds no JavaScript, no focus stops and
+no semantic changes, and it stops under `prefers-reduced-motion` or Flutter's
+`MediaQuery.disableAnimations`. Without the preset, the widget and serialized
+HTML retain their previous bytes.
 
 ```dart
 SeoRichText(
@@ -755,12 +765,24 @@ final seoRoutes = [
   SeoRoute(
     path: '/product',
     delivery: SeoRouteDelivery.domFirst,
-    domFirstFeatures: const {SeoDomFirstFeature.tabs},
+    domFirstFeatures: const {
+      SeoDomFirstFeature.tabs,
+      SeoDomFirstFeature.motion,
+    },
     meta: (_) => const SeoMeta(title: 'Product'),
-    body: (_) => buildSeoTabsNodes(
-      tabs: productTabs,
-      interactionId: 'product-tabs',
-    ),
+    body: (_) => [
+      ...buildSeoTabsNodes(
+        tabs: productTabs,
+        interactionId: 'product-tabs',
+      ),
+      ...buildSeoBarChartNodes(
+        data: const [
+          (label: '2025', value: 31.0),
+          (label: '2026', value: 54.0),
+        ],
+        motion: SeoMotionPreset.gentle,
+      ),
+    ],
   ),
 ];
 ```
@@ -773,12 +795,14 @@ belong to Flutter's visible shell. The middleware uses the same
 `domFirstStylesheet` default. `domFirstNonce` can supply a per-response CSP
 nonce.
 
-This first vertical slice deliberately supports only package-owned tabs. It
-does not translate arbitrary Flutter `State`, Cubits or callbacks. Instead,
-`SeoTabs` and the browser adapter execute the same pure transition while each
-presentation owns its current state. Custom application transitions, effects,
-forms and client-side routing require later, separately designed build and
-security boundaries.
+The executable slice deliberately supports only package-owned transitions. It
+does not translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs`
+and the browser adapter execute the same pure transition while each
+presentation owns its current state. `SeoDomFirstFeature.motion` is separate:
+it adds fixed CSS only, never a script, and responds exclusively to fixed
+markers produced by the pure component builders. Custom application
+transitions, content effects, forms and client-side routing require later,
+separately designed build and security boundaries.
 
 On a DOM-first route a resolver result is final because no Flutter app exists
 there as a fallback. Therefore every `SeoRedirect` and every error document is
