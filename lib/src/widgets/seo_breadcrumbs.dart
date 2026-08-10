@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../meta/seo_schema.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
@@ -140,43 +141,11 @@ class SeoBreadcrumbs extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() => items.isEmpty
-      ? const []
-      : [
-          SeoNode(
-            tag: 'nav',
-            // nav carries the navigation role, where an accessible name
-            // is allowed — unlike a bare <p> or <div>.
-            attributes: {'class': 'esen-seo-breadcrumbs', 'aria-label': label},
-            children: [
-              SeoNode(tag: 'ol', children: [
-                for (var i = 0; i < items.length; i++)
-                  SeoNode(tag: 'li', children: [
-                    _stepNode(items[i], isCurrent: i == items.length - 1),
-                    if (i < items.length - 1 && separator.isNotEmpty)
-                      SeoNode(
-                        tag: 'span',
-                        text: separator,
-                        attributes: const {'aria-hidden': 'true'},
-                      ),
-                  ]),
-              ]),
-            ],
-          ),
-        ];
-
-  /// Only the final step is the current page — a step in the middle
-  /// without a URL is simply not a link, not a second "you are here".
-  SeoNode _stepNode(SeoBreadcrumbEntry item, {required bool isCurrent}) {
-    final href = item.href;
-    final current = isCurrent ? const {'aria-current': 'page'} : const {};
-    if (href == null) {
-      return SeoNode(tag: 'span', text: item.label, attributes: {...current});
-    }
-    return SeoNode(
-      tag: 'a',
-      text: item.label,
-      attributes: {'href': href, ...current},
-    );
-  }
+  List<SeoNode> toSeoNodes() => buildSeoBreadcrumbsNodes(
+        items: [
+          for (final item in items) (label: item.label, url: item.url),
+        ],
+        separator: separator,
+        label: label,
+      );
 }

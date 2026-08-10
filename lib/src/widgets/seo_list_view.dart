@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -88,17 +89,6 @@ class SeoListView<T> extends SeoBlock {
   /// Extra HTML attributes for the wrapping element.
   final Map<String, String> attributes;
 
-  /// A blank tag means "no wrapper" — never an empty element name,
-  /// which would silently swallow the entries.
-  String? get _itemTag {
-    final explicit = itemTag?.trim();
-    if (explicit != null) return explicit.isEmpty ? null : explicit;
-    const listElements = {'ul', 'ol', 'menu'};
-    return listElements.contains(_listTag.toLowerCase()) ? 'li' : null;
-  }
-
-  String get _listTag => listTag.trim().isEmpty ? 'div' : listTag.trim();
-
   @override
   Widget buildFlutter(BuildContext context) {
     final separator = separatorBuilder;
@@ -126,25 +116,11 @@ class SeoListView<T> extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() {
-    final wrap = _itemTag;
-    final children = <SeoNode>[];
-    for (var i = 0; i < items.length; i++) {
-      final nodes = nodeBuilder(items[i], i);
-      if (nodes.isEmpty) continue;
-      if (wrap == null) {
-        children.addAll(nodes);
-      } else {
-        children.add(SeoNode(tag: wrap, children: nodes));
-      }
-    }
-    if (children.isEmpty) return const [];
-    return [
-      SeoNode(
-        tag: _listTag,
-        attributes: {'class': 'esen-seo-list', ...attributes},
-        children: children,
-      ),
-    ];
-  }
+  List<SeoNode> toSeoNodes() => buildSeoListViewNodes(
+        items: items,
+        nodeBuilder: nodeBuilder,
+        listTag: listTag,
+        itemTag: itemTag,
+        attributes: attributes,
+      );
 }

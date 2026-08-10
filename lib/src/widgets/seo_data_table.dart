@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -112,28 +113,9 @@ class SeoDataTable extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() {
-    if (columns.isEmpty) return const [];
-    return [
-      SeoNode(
-        tag: 'table',
-        attributes: {'class': 'esen-seo-data-table'},
-        children: [
-          if (title != null) SeoNode(tag: 'caption', text: title),
-          SeoNode(tag: 'thead', children: [
-            SeoNode(tag: 'tr', children: [
-              for (final column in columns) SeoNode(tag: 'th', text: column),
-            ]),
-          ]),
-          SeoNode(tag: 'tbody', children: [
-            for (final row in rows)
-              SeoNode(tag: 'tr', children: [
-                for (final value in _cells(row))
-                  SeoNode(tag: 'td', text: value),
-              ]),
-          ]),
-        ],
-      ),
-    ];
-  }
+  List<SeoNode> toSeoNodes() => buildSeoDataTableNodes(
+        columns: columns,
+        rows: rows,
+        title: title,
+      );
 }

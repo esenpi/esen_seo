@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 import 'seo_chart_format.dart';
@@ -143,49 +144,12 @@ class SeoBarChart extends SeoBlock {
   /// The HTML translation: CSS bars for the eye (visible shell),
   /// a real table for crawlers and screen readers.
   @override
-  List<SeoNode> toSeoNodes() {
-    final max = _maxValue;
-    return [
-      SeoNode(
-        tag: 'figure',
-        attributes: {'class': 'esen-seo-bar-chart'},
-        children: [
-          if (title != null) SeoNode(tag: 'figcaption', text: title),
-          // Die Balken sind reine Optik — die Tabelle darunter trägt die
-          // Semantik, deshalb bleiben sie für Screenreader unsichtbar.
-          SeoNode(
-            tag: 'div',
-            attributes: {
-              'aria-hidden': 'true',
-              'style': 'display:flex;align-items:flex-end;gap:8px;'
-                  'height:${cssNumber(_height)}px',
-            },
-            children: [
-              for (final entry in data)
-                SeoNode(
-                  tag: 'div',
-                  attributes: {
-                    'title': '${entry.label}: ${cssNumber(_valueOf(entry))}',
-                    'style': 'flex:1;border-radius:3px 3px 0 0;'
-                        'background:${cssColor(color)};'
-                        'height:${cssPercent(_valueOf(entry), max)}%',
-                  },
-                ),
-            ],
-          ),
-          // Kein <caption>: Die <figcaption> oben beschriftet die
-          // Tabelle bereits — sonst steht der Titel doppelt im Text.
-          SeoNode(tag: 'table', children: [
-            SeoNode(tag: 'tbody', children: [
-              for (final entry in data)
-                SeoNode(tag: 'tr', children: [
-                  SeoNode(tag: 'th', text: entry.label),
-                  SeoNode(tag: 'td', text: cssNumber(_valueOf(entry))),
-                ]),
-            ]),
-          ]),
+  List<SeoNode> toSeoNodes() => buildSeoBarChartNodes(
+        data: [
+          for (final entry in data) (label: entry.label, value: entry.value),
         ],
-      ),
-    ];
-  }
+        title: title,
+        height: height,
+        colorArgb: flutterColorArgb(color),
+      );
 }

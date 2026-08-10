@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -102,23 +103,12 @@ class SeoFigure extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() => [
-        SeoNode(
-          tag: 'figure',
-          attributes: const {'class': 'esen-seo-figure'},
-          children: [
-            SeoNode(tag: 'img', attributes: {
-              'src': src,
-              // Immer setzen: ein fehlendes alt ist etwas anderes als
-              // ein bewusst leeres (dekoratives Bild).
-              'alt': alt,
-              if (_width != null) 'width': '$_width',
-              if (_height != null) 'height': '$_height',
-              if (lazy) 'loading': 'lazy',
-            }),
-            if (caption != null && caption!.isNotEmpty)
-              SeoNode(tag: 'figcaption', text: caption),
-          ],
-        ),
-      ];
+  List<SeoNode> toSeoNodes() => buildSeoFigureNodes(
+        src: src,
+        alt: alt,
+        caption: caption,
+        width: width,
+        height: height,
+        lazy: lazy,
+      );
 }

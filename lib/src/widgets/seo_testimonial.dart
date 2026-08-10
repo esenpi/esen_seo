@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -96,27 +97,10 @@ class SeoTestimonial extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() {
-    final attribution = _attribution;
-    return [
-      SeoNode(
-        tag: 'figure',
-        attributes: const {'class': 'esen-seo-testimonial'},
-        children: [
-          SeoNode(
-            tag: 'blockquote',
-            attributes: {
-              if (sourceUrl != null && sourceUrl!.isNotEmpty)
-                'cite': sourceUrl!,
-            },
-            children: [SeoNode(tag: 'p', text: quote)],
-          ),
-          // Die Zuschreibung gehört laut HTML-Spezifikation NEBEN das
-          // blockquote, nicht hinein — sie ist nicht Teil des Zitats.
-          if (attribution != null)
-            SeoNode(tag: 'figcaption', text: '— $attribution'),
-        ],
-      ),
-    ];
-  }
+  List<SeoNode> toSeoNodes() => buildSeoTestimonialNodes(
+        quote: quote,
+        author: author,
+        role: role,
+        sourceUrl: sourceUrl,
+      );
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../meta/seo_schema.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
@@ -87,8 +88,6 @@ class _SeoFaqState extends State<SeoFaq> with SeoBlockState<SeoFaq> {
       for (var i = 0; i < widget.entries.length; i++) i,
   };
 
-  int get _level => widget.titleLevel.clamp(1, 6);
-
   /// An empty or blank title must not produce an empty heading element —
   /// that is exactly what SEO and accessibility linters flag.
   bool get _hasTitle => widget.title != null && widget.title!.trim().isNotEmpty;
@@ -160,20 +159,12 @@ class _SeoFaqState extends State<SeoFaq> with SeoBlockState<SeoFaq> {
   /// and stays expandable without any JavaScript — which also makes it
   /// work in the prerendered shell before Flutter boots.
   @override
-  List<SeoNode> toSeoNodes() => widget.entries.isEmpty
-      ? const []
-      : [
-          SeoNode(
-            tag: 'section',
-            attributes: const {'class': 'esen-seo-faq'},
-            children: [
-              if (_hasTitle) SeoNode(tag: 'h$_level', text: widget.title),
-              for (final entry in widget.entries)
-                SeoNode(tag: 'details', children: [
-                  SeoNode(tag: 'summary', text: entry.question),
-                  SeoNode(tag: 'p', text: entry.answer),
-                ]),
-            ],
-          ),
-        ];
+  List<SeoNode> toSeoNodes() => buildSeoFaqNodes(
+        entries: [
+          for (final entry in widget.entries)
+            (question: entry.question, answer: entry.answer),
+        ],
+        title: widget.title,
+        titleLevel: widget.titleLevel,
+      );
 }

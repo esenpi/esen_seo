@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 import 'seo_chart_format.dart';
@@ -66,13 +67,6 @@ class SeoRating extends SeoBlock {
 
   String get _score => '${cssNumber(_value)}/$_scale';
 
-  /// Stars (when the scale allows them) plus the exact score and the
-  /// optional context — the same information the widget shows.
-  String get _mirrorText {
-    final scored = label == null ? _score : '$_score ($label)';
-    return _stars.isEmpty ? scored : '$_stars $scored';
-  }
-
   @override
   Widget buildFlutter(BuildContext context) {
     return Row(
@@ -92,14 +86,9 @@ class SeoRating extends SeoBlock {
   }
 
   @override
-  List<SeoNode> toSeoNodes() => [
-        // Kein aria-label: Für <p> ist ein ARIA-Name laut Spezifikation
-        // verboten (Rolle „paragraph" ist name-prohibited) — der Text
-        // trägt den Wert ohnehin vollständig.
-        SeoNode(
-          tag: 'p',
-          attributes: const {'class': 'esen-seo-rating'},
-          text: _mirrorText,
-        ),
-      ];
+  List<SeoNode> toSeoNodes() => buildSeoRatingNodes(
+        value: value,
+        max: max,
+        label: label,
+      );
 }

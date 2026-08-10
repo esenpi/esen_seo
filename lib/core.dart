@@ -17,6 +17,8 @@
 /// this core.
 library;
 
+export 'src/components/seo_component_format.dart';
+export 'src/components/seo_components.dart';
 export 'src/meta/seo_meta.dart';
 export 'src/meta/seo_schema.dart';
 export 'src/renderer/html_renderer.dart';

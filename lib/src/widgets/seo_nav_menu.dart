@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -226,34 +227,13 @@ class _SeoNavMenuState extends State<SeoNavMenu>
   /// The HTML translation — the complete tree, regardless of what is
   /// open on screen.
   @override
-  List<SeoNode> toSeoNodes() => widget.items.isEmpty
-      ? const []
-      : [
-          SeoNode(
-            tag: 'nav',
-            // nav takes an accessible name; several navigations per page
-            // are normal and must be distinguishable.
-            attributes: {'class': 'esen-seo-nav', 'aria-label': widget.label},
-            children: [_listNode(widget.items)],
-          ),
-        ];
-
-  SeoNode _listNode(List<SeoNavItem> items) => SeoNode(
-        tag: 'ul',
-        children: [
-          for (final item in items)
-            SeoNode(tag: 'li', children: [
-              _entryNode(item),
-              // Untermenüs gehören INS li des Elternteils — nur so
-              // bleibt die Hierarchie für Crawler erkennbar.
-              if (item.children.isNotEmpty) _listNode(item.children),
-            ]),
-        ],
+  List<SeoNode> toSeoNodes() => buildSeoNavMenuNodes(
+        items: widget.items,
+        itemView: (item) => (
+          label: item.label,
+          url: item.url,
+          children: item.children,
+        ),
+        label: widget.label,
       );
-
-  SeoNode _entryNode(SeoNavItem item) {
-    final href = item.href;
-    if (href == null) return SeoNode(tag: 'span', text: item.label);
-    return SeoNode(tag: 'a', text: item.label, attributes: {'href': href});
-  }
 }

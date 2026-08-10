@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 import 'seo_chart_format.dart';
@@ -80,14 +81,6 @@ class SeoPieChart extends SeoBlock {
   /// invariants and leak `NaNpx` into the mirrored CSS.
   double get _diameter => safeDimension(diameter, 180);
 
-  double get _total {
-    var total = 0.0;
-    for (final entry in data) {
-      total += _valueOf(entry);
-    }
-    return total;
-  }
-
   /// An empty palette must not divide by zero in the modulo below.
   List<Color> get _palette => palette.isEmpty ? defaultPalette : palette;
 
@@ -149,60 +142,20 @@ class SeoPieChart extends SeoBlock {
   /// The HTML translation: a `conic-gradient` circle for the eye,
   /// a table with labels, values and shares for crawlers.
   @override
-  List<SeoNode> toSeoNodes() {
-    final total = _total;
-    return [
-      SeoNode(
-        tag: 'figure',
-        attributes: {'class': 'esen-seo-pie-chart'},
-        children: [
-          if (title != null) SeoNode(tag: 'figcaption', text: title),
-          SeoNode(
-            tag: 'div',
-            attributes: {
-              'aria-hidden': 'true',
-              'style': 'width:${cssNumber(_diameter)}px;'
-                  'height:${cssNumber(_diameter)}px;'
-                  'border-radius:50%;'
-                  'background:${_conicGradient(total)}',
-            },
-          ),
-          // Kein <caption>: Die <figcaption> oben beschriftet die
-          // Tabelle bereits — sonst steht der Titel doppelt im Text.
-          SeoNode(tag: 'table', children: [
-            SeoNode(tag: 'tbody', children: [
-              for (final entry in data)
-                SeoNode(tag: 'tr', children: [
-                  SeoNode(tag: 'th', text: entry.label),
-                  SeoNode(tag: 'td', text: cssNumber(_valueOf(entry))),
-                  SeoNode(
-                    tag: 'td',
-                    text: '${cssPercent(_valueOf(entry), total)}%',
-                  ),
-                ]),
-            ]),
-          ]),
+  List<SeoNode> toSeoNodes() => buildSeoPieChartNodes(
+        data: [
+          for (final entry in data)
+            (
+              label: entry.label,
+              value: entry.value,
+              colorArgb:
+                  entry.color == null ? null : flutterColorArgb(entry.color!),
+            ),
         ],
-      ),
-    ];
-  }
-
-  String _conicGradient(double total) {
-    if (total <= 0) return '#e5e7eb';
-    final stops = StringBuffer('conic-gradient(');
-    var start = 0.0;
-    for (var i = 0; i < data.length; i++) {
-      final end = start + _valueOf(data[i]);
-      if (i > 0) stops.write(',');
-      stops
-        ..write(cssColor(_colorAt(i)))
-        ..write(' ${cssPercent(start, total)}%')
-        ..write(' ${cssPercent(end, total)}%');
-      start = end;
-    }
-    stops.write(')');
-    return stops.toString();
-  }
+        title: title,
+        diameter: diameter,
+        paletteArgb: [for (final color in palette) flutterColorArgb(color)],
+      );
 }
 
 class _PiePainter extends CustomPainter {

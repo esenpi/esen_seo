@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -92,8 +93,6 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
       ? 0
       : widget.initialIndex.clamp(0, widget.tabs.length - 1);
 
-  int get _level => widget.headingLevel.clamp(1, 6);
-
   @override
   void didUpdateWidget(SeoTabs oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -161,19 +160,10 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
   }
 
   @override
-  List<SeoNode> toSeoNodes() => widget.tabs.isEmpty
-      ? const []
-      : [
-          SeoNode(
-            tag: 'div',
-            attributes: const {'class': 'esen-seo-tabs'},
-            children: [
-              for (final tab in widget.tabs)
-                SeoNode(tag: 'section', children: [
-                  SeoNode(tag: 'h$_level', text: tab.label),
-                  ...tab.nodes,
-                ]),
-            ],
-          ),
-        ];
+  List<SeoNode> toSeoNodes() => buildSeoTabsNodes(
+        tabs: [
+          for (final tab in widget.tabs) (label: tab.label, nodes: tab.nodes),
+        ],
+        headingLevel: widget.headingLevel,
+      );
 }
