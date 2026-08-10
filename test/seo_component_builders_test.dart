@@ -13,7 +13,7 @@ void main() {
   const renderer = HtmlRenderer();
 
   group('pure component builders', () {
-    test('all thirteen builders are available through core.dart', () {
+    test('all fourteen builders are available through core.dart', () {
       const navItems = [
         _NavItem('Products', url: '/products', children: [
           _NavItem('SEO', url: '/products/seo'),
@@ -67,6 +67,14 @@ void main() {
         'richText': renderer.render(buildSeoRichTextNodes(
           spans: const [SeoRichTextSpan.strong(text: 'Important')],
         )),
+        'stepper': renderer.render(buildSeoStepperNodes(
+          steps: [
+            (
+              label: 'Account',
+              nodes: [SeoNode(tag: 'p', text: 'Account content')],
+            ),
+          ],
+        )),
         'tabs': renderer.render(buildSeoTabsNodes(
           tabs: [
             (
@@ -81,7 +89,7 @@ void main() {
         )),
       };
 
-      expect(output, hasLength(13));
+      expect(output, hasLength(14));
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
       expect(output['navMenu'], isNot(contains('data-esen-component')));
@@ -93,6 +101,7 @@ void main() {
       expect(output['tabs'], isNot(contains('data-esen-component')));
       expect(output['tabs'], isNot(contains('<button')));
       expect(output['richText'], contains('<strong>Important</strong>'));
+      expect(output['stepper'], contains('<ol><li><h3>Account</h3>'));
     });
 
     test('carousel opts in with stable ids and complete slide content', () {
@@ -266,6 +275,65 @@ void main() {
         '<div class="esen-seo-tabs">'
         '<section><h3>Overview</h3><p>Content</p></section>'
         '</div>',
+      );
+    });
+
+    test('stepper opts in with ordered complete content and stable ids', () {
+      final html = renderer.render(buildSeoStepperNodes(
+        steps: [
+          (
+            label: 'Account',
+            nodes: [SeoNode(tag: 'p', text: 'Account content')],
+          ),
+          (
+            label: 'Review',
+            nodes: [SeoNode(tag: 'p', text: 'Review content')],
+          ),
+        ],
+        headingLevel: 9,
+        interactionId: 'checkout-steps',
+        interactionLabel: 'Checkout',
+        previousLabel: 'Previous',
+        nextLabel: 'Continue',
+        positionLabel: 'Stage',
+        initialIndex: 99,
+      ));
+
+      expect(
+        html,
+        startsWith('<div class="esen-seo-stepper" id="checkout-steps" '
+            'data-esen-component="stepper" data-esen-label="Checkout" '
+            'data-esen-previous-label="Previous" '
+            'data-esen-next-label="Continue" '
+            'data-esen-position-label="Stage" '
+            'data-esen-initial-index="1">'
+            '<ol data-esen-step-list="">'),
+      );
+      expect(html, contains('id="checkout-steps-step-0"'));
+      expect(html, contains('id="checkout-steps-panel-1"'));
+      expect('data-esen-step=""'.allMatches(html), hasLength(2));
+      expect('data-esen-step-panel=""'.allMatches(html), hasLength(2));
+      expect(html, contains('<h6>Account</h6>'));
+      expect(html, contains('<p>Review content</p>'));
+      expect(html, isNot(contains('<button')));
+      expect(html, isNot(contains(' hidden')));
+    });
+
+    test('invalid interaction ids leave steppers static and complete', () {
+      final html = renderer.render(buildSeoStepperNodes(
+        steps: [
+          (
+            label: 'Account',
+            nodes: [SeoNode(tag: 'p', text: 'Account content')],
+          ),
+        ],
+        interactionId: 'invalid id',
+      ));
+
+      expect(
+        html,
+        '<div class="esen-seo-stepper"><ol><li><h3>Account</h3>'
+        '<div><p>Account content</p></div></li></ol></div>',
       );
     });
 

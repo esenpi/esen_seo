@@ -9,6 +9,7 @@ const siteBase = 'https://esen.software';
 
 typedef DemoTabData = ({String content, String label});
 typedef DemoCarouselData = ({String content, String label});
+typedef DemoStepperData = ({String content, String label});
 
 class DemoNavData {
   const DemoNavData(this.label, {this.url, this.children = const []});
@@ -72,6 +73,21 @@ const demoCarouselSlides = <DemoCarouselData>[
   ),
 ];
 
+const demoStepperSteps = <DemoStepperData>[
+  (
+    label: 'Choose content',
+    content: 'Define every step once in a shared data model.',
+  ),
+  (
+    label: 'Render everywhere',
+    content: 'Flutter stays lazy while semantic HTML contains every body.',
+  ),
+  (
+    label: 'Enhance safely',
+    content: 'Validated vanilla JavaScript adds controls to the visible shell.',
+  ),
+];
+
 List<SeoNode> demoTabPanelNodes(DemoTabData tab) => [
       SeoNode(tag: 'p', text: tab.content),
     ];
@@ -89,6 +105,21 @@ List<SeoCarouselComponentEntry> demoCarouselEntries() => [
       for (final slide in demoCarouselSlides)
         (label: slide.label, nodes: demoCarouselSlideNodes(slide)),
     ];
+
+List<SeoNode> demoStepperBodyNodes(DemoStepperData step) => [
+      SeoNode(tag: 'p', text: step.content),
+    ];
+
+List<SeoStepperComponentEntry> demoStepperEntries() => [
+      for (final step in demoStepperSteps)
+        (label: step.label, nodes: demoStepperBodyNodes(step)),
+    ];
+
+List<SeoNode> demoStepperNodes() => buildSeoStepperNodes(
+      steps: demoStepperEntries(),
+      interactionId: 'demo-stepper',
+      interactionLabel: 'Publishing flow',
+    );
 
 List<SeoNode> demoCarouselNodes() => buildSeoCarouselNodes(
       slides: demoCarouselEntries(),
@@ -202,6 +233,7 @@ final seoRoutes = [
         interactionId: 'demo-tabs',
         interactionLabel: 'Rendering targets',
       ),
+      ...demoStepperNodes(),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],
   ),

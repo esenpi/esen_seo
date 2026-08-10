@@ -258,7 +258,7 @@ not reliably identify a URL or the difference between importance and visual
 boldness. Role-specific Flutter styles remain configurable on `SeoRichText`;
 the HTML elements can be styled with ordinary CSS.
 
-Four of them close a different kind of hole: content Flutter never
+Five of them close a different kind of hole: content Flutter never
 builds cannot be mirrored, because the mirror walks the widget tree.
 
 - **`SeoNavMenu`** — a dropdown's entries live in an overlay and do not
@@ -275,6 +275,9 @@ builds cannot be mirrored, because the mirror walks the widget tree.
 - **`SeoTabs`** — a `TabBarView` builds only the selected panel, so on
   a product page two thirds of the content are invisible. All panels
   are mirrored, each behind its own heading.
+- **`SeoStepper`** — Flutter builds the active body and keeps visited bodies
+  mounted, while every unvisited step already exists in HTML as an ordered
+  `<ol><li>` flow with its own heading and complete content.
 
 `SeoFaq` and `SeoBreadcrumbs` also hand you the matching structured
 data, so the on-page content and the rich result come from one source:
@@ -726,9 +729,9 @@ loads (slow network, JS error), the user simply keeps a readable page.
 ### Progressive interactions
 
 Visible HTML can opt into package-owned progressive enhancement. `SeoTabs`,
-`SeoNavMenu` and `SeoCarousel` are currently supported: Flutter keeps its
-native stateful widgets on iOS, Android and in the running web app, while the
-visible semantic page gains accessible controls from a small vanilla
+`SeoNavMenu`, `SeoCarousel` and `SeoStepper` are currently supported: Flutter
+keeps its native stateful widgets on iOS, Android and in the running web app,
+while the visible semantic page gains accessible controls from a small vanilla
 JavaScript runtime.
 
 ```dart
@@ -750,6 +753,12 @@ SeoCarousel(
   slides: productSlides,
 );
 
+SeoStepper(
+  interactionId: 'checkout-steps',
+  interactionLabel: 'Checkout',
+  steps: checkoutSteps,
+);
+
 await prerenderSite(
   routes: seoRoutes,
   siteBase: siteBase,
@@ -760,16 +769,17 @@ await prerenderSite(
 );
 ```
 
-The source contains every panel and carousel slide as ordinary sections and
-headings. JavaScript creates controls only after validating that structure,
-uses `textContent` for labels, and skips the invisible `inert` mirror after
-Flutter takes over. With JavaScript disabled, nothing disappears and every
-link, slide and paragraph remains readable. Navigation remains a native list
-of links rather than becoming an ARIA application menu: only branches receive
-disclosure buttons, and linked parents keep a separate navigation target.
-Carousels do not autoplay. This is an explicit component contract, not a
-compiler that attempts to translate arbitrary Dart callbacks or application
-state into JavaScript.
+The source contains every tab panel, carousel slide and step body as ordinary
+sections or ordered list items with headings. JavaScript creates controls only
+after validating that structure, uses `textContent` for labels, and skips the
+invisible `inert` mirror after Flutter takes over. With JavaScript disabled,
+nothing disappears and every link, slide, panel and step remains readable.
+Navigation remains a native list of links rather than becoming an ARIA
+application menu: only branches receive disclosure buttons, and linked parents
+keep a separate navigation target. Carousels do not autoplay. Steppers do not
+translate validation, completion rules, form state or callbacks. This is an
+explicit component contract, not a compiler that attempts to translate
+arbitrary Dart callbacks or application state into JavaScript.
 
 For a standalone semantic page with no Flutter bootstrap, use
 `SeoPage.visibleFromNodes(...)`; it applies the same default stylesheet and

@@ -35,5 +35,6 @@ export 'src/widgets/seo_nav_menu.dart';
 export 'src/widgets/seo_pie_chart.dart';
 export 'src/widgets/seo_rating.dart';
 export 'src/widgets/seo_rich_text.dart';
+export 'src/widgets/seo_stepper.dart';
 export 'src/widgets/seo_tabs.dart';
 export 'src/widgets/seo_testimonial.dart';

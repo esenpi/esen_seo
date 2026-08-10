@@ -14,6 +14,8 @@ void main() {
         seoInteractionRuntime,
         isNot(contains("setAttribute('role', 'menu')")),
       );
+      expect(seoInteractionRuntime, contains('stepperSelector'));
+      expect(seoInteractionRuntime, contains("'aria-current', 'step'"));
     });
 
     test('script and style wrappers escape an optional nonce', () {

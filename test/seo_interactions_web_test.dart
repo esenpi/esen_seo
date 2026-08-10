@@ -311,6 +311,136 @@ void main() {
     }
     script.remove();
   });
+
+  test('stepper enhances ordered steps and rejects malformed roots', () {
+    final shell = web.document.createElement('div')
+      ..id = 'esen-seo-content'
+      ..setAttribute('data-esen-seo-shell', 'visible');
+    fixture.appendChild(shell);
+    final root = _appendStepper(shell, 'checkout-steps');
+
+    final malformed = _appendStepper(shell, 'malformed-stepper');
+    malformed.querySelector('li')?.appendChild(web.document.createElement('p'));
+    final duplicate = _appendStepper(shell, 'duplicate-stepper');
+    shell.appendChild(
+      web.document.createElement('div')..id = 'duplicate-stepper-panel-0',
+    );
+    final wrongId = _appendStepper(shell, 'wrong-id-stepper');
+    wrongId.querySelector('li')?.id = 'borrowed-step-id';
+    final emptyHeading = _appendStepper(shell, 'empty-heading-stepper');
+    emptyHeading.querySelector('h3')?.textContent = '   ';
+    final emptyControl = _appendStepper(shell, 'empty-control-stepper');
+    emptyControl.setAttribute('data-esen-next-label', '   ');
+    final invalidInitial = _appendStepper(shell, 'invalid-initial-stepper');
+    invalidInitial.setAttribute('data-esen-initial-index', '1oops');
+    final collision = _appendStepper(shell, 'collision-stepper');
+    shell.appendChild(
+      web.document.createElement('div')..id = 'collision-stepper-step-button-0',
+    );
+    final single = _appendStepper(shell, 'single-stepper', count: 1);
+    final inert = web.document.createElement('div')..setAttribute('inert', '');
+    shell.appendChild(inert);
+    final inertRoot = _appendStepper(inert, 'inert-stepper');
+    final outside = _appendStepper(fixture, 'outside-stepper');
+    final rtl = _appendStepper(shell, 'rtl-stepper')
+      ..setAttribute('dir', 'rtl');
+
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.textContent, contains('Account content'));
+    expect(root.textContent, contains('Review content'));
+
+    final script = web.document.createElement('script')
+      ..textContent = seoInteractionRuntime;
+    web.document.body?.appendChild(script);
+
+    final buttons = root.querySelectorAll('[data-esen-step-button]');
+    final panels = root.querySelectorAll('[data-esen-step-panel]');
+    final controls = root.querySelectorAll('[data-esen-stepper-control]');
+    final firstButton = buttons.item(0)! as web.Element;
+    final secondButton = buttons.item(1)! as web.Element;
+    final thirdButton = buttons.item(2)! as web.Element;
+    final previous = controls.item(0)! as web.Element;
+    final next = controls.item(1)! as web.Element;
+    final status = root.querySelector('[data-esen-stepper-status]')!;
+
+    expect(root.getAttribute('role'), 'region');
+    expect(root.getAttribute('aria-label'), 'Checkout');
+    expect(buttons.length, 3);
+    expect(controls.length, 2);
+    expect(root.querySelectorAll('h3[hidden]').length, 3);
+    expect(secondButton.getAttribute('aria-current'), 'step');
+    expect(secondButton.getAttribute('aria-expanded'), 'true');
+    expect(secondButton.getAttribute('tabindex'), '0');
+    expect(firstButton.getAttribute('tabindex'), '-1');
+    expect((panels.item(1)! as web.Element).getAttribute('role'), 'region');
+    expect(
+      (panels.item(1)! as web.Element).getAttribute('aria-labelledby'),
+      secondButton.id,
+    );
+    expect((panels.item(0)! as web.Element).hasAttribute('hidden'), isTrue);
+    expect((panels.item(1)! as web.Element).hasAttribute('hidden'), isFalse);
+    expect(status.textContent, 'Step 2 / 3');
+    expect(status.getAttribute('aria-live'), 'polite');
+
+    thirdButton.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(status.textContent, 'Step 3 / 3');
+    expect(next.getAttribute('aria-disabled'), 'true');
+    next.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(status.textContent, 'Step 3 / 3');
+
+    previous.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(status.textContent, 'Step 2 / 3');
+    _keydown(secondButton, 'Home');
+    expect(status.textContent, 'Step 1 / 3');
+    expect(web.document.activeElement?.id, firstButton.id);
+    _keydown(firstButton, 'ArrowDown');
+    expect(status.textContent, 'Step 2 / 3');
+    _keydown(secondButton, 'End');
+    expect(status.textContent, 'Step 3 / 3');
+    thirdButton.dispatchEvent(
+      web.KeyboardEvent(
+        'keydown',
+        web.KeyboardEventInit(
+          key: 'ArrowUp',
+          repeat: true,
+          bubbles: true,
+        ),
+      ),
+    );
+    expect(status.textContent, 'Step 3 / 3');
+
+    final rtlButtons = rtl.querySelectorAll('[data-esen-step-button]');
+    final rtlSecond = rtlButtons.item(1)! as web.Element;
+    _keydown(rtlSecond, 'ArrowRight');
+    expect(
+      rtl.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 1 / 3',
+    );
+
+    for (final rejected in [
+      malformed,
+      duplicate,
+      wrongId,
+      emptyHeading,
+      emptyControl,
+      invalidInitial,
+      collision,
+      single,
+      inertRoot,
+      outside,
+    ]) {
+      expect(rejected.querySelectorAll('button').length, 0);
+      expect(rejected.querySelectorAll('[hidden]').length, 0);
+    }
+    script.remove();
+  });
 }
 
 void _keydown(web.Element element, String key) {
@@ -369,6 +499,43 @@ web.Element _appendCarousel(
       ..textContent = 'Slide ${index + 1}');
     root.appendChild(slide);
   }
+  parent.appendChild(root);
+  return root;
+}
+
+web.Element _appendStepper(
+  web.Element parent,
+  String id, {
+  int count = 3,
+  int initialIndex = 1,
+}) {
+  final root = web.document.createElement('div')
+    ..id = id
+    ..setAttribute('data-esen-component', 'stepper')
+    ..setAttribute('data-esen-label', 'Checkout')
+    ..setAttribute('data-esen-previous-label', 'Back')
+    ..setAttribute('data-esen-next-label', 'Next')
+    ..setAttribute('data-esen-position-label', 'Step')
+    ..setAttribute('data-esen-initial-index', '$initialIndex');
+  final list = web.document.createElement('ol')
+    ..setAttribute('data-esen-step-list', '');
+  const labels = ['Account', 'Address', 'Review'];
+  for (var index = 0; index < count; index += 1) {
+    final step = web.document.createElement('li')
+      ..id = '$id-step-$index'
+      ..setAttribute('data-esen-step', '');
+    step.appendChild(
+      web.document.createElement('h3')..textContent = labels[index],
+    );
+    final panel = web.document.createElement('div')
+      ..id = '$id-panel-$index'
+      ..setAttribute('data-esen-step-panel', '');
+    panel.appendChild(web.document.createElement('p')
+      ..textContent = '${labels[index]} content');
+    step.appendChild(panel);
+    list.appendChild(step);
+  }
+  root.appendChild(list);
   parent.appendChild(root);
   return root;
 }

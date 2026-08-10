@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Added `SeoStepper`, a state-hidden-content bridge with lazy native Flutter
+  bodies and every step present as an ordered semantic HTML list. A valid
+  `interactionId` progressively adds validated step buttons, previous/next
+  controls, live position, roving focus and Arrow/Home/End keyboard navigation;
+  malformed and single-step structures remain complete static content.
 * Added `SeoRichText`, a declarative inline model shared by native Flutter
   `TextSpan`s and semantic HTML. Strong importance, emphasis, inline code,
   safe links and line breaks retain their meaning instead of being flattened

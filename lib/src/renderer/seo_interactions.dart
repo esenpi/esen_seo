@@ -25,6 +25,16 @@ const String seoInteractionStylesheet = '''
 #$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-status{display:inline-block;min-width:4rem;text-align:center}
 #$seoContainerId [data-esen-component="carousel"][data-esen-enhanced="true"]>section[data-esen-carousel-slide][hidden]{display:none}
+#$seoContainerId [data-esen-component="stepper"]>[data-esen-step-list]{list-style:none;padding:0}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]{font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button][aria-current="step"]{font-weight:600}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-controls{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-block:.75rem}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:.5rem .75rem;cursor:pointer;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control][aria-disabled="true"]{opacity:.4;cursor:default}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-status{display:inline-block;min-width:6rem;text-align:center}
+#$seoContainerId [data-esen-component="stepper"][data-esen-enhanced="true"] [data-esen-step-panel][hidden]{display:none}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]{font:inherit;color:inherit;background:transparent;border:0;padding:.25rem;cursor:pointer}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="nav-menu"] .esen-seo-nav-toggle-label{padding:.25rem 0}
@@ -44,6 +54,7 @@ const String seoInteractionRuntime = r'''
 
   var tabsSelector = '[data-esen-component="tabs"]';
   var carouselSelector = '[data-esen-component="carousel"]';
+  var stepperSelector = '[data-esen-component="stepper"]';
   var navSelector = '[data-esen-component="nav-menu"]';
 
   function directPanels(root) {
@@ -57,6 +68,12 @@ const String seoInteractionRuntime = r'''
     return Array.prototype.filter.call(root.children, function (child) {
       return child.tagName === 'SECTION' &&
           child.hasAttribute('data-esen-carousel-slide');
+    });
+  }
+
+  function directStepperSteps(list) {
+    return Array.prototype.filter.call(list.children, function (child) {
+      return child.tagName === 'LI' && child.hasAttribute('data-esen-step');
     });
   }
 
@@ -295,6 +312,177 @@ const String seoInteractionRuntime = r'''
     activate(initial);
   }
 
+  function enhanceStepper(root) {
+    if (!canEnhance(root) || root.children.length !== 1) return;
+    var list = root.firstElementChild;
+    if (!list || list.tagName !== 'OL' ||
+        !list.hasAttribute('data-esen-step-list')) return;
+
+    var steps = directStepperSteps(list);
+    if (steps.length < 2 || steps.length !== list.children.length) return;
+
+    var label = root.getAttribute('data-esen-label') || '';
+    var previousLabel = root.getAttribute('data-esen-previous-label') || '';
+    var nextLabel = root.getAttribute('data-esen-next-label') || '';
+    var positionLabel = root.getAttribute('data-esen-position-label') || '';
+    if (!label.trim() || !previousLabel.trim() || !nextLabel.trim() ||
+        !positionLabel.trim()) return;
+
+    var initialValue = root.getAttribute('data-esen-initial-index');
+    if (initialValue === null || !/^(0|[1-9][0-9]*)$/.test(initialValue)) {
+      return;
+    }
+    var initial = Number(initialValue);
+    if (!Number.isSafeInteger(initial) || initial >= steps.length) return;
+
+    var previousId = root.id + '-previous';
+    var nextId = root.id + '-next';
+    var statusId = root.id + '-status';
+    if (idCount(previousId) !== 0 || idCount(nextId) !== 0 ||
+        idCount(statusId) !== 0) return;
+
+    var ids = Object.create(null);
+    var entries = [];
+    var valid = steps.every(function (step, index) {
+      if (step.children.length !== 2) return false;
+      var heading = step.children[0];
+      var panel = step.children[1];
+      var headingTag = heading ? heading.tagName : '';
+      var headingText = heading ? heading.textContent || '' : '';
+      var buttonId = root.id + '-step-button-' + index;
+      var expectedStepId = root.id + '-step-' + index;
+      var expectedPanelId = root.id + '-panel-' + index;
+      if (step.id !== expectedStepId || panel.id !== expectedPanelId ||
+          idCount(step.id) !== 1 || idCount(panel.id) !== 1 ||
+          ids[step.id] || ids[panel.id] || idCount(buttonId) !== 0 ||
+          !/^H[1-6]$/.test(headingTag) || !headingText.trim() ||
+          panel.tagName !== 'DIV' ||
+          !panel.hasAttribute('data-esen-step-panel')) {
+        return false;
+      }
+      ids[step.id] = true;
+      ids[panel.id] = true;
+      entries.push({
+        step: step,
+        heading: heading,
+        panel: panel,
+        buttonId: buttonId
+      });
+      return true;
+    });
+    if (!valid) return;
+
+    var rtl = window.getComputedStyle(root).direction === 'rtl';
+    var buttons = entries.map(function (entry) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.id = entry.buttonId;
+      button.className = 'esen-seo-step-button';
+      button.setAttribute('data-esen-step-button', '');
+      button.setAttribute('aria-controls', entry.panel.id);
+      button.textContent = entry.heading.textContent || '';
+      entry.panel.setAttribute('role', 'region');
+      entry.panel.setAttribute('aria-labelledby', button.id);
+      entry.heading.hidden = true;
+      entry.step.insertBefore(button, entry.heading);
+      return button;
+    });
+
+    var controls = document.createElement('div');
+    controls.className = 'esen-seo-stepper-controls';
+    controls.setAttribute('data-esen-stepper-controls', '');
+
+    function control(id, accessibleLabel) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.id = id;
+      button.setAttribute('data-esen-stepper-control', '');
+      button.textContent = accessibleLabel;
+      return button;
+    }
+
+    var previous = control(previousId, previousLabel);
+    var next = control(nextId, nextLabel);
+    var status = document.createElement('span');
+    status.id = statusId;
+    status.className = 'esen-seo-stepper-status';
+    status.setAttribute('data-esen-stepper-status', '');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+    controls.appendChild(previous);
+    controls.appendChild(status);
+    controls.appendChild(next);
+
+    var current = 0;
+    function activate(index, moveFocus) {
+      if (index < 0 || index >= entries.length) return;
+      current = index;
+      entries.forEach(function (entry, entryIndex) {
+        var selected = entryIndex === current;
+        if (selected) {
+          buttons[entryIndex].setAttribute('aria-current', 'step');
+        } else {
+          buttons[entryIndex].removeAttribute('aria-current');
+        }
+        buttons[entryIndex].setAttribute(
+            'aria-expanded', selected ? 'true' : 'false');
+        buttons[entryIndex].tabIndex = selected ? 0 : -1;
+        entry.panel.hidden = !selected;
+      });
+      previous.setAttribute('aria-disabled', current === 0 ? 'true' : 'false');
+      next.setAttribute(
+          'aria-disabled', current === entries.length - 1 ? 'true' : 'false');
+      status.textContent = positionLabel + ' ' +
+          (current + 1) + ' / ' + entries.length;
+      if (moveFocus) buttons[current].focus();
+    }
+
+    buttons.forEach(function (button, index) {
+      button.addEventListener('click', function () {
+        activate(index, false);
+      });
+      button.addEventListener('keydown', function (event) {
+        var target = null;
+        if (event.key === 'ArrowDown') {
+          target = Math.min(index + 1, buttons.length - 1);
+        } else if (event.key === 'ArrowUp') {
+          target = Math.max(index - 1, 0);
+        } else if (event.key === 'ArrowRight') {
+          target = rtl ? Math.max(index - 1, 0) :
+              Math.min(index + 1, buttons.length - 1);
+        } else if (event.key === 'ArrowLeft') {
+          target = rtl ? Math.min(index + 1, buttons.length - 1) :
+              Math.max(index - 1, 0);
+        } else if (event.key === 'Home') {
+          target = 0;
+        } else if (event.key === 'End') {
+          target = buttons.length - 1;
+        }
+        if (target === null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) activate(target, true);
+      });
+    });
+
+    previous.addEventListener('click', function () {
+      if (previous.getAttribute('aria-disabled') !== 'true') {
+        activate(current - 1, false);
+      }
+    });
+    next.addEventListener('click', function () {
+      if (next.getAttribute('aria-disabled') !== 'true') {
+        activate(current + 1, false);
+      }
+    });
+
+    root.appendChild(controls);
+    root.setAttribute('role', 'region');
+    root.setAttribute('aria-label', label);
+    root.setAttribute('data-esen-enhanced', 'true');
+    activate(initial, false);
+  }
+
   function enhanceNav(root) {
     if (!canEnhance(root) || root.children.length !== 1) return;
     var rootList = root.firstElementChild;
@@ -408,6 +596,7 @@ const String seoInteractionRuntime = r'''
     var root = scope || document;
     enhanceSelector(root, tabsSelector, enhanceTabs);
     enhanceSelector(root, carouselSelector, enhanceCarousel);
+    enhanceSelector(root, stepperSelector, enhanceStepper);
     enhanceSelector(root, navSelector, enhanceNav);
   }
 

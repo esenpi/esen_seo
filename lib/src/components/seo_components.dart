@@ -30,6 +30,9 @@ typedef SeoPieChartComponentEntry = ({
 /// Pure input for one panel in [buildSeoTabsNodes].
 typedef SeoTabComponentEntry = ({String label, List<SeoNode> nodes});
 
+/// Pure input for one step in [buildSeoStepperNodes].
+typedef SeoStepperComponentEntry = ({String label, List<SeoNode> nodes});
+
 final RegExp _validInteractionId = RegExp(r'^[A-Za-z][A-Za-z0-9_-]{0,127}$');
 
 /// Default ARGB palette used by [buildSeoPieChartNodes].
@@ -495,6 +498,80 @@ List<SeoNode> buildSeoRatingNodes({
       tag: 'p',
       attributes: const {'class': 'esen-seo-rating'},
       text: text,
+    ),
+  ];
+}
+
+/// Builds the complete ordered semantic source for a stepper.
+///
+/// Every step and body is present without JavaScript. A valid
+/// [interactionId] adds inert markers that the package-owned runtime may
+/// enhance only after validating the complete structure.
+List<SeoNode> buildSeoStepperNodes({
+  required List<SeoStepperComponentEntry> steps,
+  int headingLevel = 3,
+  String? interactionId,
+  String interactionLabel = 'Steps',
+  String previousLabel = 'Back',
+  String nextLabel = 'Next',
+  String positionLabel = 'Step',
+  int initialIndex = 0,
+}) {
+  if (steps.isEmpty) return const [];
+  final level = headingLevel.clamp(1, 6);
+  final candidate = interactionId?.trim();
+  final id = candidate != null && _validInteractionId.hasMatch(candidate)
+      ? candidate
+      : null;
+  final selectedIndex = initialIndex.clamp(0, steps.length - 1);
+  return [
+    SeoNode(
+      tag: 'div',
+      attributes: {
+        'class': 'esen-seo-stepper',
+        if (id != null) ...{
+          'id': id,
+          'data-esen-component': 'stepper',
+          'data-esen-label': interactionLabel,
+          'data-esen-previous-label': previousLabel,
+          'data-esen-next-label': nextLabel,
+          'data-esen-position-label': positionLabel,
+          'data-esen-initial-index': '$selectedIndex',
+        },
+      },
+      children: [
+        SeoNode(
+          tag: 'ol',
+          attributes: {
+            if (id != null) 'data-esen-step-list': '',
+          },
+          children: [
+            for (var index = 0; index < steps.length; index++)
+              SeoNode(
+                tag: 'li',
+                attributes: {
+                  if (id != null) ...{
+                    'id': '$id-step-$index',
+                    'data-esen-step': '',
+                  },
+                },
+                children: [
+                  SeoNode(tag: 'h$level', text: steps[index].label),
+                  SeoNode(
+                    tag: 'div',
+                    attributes: {
+                      if (id != null) ...{
+                        'id': '$id-panel-$index',
+                        'data-esen-step-panel': '',
+                      },
+                    },
+                    children: steps[index].nodes,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ],
     ),
   ];
 }

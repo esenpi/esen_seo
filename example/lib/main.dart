@@ -225,6 +225,18 @@ class DemoPage extends StatelessWidget {
                 ),
             ],
           ),
+          SeoStepper(
+            interactionId: 'demo-stepper',
+            interactionLabel: 'Publishing flow',
+            steps: [
+              for (final step in demoStepperSteps)
+                SeoStep(
+                  label: step.label,
+                  content: Text(step.content),
+                  nodes: demoStepperBodyNodes(step),
+                ),
+            ],
+          ),
         ],
       ).main,
     );

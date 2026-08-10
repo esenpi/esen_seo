@@ -7,15 +7,15 @@ Future<void> main() async {
   final page = SeoPage.visibleFromNodes(
     meta: const SeoMeta(
       title: 'Progressive components - esen_seo',
-      description: 'Navigation, carousel slides and tabs rendered as complete '
-          'HTML and enhanced with package-owned JavaScript.',
+      description: 'Navigation, carousel slides, tabs and steps rendered as '
+          'complete HTML and enhanced with package-owned JavaScript.',
     ),
     body: [
       SeoNode(tag: 'h1', text: 'Progressive components'),
       SeoNode(
         tag: 'p',
-        text: 'Disable JavaScript and every link, slide and panel remains '
-            'readable.',
+        text: 'Disable JavaScript and every link, slide, panel and step body '
+            'remains readable.',
       ),
       SeoNode(tag: 'h2', text: 'Progressive navigation'),
       ...demoNavNodes(),
@@ -27,6 +27,8 @@ Future<void> main() async {
         interactionId: 'demo-tabs',
         interactionLabel: 'Rendering targets',
       ),
+      SeoNode(tag: 'h2', text: 'Progressive stepper'),
+      ...demoStepperNodes(),
     ],
   );
 
