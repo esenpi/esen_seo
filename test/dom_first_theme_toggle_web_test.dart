@@ -34,6 +34,8 @@ void main() {
     expect(root.getAttribute('data-esen-enhanced'), 'true');
     expect(button.textContent, contains('Hell'));
     expect(button.getAttribute('aria-label'), 'Hellen Modus aktivieren');
+    expect(button.getAttribute('data-esen-dark'), 'true');
+    expect(button.children.length, 0);
     expect(
       web.document.documentElement?.getAttribute('data-esen-theme'),
       'dark',
@@ -45,6 +47,7 @@ void main() {
 
     expect(button.textContent, contains('Dunkel'));
     expect(button.getAttribute('aria-label'), 'Dunklen Modus aktivieren');
+    expect(button.getAttribute('data-esen-dark'), 'false');
     expect(
       web.document.documentElement?.getAttribute('data-esen-theme'),
       'light',

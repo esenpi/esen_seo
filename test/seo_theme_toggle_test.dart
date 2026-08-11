@@ -34,6 +34,18 @@ void main() {
     expect(oversized, contains('hidden'));
   });
 
+  test('compact behavior is declared in the shared component marker', () {
+    final html = const HtmlRenderer().render(
+      buildSeoThemeToggleNodes(compactOnSmallScreens: true),
+    );
+
+    expect(html, contains('data-esen-compact="true"'));
+    expect(
+      seoDomFirstThemeToggleStylesheet,
+      contains('@media (max-width:600px)'),
+    );
+  });
+
   testWidgets('Flutter control reports the next resolved brightness',
       (tester) async {
     bool? requested;
@@ -60,6 +72,37 @@ void main() {
     );
     await tester.tap(find.text('Dunkel'));
     expect(requested, isTrue);
+    semantics.dispose();
+  });
+
+  testWidgets('compact Flutter control keeps only the symbol on mobile',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SeoThemeToggle(
+            isDark: false,
+            onChanged: (_) {},
+            darkLabel: 'Dunkel',
+            darkSemanticLabel: 'Dunklen Modus aktivieren',
+            compactOnSmallScreens: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Dunkel'), findsNothing);
+    expect(find.text('\u263e'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Dunklen Modus aktivieren'),
+      findsOneWidget,
+    );
+    expect(tester.getSize(find.byType(OutlinedButton)), const Size(48, 48));
     semantics.dispose();
   });
 }

@@ -1,8 +1,9 @@
 /// Assets and wrappers for permanent semantic DOM delivery.
 library;
 
-import '../routing/seo_route_delivery.dart';
+import '../components/seo_components.dart';
 import '../components/seo_theme_transition.dart';
+import '../routing/seo_route_delivery.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
@@ -48,8 +49,11 @@ html[data-esen-theme="dark"]{color-scheme:dark}
 @media (prefers-color-scheme:dark){html:not([data-esen-theme="light"]):not([data-esen-theme="dark"]){color-scheme:dark}}
 #$seoContainerId [data-esen-component="theme-toggle"][data-esen-enhanced="true"]{display:inline-flex}
 #$seoContainerId .esen-seo-theme-toggle-button{display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-width:5.75rem;min-height:2.5rem;padding:.4375rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface-container-low,#eff5f2);color:var(--esen-color-on-surface,#171d1b);font:inherit;font-size:var(--esen-type-label-large-size,.875rem);font-weight:600;line-height:1;cursor:pointer}
+#$seoContainerId .esen-seo-theme-toggle-button::before{content:"\\263e"}
+#$seoContainerId .esen-seo-theme-toggle-button[data-esen-dark="true"]::before{content:"\\2600"}
 #$seoContainerId .esen-seo-theme-toggle-button:hover{background:var(--esen-color-surface-container,#e9efed)}
 #$seoContainerId .esen-seo-theme-toggle-button:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+@media (max-width:${seoThemeToggleCompactBreakpoint}px){#$seoContainerId [data-esen-component="theme-toggle"][data-esen-compact="true"] .esen-seo-theme-toggle-button{min-width:3rem;width:3rem;min-height:3rem;padding:.4375rem;gap:0;font-size:0}#$seoContainerId [data-esen-component="theme-toggle"][data-esen-compact="true"] .esen-seo-theme-toggle-button::before{font-size:var(--esen-type-label-large-size,.875rem)}}
 ''';
 
 /// Marks the pre-paint theme restoration script in a generated document.

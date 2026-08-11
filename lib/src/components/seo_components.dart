@@ -44,6 +44,9 @@ typedef SeoTabComponentEntry = ({String label, List<SeoNode> nodes});
 /// Pure input for one step in [buildSeoStepperNodes].
 typedef SeoStepperComponentEntry = ({String label, List<SeoNode> nodes});
 
+/// Viewport width at which an opted-in theme toggle becomes icon-only.
+const int seoThemeToggleCompactBreakpoint = 600;
+
 /// Builds the inert marker upgraded by the package-owned theme runtime.
 ///
 /// Without JavaScript the marker stays hidden and the document follows the
@@ -55,6 +58,7 @@ List<SeoNode> buildSeoThemeToggleNodes({
   String darkLabel = 'Dark',
   String lightSemanticLabel = 'Use light theme',
   String darkSemanticLabel = 'Use dark theme',
+  bool compactOnSmallScreens = false,
 }) {
   final light = lightLabel.trim();
   final dark = darkLabel.trim();
@@ -72,6 +76,7 @@ List<SeoNode> buildSeoThemeToggleNodes({
         'hidden': '',
         if (valid) ...{
           'data-esen-component': 'theme-toggle',
+          if (compactOnSmallScreens) 'data-esen-compact': 'true',
           'data-esen-light-label': light,
           'data-esen-dark-label': dark,
           'data-esen-light-semantic-label': lightSemantic,

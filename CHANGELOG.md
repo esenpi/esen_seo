@@ -7,7 +7,9 @@
   follows the system when no preference exists, persists changes best-effort
   and keeps malformed markers inert. Theme CSS opts into explicit palette
   selectors with `enableManualTheme: true`; existing stylesheet and document
-  bytes remain unchanged by default.
+  bytes remain unchanged by default. `compactOnSmallScreens` switches both
+  Flutter and DOM-first controls to an accessible icon-only presentation at
+  widths up to 600 pixels.
 * Added `SeoCollection`, a complete searchable, single-category-filterable,
   sortable and paginated content collection. Flutter and the separately
   opt-in `SeoDomFirstFeature.collection` runtime share one prepared pure Dart

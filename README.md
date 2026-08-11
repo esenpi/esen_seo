@@ -998,6 +998,11 @@ exactly one toggle per DOM-first document; ambiguous duplicate controls stay
 inert. Manual selection is intended for `SeoThemeMode.system`, since a forced
 mode deliberately emits only its selected palette.
 
+Set `compactOnSmallScreens: true` to keep the full label on larger layouts and
+show only the sun or moon symbol at widths up to 600 pixels. Flutter and the
+DOM-first presentation use the same breakpoint; the tooltip and accessible
+name remain complete in both layouts.
+
 Every value is validated against an allow list before it becomes CSS;
 what fails validation is dropped and the shell degrades to the default
 look rather than breaking.
