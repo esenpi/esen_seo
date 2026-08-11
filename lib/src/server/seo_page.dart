@@ -5,7 +5,13 @@ import '../renderer/seo_dom_first.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
+import '../routing/seo_application_runtime.dart';
 import '../routing/seo_route_delivery.dart';
+import 'seo_runtime_store.dart';
+
+/// Marks a verified application-authored runtime in a DOM-first document.
+const String seoDomFirstApplicationScriptAttribute =
+    'data-esen-seo-dom-first-application-runtime';
 
 /// A complete server-rendered page: head metadata plus a semantic HTML body.
 ///
@@ -30,7 +36,8 @@ class SeoPage {
         stylesheet = null,
         enableInteractions = false,
         interactionNonce = null,
-        domFirstFeatures = const {};
+        domFirstFeatures = const {},
+        applicationRuntime = null;
 
   /// Builds the body from [SeoNode]s using the same renderer as the
   /// Flutter side.
@@ -61,7 +68,8 @@ class SeoPage {
           const HtmlRenderer().render(body),
           mode: SeoRenderMode.visibleShell,
         ),
-        domFirstFeatures = const {};
+        domFirstFeatures = const {},
+        applicationRuntime = null;
 
   /// Builds a permanent semantic page without a Flutter browser runtime.
   ///
@@ -74,12 +82,22 @@ class SeoPage {
     this.stylesheet = seoDefaultStylesheet,
     Set<SeoDomFirstFeature> features = const {},
     this.interactionNonce,
+    this.applicationRuntime,
   })  : meta = meta ?? const SeoMeta(),
         bodyHtml = seoDomFirstContainerHtml(
           const HtmlRenderer().render(body),
         ),
         enableInteractions = false,
-        domFirstFeatures = Set.unmodifiable(features);
+        domFirstFeatures = Set.unmodifiable(features) {
+    if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime &&
+        features.contains(SeoDomFirstFeature.tabs)) {
+      throw ArgumentError.value(
+        applicationRuntime!.reference,
+        'applicationRuntime',
+        'cannot be combined with the package-owned tabs runtime',
+      );
+    }
+  }
 
   /// Head metadata: title, description, OpenGraph, JSON-LD schemas.
   final SeoMeta meta;
@@ -108,6 +126,9 @@ class SeoPage {
   /// Compiled behaviours selected for a permanent DOM-first page.
   final Set<SeoDomFirstFeature> domFirstFeatures;
 
+  /// A separately built and verified application transition for this page.
+  final SeoDomFirstRuntimeArtifact? applicationRuntime;
+
   /// Optional CSP nonce placed on package-generated style and script tags.
   ///
   /// In visible-shell mode it does not cover the container's inline `style`
@@ -117,6 +138,11 @@ class SeoPage {
   /// Renders the complete HTML document.
   String toHtmlDocument() {
     final language = HtmlRenderer.escapeAttribute(lang);
+    final effectiveFeatures = {
+      ...domFirstFeatures,
+      if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime)
+        SeoDomFirstFeature.tabs,
+    };
     final head = StringBuffer();
     head.write(
       seoDomFirstFeatureBootstrapScriptHtml(
@@ -132,7 +158,7 @@ class SeoPage {
     }
     head.write(
       seoDomFirstFeatureStyleHtml(
-        domFirstFeatures,
+        effectiveFeatures,
         nonce: interactionNonce,
       ),
     );
@@ -146,6 +172,12 @@ class SeoPage {
         nonce: interactionNonce,
       ),
     );
+    if (applicationRuntime case final artifact?) {
+      runtime.write(_applicationRuntimeScriptHtml(
+        artifact,
+        nonce: interactionNonce,
+      ));
+    }
     return '<!DOCTYPE html>'
         '<html lang="$language">'
         '<head>'
@@ -157,4 +189,19 @@ class SeoPage {
         '<body>$bodyHtml$runtime</body>'
         '</html>';
   }
+}
+
+String _applicationRuntimeScriptHtml(
+  SeoDomFirstRuntimeArtifact artifact, {
+  String? nonce,
+}) {
+  final id = HtmlRenderer.escapeAttribute(artifact.reference.id);
+  final hash = HtmlRenderer.escapeAttribute(artifact.manifest.sha256);
+  final value = nonce?.trim();
+  final nonceAttribute = value == null || value.isEmpty
+      ? ''
+      : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
+  return '<script $seoDomFirstApplicationScriptAttribute="$id" '
+      'data-esen-seo-runtime-sha256="$hash"$nonceAttribute>'
+      '${artifact.javascript}</script>';
 }

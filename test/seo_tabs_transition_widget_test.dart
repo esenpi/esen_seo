@@ -36,4 +36,33 @@ void main() {
       }
     }
   });
+
+  testWidgets('Flutter delegates selection to an application transition',
+      (tester) async {
+    SeoTabsState keepFirst(SeoTabsState state, SeoTabsAction action) =>
+        SeoTabsState(index: 0, count: state.count);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoTabs(
+          transition: keepFirst,
+          tabs: [
+            for (var index = 0; index < 2; index++)
+              SeoTab(
+                label: 'Tab $index',
+                content: Text('Panel $index'),
+                nodes: [SeoNode(tag: 'p', text: 'Panel $index')],
+              ),
+          ],
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Tab 1'));
+    await tester.pump();
+
+    expect(find.text('Panel 0'), findsOneWidget);
+    expect(find.text('Panel 1'), findsNothing);
+  });
 }

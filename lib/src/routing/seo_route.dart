@@ -7,6 +7,7 @@ import 'dart:async';
 
 import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
+import 'seo_application_runtime.dart';
 import 'seo_resolution.dart';
 import 'seo_route_delivery.dart';
 
@@ -74,12 +75,18 @@ class SeoRoute {
     this.lastModified,
     this.delivery = SeoRouteDelivery.flutter,
     Set<SeoDomFirstFeature> domFirstFeatures = const {},
+    SeoDomFirstApplicationRuntime? applicationRuntime,
   })  : path = _validatedSeoRoutePath(path),
         isDynamic = false,
         resolve = _staticResolver(meta, body),
         domFirstFeatures = _validatedDomFirstFeatures(
           delivery,
           domFirstFeatures,
+        ),
+        applicationRuntime = _validatedApplicationRuntime(
+          delivery,
+          domFirstFeatures,
+          applicationRuntime,
         );
 
   /// The database form: one [resolve] read produces metadata **and**
@@ -111,6 +118,7 @@ class SeoRoute {
     this.lastModified,
     this.delivery = SeoRouteDelivery.flutter,
     Set<SeoDomFirstFeature> domFirstFeatures = const {},
+    SeoDomFirstApplicationRuntime? applicationRuntime,
   })  : path = _validatedSeoRoutePath(path),
         meta = null,
         body = null,
@@ -118,6 +126,11 @@ class SeoRoute {
         domFirstFeatures = _validatedDomFirstFeatures(
           delivery,
           domFirstFeatures,
+        ),
+        applicationRuntime = _validatedApplicationRuntime(
+          delivery,
+          domFirstFeatures,
+          applicationRuntime,
         );
 
   /// The URL path pattern, e.g. `/` or `/blog/:slug`.
@@ -145,6 +158,12 @@ class SeoRoute {
   /// Features are rejected on Flutter-delivered routes instead of being
   /// silently ignored, so a misplaced opt-in cannot appear to work.
   final Set<SeoDomFirstFeature> domFirstFeatures;
+
+  /// Application-authored pure logic compiled for this DOM-first route.
+  ///
+  /// Only the typed identity is stored here. Server delivery must resolve and
+  /// verify its separate build artifact before writing any JavaScript.
+  final SeoDomFirstApplicationRuntime? applicationRuntime;
 
   /// Whether the semantic document permanently owns the web route.
   bool get isDomFirst => delivery == SeoRouteDelivery.domFirst;
@@ -226,6 +245,38 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
     );
   }
   return Set<SeoDomFirstFeature>.unmodifiable(features);
+}
+
+SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
+  SeoRouteDelivery delivery,
+  Set<SeoDomFirstFeature> features,
+  SeoDomFirstApplicationRuntime? runtime,
+) {
+  if (runtime == null) return null;
+  if (delivery != SeoRouteDelivery.domFirst) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'requires delivery: SeoRouteDelivery.domFirst',
+    );
+  }
+  if (!isValidSeoApplicationRuntimeId(runtime.id)) {
+    throw ArgumentError.value(
+      runtime.id,
+      'applicationRuntime',
+      'must start with a lowercase letter and contain at most 64 lowercase '
+          'letters, digits, underscores or dashes',
+    );
+  }
+  if (runtime is SeoDomFirstTabsApplicationRuntime &&
+      features.contains(SeoDomFirstFeature.tabs)) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'cannot be combined with the package-owned tabs runtime',
+    );
+  }
+  return runtime;
 }
 
 /// Wraps the convenience [SeoRoute]'s two builders into a single

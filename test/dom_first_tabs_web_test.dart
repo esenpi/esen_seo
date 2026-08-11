@@ -2,6 +2,8 @@
 library;
 
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
+import 'package:esen_seo/src/components/seo_tabs_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_tabs_adapter_web.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
 
@@ -153,6 +155,33 @@ void main() {
       root.querySelector('[role="tablist"]')?.getAttribute('aria-label'),
       'Tabs',
     );
+  });
+
+  test('adapter executes an application transition instead of the default', () {
+    final container = _container(fixture);
+    final root = _tabs(container, 'application-tabs', initialIndex: 1);
+
+    SeoTabsState doNotWrap(SeoTabsState state, SeoTabsAction action) {
+      if (action is SeoTabsNext && state.index == state.count - 1) return state;
+      if (action is SeoTabsPrevious && state.index == 0) return state;
+      return transitionSeoTabs(state, action);
+    }
+
+    enhanceSeoDomFirstTabs(transition: doNotWrap);
+    final tabs = root.querySelectorAll('[role="tab"]');
+    final first = tabs.item(0)! as web.HTMLElement;
+    final last = tabs.item(1)! as web.HTMLElement;
+
+    _keydown(last, 'ArrowRight');
+    expect(last.getAttribute('aria-selected'), 'true');
+    expect(first.getAttribute('aria-selected'), 'false');
+
+    first.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    _keydown(first, 'ArrowLeft');
+    expect(first.getAttribute('aria-selected'), 'true');
+    expect(last.getAttribute('aria-selected'), 'false');
   });
 }
 

@@ -1,5 +1,14 @@
 ## Unreleased
 
+* Added the first application-authored DOM-first state slice. `SeoTabs` accepts
+  a pure `SeoTabsTransition`, while a DOM-first route can select the same logic
+  through `SeoDomFirstApplicationRuntime.tabs`. The `esen_seo_runtime` build
+  command parser-checks the application's complete import graph, compiles a
+  CSP-compatible JavaScript artifact and writes a SHA-256 manifest outside
+  `lib/`. Middleware and prerendering require a runtime store and revalidate
+  identity, bytes, gzip budget and hash before route-scoped inline delivery;
+  missing, stale, foreign and manipulated artifacts fail closed. Existing
+  Flutter and non-opted-in route delivery remains unchanged.
 * Added `SeoThemeToggle`, a controlled Flutter light/dark control with a
   separately selected `SeoDomFirstFeature.themeToggle` presentation. The
   generated web adapter restores a closed `light`/`dark` preference before
@@ -45,8 +54,7 @@
   validates its complete structure before mutation, creates fixed ARIA
   controls through one apply boundary, supports pointer and Arrow/Home/End
   navigation, and leaves the complete document readable without JavaScript.
-  Application-authored transitions, effects, forms and client routing are not
-  part of this first slice.
+  Effects, forms and client routing are not part of this slice.
 * Added a separate `domFirstStylesheet` input to static prerendering, matching
   the middleware API. Mixed sites can theme permanent HTML routes without
   changing the stylesheet bytes of Flutter-delivered routes.

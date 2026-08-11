@@ -12,6 +12,7 @@ import '../routing/seo_path_kind.dart';
 import 'bot_detector.dart';
 import 'llms_txt.dart';
 import 'seo_page.dart';
+import 'seo_runtime_store.dart';
 import 'sitemap.dart';
 
 /// Maps an incoming request to the [SeoPage] a bot should receive,
@@ -114,6 +115,12 @@ Middleware seoBotMiddleware({
   /// The callback runs for the matched route only. It does not affect the
   /// semantic content and is never consulted for Flutter-delivered routes.
   String? Function(Request request)? domFirstNonce,
+
+  /// Resolves application-authored runtimes selected by DOM-first routes.
+  ///
+  /// The middleware verifies the artifact on every delivery. Routes without an
+  /// application runtime never consult this store.
+  SeoDomFirstRuntimeStore? domFirstRuntimeStore,
   Duration? infrastructureCacheTtl = seoAutoInfrastructureCacheTtl,
 
   /// Called when a route resolver fails.
@@ -131,6 +138,11 @@ Middleware seoBotMiddleware({
     routes != null || resolve != null,
     'seoBotMiddleware needs `routes` and/or `resolve`.',
   );
+  final needsApplicationRuntime =
+      routes?.any((route) => route.applicationRuntime != null) ?? false;
+  if (needsApplicationRuntime && domFirstRuntimeStore == null) {
+    throw ArgumentError.notNull('domFirstRuntimeStore');
+  }
   // Not just `isDynamic`: a CLASSIC route may carry an async
   // `enumeratePaths` too, and the synchronous pass cannot await it
   // either. Deciding on "is dynamic" alone made /sitemap.xml throw for a
@@ -342,6 +354,13 @@ Middleware seoBotMiddleware({
       if (routes != null) {
         final match = matchSeoRoute(routes, path);
         if (match != null && match.route.isDomFirst) {
+          final runtimeReference = match.route.applicationRuntime;
+          final applicationRuntime = runtimeReference == null
+              ? null
+              : await loadSeoDomFirstRuntime(
+                  domFirstRuntimeStore!,
+                  runtimeReference,
+                );
           final SeoResolution resolution;
           try {
             resolution = await match.resolve(
@@ -373,6 +392,7 @@ Middleware seoBotMiddleware({
                   lang: resolution.lang ?? match.route.lang,
                   stylesheet: domFirstStylesheet,
                   features: match.route.domFirstFeatures,
+                  applicationRuntime: applicationRuntime,
                   interactionNonce: domFirstNonce?.call(request),
                 ),
                 status: statusCode,

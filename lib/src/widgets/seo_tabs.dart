@@ -64,6 +64,7 @@ class SeoTabs extends StatefulWidget {
     this.headingLevel = 3,
     this.interactionId,
     this.interactionLabel = 'Tabs',
+    this.transition = transitionSeoTabs,
     this.labelStyle,
     this.selectedLabelStyle,
     this.indicatorColor = const Color(0xFF2563EB),
@@ -87,6 +88,9 @@ class SeoTabs extends StatefulWidget {
 
   /// Accessible label of the enhanced tab list.
   final String interactionLabel;
+
+  /// Pure selection logic shared with an optional application web runtime.
+  final SeoTabsTransition transition;
 
   /// Style of the unselected tab labels.
   final TextStyle? labelStyle;
@@ -160,7 +164,11 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => setState(() {
-        _tabsState = transitionSeoTabs(_tabsState, SeoTabsSelect(index));
+        _tabsState = applySeoTabsTransition(
+          widget.transition,
+          _tabsState,
+          SeoTabsSelect(index),
+        );
       }),
       child: Container(
         padding: const EdgeInsets.only(bottom: 6),

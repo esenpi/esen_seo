@@ -11,20 +11,25 @@ import 'seo_container.dart';
 /// The whole control is validated before [_TabsApplyBoundary] performs the
 /// first mutation. Invalid or ambiguous markup therefore remains complete,
 /// readable HTML instead of becoming a partially initialized control.
-void enhanceSeoDomFirstTabs() {
+void enhanceSeoDomFirstTabs({
+  SeoTabsTransition transition = transitionSeoTabs,
+}) {
   for (final apply in _TabsApplyBoundary.discover(web.document)) {
-    _enhanceTabs(apply);
+    _enhanceTabs(apply, transition);
   }
 }
 
-void _enhanceTabs(_TabsApplyBoundary apply) {
+void _enhanceTabs(
+  _TabsApplyBoundary apply,
+  SeoTabsTransition transition,
+) {
   var state = initialSeoTabsState(
     count: apply.count,
     index: apply.initialIndex,
   );
 
   void dispatch(SeoTabsAction action, {required bool moveFocus}) {
-    state = transitionSeoTabs(state, action);
+    state = applySeoTabsTransition(transition, state, action);
     apply.state(state, moveFocus: moveFocus);
   }
 

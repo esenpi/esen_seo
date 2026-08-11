@@ -1,0 +1,44 @@
+/// Typed references to application-authored DOM-first browser logic.
+library;
+
+/// One application runtime selected by a DOM-first route.
+///
+/// The route stores only this validated logical identity. JavaScript remains
+/// outside the route table and is loaded through the server runtime store.
+sealed class SeoDomFirstApplicationRuntime {
+  const SeoDomFirstApplicationRuntime._(this.id);
+
+  /// Uses an application-authored transition with the package tabs adapter.
+  const factory SeoDomFirstApplicationRuntime.tabs(String id) =
+      SeoDomFirstTabsApplicationRuntime;
+
+  /// The logical build-artifact identity.
+  final String id;
+
+  /// The closed runtime kind written to the verified manifest.
+  String get kind;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SeoDomFirstApplicationRuntime &&
+      other.runtimeType == runtimeType &&
+      other.id == id;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, id);
+}
+
+/// An application-authored transition executed by the tabs adapter.
+final class SeoDomFirstTabsApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstTabsApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'tabs';
+}
+
+/// Whether [id] is safe as a logical identity and artifact file component.
+bool isValidSeoApplicationRuntimeId(String id) =>
+    _applicationRuntimeId.hasMatch(id);
+
+final RegExp _applicationRuntimeId = RegExp(r'^[a-z][a-z0-9_-]{0,63}$');

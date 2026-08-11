@@ -37,4 +37,5 @@ export 'src/server/prerender.dart';
 export 'src/server/redirects.dart';
 export 'src/server/seo_middleware.dart';
 export 'src/server/seo_page.dart';
+export 'src/server/seo_runtime_store.dart';
 export 'src/server/sitemap.dart';

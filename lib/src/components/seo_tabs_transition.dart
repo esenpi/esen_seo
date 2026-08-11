@@ -1,6 +1,37 @@
 /// Pure state transition shared by Flutter and DOM-first tab presentations.
 library;
 
+/// A state-free tabs transition shared by platform presentations.
+typedef SeoTabsTransition = SeoTabsState Function(
+  SeoTabsState state,
+  SeoTabsAction action,
+);
+
+/// Executes [transition] within the closed state contract of a tabs control.
+///
+/// Application logic cannot change the panel count or select a missing panel.
+/// A thrown exception or invalid result leaves the last valid state unchanged
+/// on both Flutter and DOM-first presentations.
+SeoTabsState applySeoTabsTransition(
+  SeoTabsTransition transition,
+  SeoTabsState state,
+  SeoTabsAction action,
+) {
+  final current = _normalizedSeoTabsState(state);
+  final SeoTabsState result;
+  try {
+    result = transition(current, action);
+  } catch (_) {
+    return current;
+  }
+  if (result.count != current.count ||
+      result.index < 0 ||
+      result.index >= current.count) {
+    return current;
+  }
+  return result;
+}
+
 /// The complete state needed to select one panel in a tab group.
 final class SeoTabsState {
   const SeoTabsState({required this.index, required this.count});

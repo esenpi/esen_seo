@@ -848,15 +848,130 @@ belong to Flutter's visible shell. The middleware uses the same
 `domFirstStylesheet` default. `domFirstNonce` can supply a per-response CSP
 nonce.
 
-The executable slices deliberately support only package-owned transitions.
-They do not translate arbitrary Flutter `State`, Cubits or callbacks.
-`SeoTabs` and `SeoCollection` each share their pure transition with a separate
-browser adapter while each presentation owns its current state.
+The built-in executable slices use package-owned transitions. They do not
+translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs` and
+`SeoCollection` each share their pure transition with a separate browser
+adapter while each presentation owns its current state.
 `SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
-markers produced by the pure component builders. Custom application
-transitions, content effects, forms and client-side routing require later,
-separately designed build and security boundaries.
+markers produced by the pure component builders. Content effects, forms and
+client-side routing remain separate, deliberately unsupported capabilities.
+
+### Application-owned tabs state
+
+One DOM-first route can instead execute a tabs transition authored in the
+application. Write it as a state-free top-level Dart function under `lib/` and
+pass the same function to Flutter:
+
+```dart
+// lib/product_tabs_transition.dart — pure Dart, no Flutter import
+import 'package:esen_seo/core.dart';
+
+SeoTabsState transitionProductTabs(
+  SeoTabsState state,
+  SeoTabsAction action,
+) {
+  // Application rule: next/previous stop at the ends instead of wrapping.
+  if (action is SeoTabsNext && state.index == state.count - 1) return state;
+  if (action is SeoTabsPrevious && state.index == 0) return state;
+  return transitionSeoTabs(state, action);
+}
+
+SeoTabs(
+  transition: transitionProductTabs,
+  tabs: flutterProductTabs,
+);
+```
+
+Compile only that transition and the package-owned tabs adapter:
+
+```shell
+dart run esen_seo:esen_seo_runtime \
+  --id product-tabs \
+  --library package:my_app/product_tabs_transition.dart \
+  --symbol transitionProductTabs
+```
+
+The command parses the complete application import/export/part graph before
+compilation. It rejects Flutter, IO, browser libraries, third-party packages,
+conditional and deferred imports, path escapes and invalid identifiers. It
+also rejects non-const top-level or static fields, so the transition cannot
+hold current state between calls. It then runs
+`dart compile js -O2 --csp --no-source-maps --fatal-warnings` and writes
+`product-tabs.js` plus a SHA-256 manifest below
+`build/esen_seo/runtimes/`. Compiler output above the fixed 25 KiB gzip budget,
+script-end tags and string-to-code constructors are refused.
+
+This is a capability and held-state boundary, not a formal proof that arbitrary
+Dart is referentially transparent. Keep environment reads and side effects out
+of the transition, and test identical action sequences on the pure, Flutter and
+compiled-browser paths.
+
+Build the artifact with the same pinned Dart SDK that serves or prerenders the
+site. CI can compile the transition again and compare the complete output,
+manifest and compiler version without modifying the artifact:
+
+```shell
+dart run esen_seo:esen_seo_runtime \
+  --id product-tabs \
+  --library package:my_app/product_tabs_transition.dart \
+  --symbol transitionProductTabs \
+  --check
+```
+
+Select the typed identity on the route, never a JavaScript string:
+
+```dart
+SeoRoute(
+  path: '/product',
+  delivery: SeoRouteDelivery.domFirst,
+  applicationRuntime:
+      const SeoDomFirstApplicationRuntime.tabs('product-tabs'),
+  meta: (_) => const SeoMeta(title: 'Product'),
+  body: (_) => buildSeoTabsNodes(
+    tabs: productTabNodes,
+    interactionId: 'product-tabs-control',
+  ),
+);
+```
+
+Finally give the server or prerenderer the build-owned directory:
+
+```dart
+final runtimes = SeoDirectoryRuntimeStore('build/esen_seo/runtimes');
+
+seoBotMiddleware(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  domFirstRuntimeStore: runtimes,
+);
+
+await prerenderSite(
+  routes: seoRoutes,
+  siteBase: siteBase,
+  domFirstRuntimeStore: runtimes,
+);
+```
+
+Every delivery rechecks kind, logical id, SHA-256, byte sizes and the expected
+Dart compiler version. Missing, stale, foreign or manipulated artifacts fail
+by name instead of falling back to package logic or Flutter. A route may select
+either the package tabs feature or one application tabs runtime, never both.
+Cubit or another Flutter state manager may dispatch the same pure transition
+on the Flutter side, but it is not compiled and is not a dependency of
+`esen_seo`.
+
+For a hybrid site that serves Flutter and DOM-first routes from the same
+origin, disable Flutter's root-scoped application-shell cache:
+
+```shell
+flutter build web --release --pwa-strategy=none
+```
+
+Alternatively, own a custom service worker whose navigation and asset scope
+excludes every DOM-first route. An existing root-scoped offline-first worker
+can otherwise intercept those navigations or fetch Flutter artifacts in the
+background even though the DOM-first document itself references none.
 
 On a DOM-first route a resolver result is final because no Flutter app exists
 there as a fallback. Therefore every `SeoRedirect` and every error document is

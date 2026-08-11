@@ -57,4 +57,37 @@ void main() {
       expect(identical(before, after), isFalse);
     });
   });
+
+  group('application transition boundary', () {
+    test('keeps the current state for invalid application output', () {
+      const current = SeoTabsState(index: 1, count: 3);
+
+      for (final invalid in <SeoTabsTransition>[
+        (_, __) => const SeoTabsState(index: -1, count: 3),
+        (_, __) => const SeoTabsState(index: 3, count: 3),
+        (_, __) => const SeoTabsState(index: 0, count: 4),
+        (_, __) => throw StateError('application failure'),
+      ]) {
+        expect(
+          applySeoTabsTransition(invalid, current, const SeoTabsNext()),
+          current,
+        );
+      }
+    });
+
+    test('normalizes input before application code receives it', () {
+      late SeoTabsState received;
+      final result = applySeoTabsTransition(
+        (state, _) {
+          received = state;
+          return state;
+        },
+        const SeoTabsState(index: 99, count: 2),
+        const SeoTabsNext(),
+      );
+
+      expect(received, const SeoTabsState(index: 1, count: 2));
+      expect(result, received);
+    });
+  });
 }

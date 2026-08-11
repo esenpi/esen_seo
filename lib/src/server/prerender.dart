@@ -5,11 +5,13 @@ import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_stylesheet.dart';
+import '../routing/seo_application_runtime.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
 import 'llms_txt.dart';
 import 'seo_page.dart';
+import 'seo_runtime_store.dart';
 import 'sitemap.dart';
 
 /// Bakes the SEO route table into the built Flutter web app as static
@@ -83,6 +85,7 @@ Future<List<String>> prerenderSite({
   String? domFirstStylesheet = seoDefaultStylesheet,
   bool enableInteractions = false,
   String? interactionNonce,
+  SeoDomFirstRuntimeStore? domFirstRuntimeStore,
   int concurrency = 8,
   void Function(String path, SeoResolution resolution)? onSkipped,
   void Function(String path, Object error, StackTrace stack)? onError,
@@ -94,6 +97,10 @@ Future<List<String>> prerenderSite({
       'must be SeoRenderMode.visibleShell when interactions are enabled',
     );
   }
+  final applicationRuntimes = await _loadApplicationRuntimes(
+    routes,
+    domFirstRuntimeStore,
+  );
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
     throw StateError(
@@ -190,6 +197,8 @@ Future<List<String>> prerenderSite({
             lang: page.lang,
             stylesheet: domFirstStylesheet,
             features: page.route!.domFirstFeatures,
+            applicationRuntime:
+                applicationRuntimes[page.route!.applicationRuntime],
             interactionNonce: interactionNonce,
           ).toHtmlDocument()
         : _applyTemplate(
@@ -256,6 +265,26 @@ Future<List<String>> prerenderSite({
     written.add(file.path);
   }
   return written;
+}
+
+Future<Map<SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>>
+    _loadApplicationRuntimes(
+  List<SeoRoute> routes,
+  SeoDomFirstRuntimeStore? store,
+) async {
+  final references = routes
+      .map((route) => route.applicationRuntime)
+      .whereType<SeoDomFirstApplicationRuntime>()
+      .toSet();
+  if (references.isEmpty) return const {};
+  if (store == null) throw ArgumentError.notNull('domFirstRuntimeStore');
+
+  final artifacts =
+      <SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>{};
+  for (final reference in references) {
+    artifacts[reference] = await loadSeoDomFirstRuntime(store, reference);
+  }
+  return Map.unmodifiable(artifacts);
 }
 
 /// The IndexNow key doubles as a file name — keep it to the character
