@@ -8,6 +8,12 @@
   remains in the source without JavaScript. Invalid, ambiguous, oversized or
   single-item collections stay complete static HTML, and sort keys are limited
   to integers represented exactly on both the Dart VM and JavaScript.
+* `SeoCollection(synchronizeUrl: true)` and `buildSeoCollectionNodes` can now
+  opt a DOM-first collection into shareable, history-aware query state. Search
+  replaces the current history entry; category, sort and page actions create
+  entries; Back and Forward restore the same pure collection state. Parameters
+  are namespaced by validated interaction id, preserve unrelated URL data and
+  are canonicalized without introducing client-side routing.
 * Added an opt-in cross-platform motion pilot for `SeoBarChart`.
   `SeoMotionPreset.gentle` drives Flutter and CSS from the same pure timing
   model, with a capped entrance stagger and decorative pointer/press emphasis.

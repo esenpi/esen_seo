@@ -197,6 +197,7 @@ void main() {
           lessThan(html.indexOf('<h2>Älter</h2>')));
       expect(html, contains('data-esen-component="collection"'));
       expect(html, contains('data-esen-page-size="1"'));
+      expect(html, isNot(contains('data-esen-synchronize-url')));
       expect('data-esen-collection-item=""'.allMatches(html), hasLength(2));
       expect(html, contains('data-esen-item-categories="0 1"'));
       expect(
@@ -204,6 +205,27 @@ void main() {
       expect(html, isNot(contains('<input')));
       expect(html, isNot(contains('<button')));
       expect(html, contains('<article'));
+    });
+
+    test('URL synchronization emits only on a valid interactive collection',
+        () {
+      const renderer = HtmlRenderer();
+      final interactive = renderer.render(buildSeoCollectionNodes(
+        items: _items,
+        interactionId: 'blog-collection',
+        synchronizeUrl: true,
+      ));
+      final staticMarkup = renderer.render(buildSeoCollectionNodes(
+        items: _items,
+        interactionId: 'not valid',
+        synchronizeUrl: true,
+      ));
+
+      expect(
+        interactive,
+        contains('data-esen-synchronize-url="true"'),
+      );
+      expect(staticMarkup, isNot(contains('data-esen-synchronize-url')));
     });
 
     test('invalid configuration degrades to complete static markup', () {

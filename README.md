@@ -454,6 +454,7 @@ SeoRoute(
     items: articleComponents,
     interactionId: 'article-collection',
     pageSize: 12,
+    synchronizeUrl: true,
   ),
 );
 ```
@@ -465,7 +466,12 @@ component. Empty or invalid ids, duplicate DOM ids, malformed metadata,
 single-item collections, more than 2,000 items, more than 32 categories and
 search corpora above 4,096 UTF-16 code units deliberately degrade to complete
 static markup. The browser runtime is selected independently from tabs and
-from `enableInteractions`.
+from `enableInteractions`. With `synchronizeUrl: true`, the DOM-first adapter
+stores non-default state in `esen.<interactionId>.q`, `.category`, `.sort` and
+`.page` query parameters. Search uses `replaceState`; category, sort and page
+changes use `pushState`; Back and Forward restore the collection. The current
+path, fragment and unrelated query parameters remain untouched, and the
+canonical route URL is unchanged.
 
 The live DOM mirror is derived directly from the widget tree, so it does
 not require a second authored content tree. A server-rendered route
@@ -861,10 +867,10 @@ the route body is the presentation, not a second tree to compare with Flutter.
 ## Progressive interactions
 
 Visible HTML can opt into package-owned progressive enhancement. `SeoTabs`,
-`SeoNavMenu`, `SeoCarousel` and `SeoStepper` are currently supported: Flutter
-keeps its native stateful widgets on iOS, Android and in the running web app,
-while the visible semantic page gains accessible controls from a small vanilla
-JavaScript runtime.
+`SeoNavMenu`, `SeoCarousel`, `SeoStepper` and `SeoCollection` are currently
+supported: Flutter keeps its native stateful widgets on iOS, Android and in the
+running web app, while the visible semantic page gains accessible controls
+from a small vanilla JavaScript runtime.
 
 ```dart
 SeoTabs(

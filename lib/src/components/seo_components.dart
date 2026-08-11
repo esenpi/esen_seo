@@ -220,7 +220,9 @@ List<SeoNode> buildSeoCarouselNodes({
 /// Builds a complete collection that can be progressively searched and paged.
 ///
 /// Every item remains present in the source document. Interaction markers are
-/// emitted only for bounded, unambiguous data and a valid [interactionId].
+/// emitted only for bounded, unambiguous data and a valid [interactionId]. Set
+/// [synchronizeUrl] to store this collection's state in namespaced query
+/// parameters on the DOM-first presentation.
 List<SeoNode> buildSeoCollectionNodes({
   required List<SeoCollectionComponentEntry> items,
   String? interactionId,
@@ -239,6 +241,7 @@ List<SeoNode> buildSeoCollectionNodes({
   String resultsLabel = 'results',
   String noResultsLabel = 'No results',
   String pageLabel = 'Page',
+  bool synchronizeUrl = false,
 }) {
   if (items.isEmpty) return const [];
   final categoryLabels = seoCollectionCategoryLabels(
@@ -320,6 +323,7 @@ List<SeoNode> buildSeoCollectionNodes({
           'data-esen-results-label': resultsLabel,
           'data-esen-empty-label': noResultsLabel,
           'data-esen-page-label': pageLabel,
+          if (synchronizeUrl) 'data-esen-synchronize-url': 'true',
         },
       },
       children: [

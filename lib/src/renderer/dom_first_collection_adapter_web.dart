@@ -3,6 +3,7 @@ import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
 import '../components/seo_collection_transition.dart';
+import '../components/seo_collection_url.dart';
 import '../components/seo_component_format.dart';
 import 'seo_container.dart';
 
@@ -17,7 +18,7 @@ void enhanceSeoDomFirstCollections() {
 }
 
 void _enhanceCollection(_CollectionApplyBoundary apply) {
-  var state = SeoCollectionState(sort: apply.initialSort);
+  var state = apply.stateFromUrl();
 
   void dispatch(SeoCollectionAction action) {
     state = transitionSeoCollection(
@@ -28,6 +29,10 @@ void _enhanceCollection(_CollectionApplyBoundary apply) {
       pageSize: apply.pageSize,
     );
     apply.state(state);
+    apply.synchronizeUrl(
+      state,
+      push: action is! SeoCollectionSetQuery,
+    );
   }
 
   apply.mount(dispatch);
@@ -38,6 +43,17 @@ void _enhanceCollection(_CollectionApplyBoundary apply) {
     state: state,
   ).state;
   apply.state(state);
+  apply.synchronizeUrl(state, push: false);
+  apply.listenToHistory((restored) {
+    state = selectSeoCollection(
+      records: apply.records,
+      categoryCount: apply.categoryCount,
+      pageSize: apply.pageSize,
+      state: restored,
+    ).state;
+    apply.state(state);
+    apply.synchronizeUrl(state, push: false);
+  });
 }
 
 typedef _CollectionEventSink = void Function(SeoCollectionAction action);
@@ -86,6 +102,7 @@ final class _CollectionPlan {
     required this.itemsNode,
     required this.items,
     required this.records,
+    required this.urlCodec,
   });
 
   final web.Element root;
@@ -98,6 +115,7 @@ final class _CollectionPlan {
   final web.Element itemsNode;
   final List<web.HTMLElement> items;
   final List<SeoCollectionRecord> records;
+  final SeoCollectionUrlCodec? urlCodec;
 }
 
 final class _CollectionApplyBoundary {
@@ -151,6 +169,8 @@ final class _CollectionApplyBoundary {
         _hiddenByAncestor(root, container)) {
       return null;
     }
+    final urlMarker = root.getAttribute('data-esen-synchronize-url');
+    if (urlMarker != null && urlMarker != 'true') return null;
     final id = root.id;
     if (!isValidSeoInteractionId(id) || _idCount(document, id) != 1) {
       return null;
@@ -334,6 +354,13 @@ final class _CollectionApplyBoundary {
       itemsNode: itemsNode,
       items: items,
       records: records,
+      urlCodec: urlMarker == 'true'
+          ? SeoCollectionUrlCodec(
+              interactionId: id,
+              categoryLabels: categories,
+              initialSort: initialSort,
+            )
+          : null,
     );
   }
 
@@ -523,6 +550,69 @@ final class _CollectionApplyBoundary {
         ..setAttribute('aria-label', label)
         ..textContent = label;
 
+  SeoCollectionState stateFromUrl() {
+    final codec = plan.urlCodec;
+    if (codec == null) return SeoCollectionState(sort: plan.initialSort);
+    try {
+      final url = web.URL(web.window.location.href);
+      List<String> values(String name) => [
+            for (final value in url.searchParams.getAll(name).toDart)
+              value.toDart,
+          ];
+      return codec.decode(
+        queryValues: values(codec.queryParameter),
+        categoryValues: values(codec.categoryParameter),
+        sortValues: values(codec.sortParameter),
+        pageValues: values(codec.pageParameter),
+      );
+    } catch (_) {
+      return SeoCollectionState(sort: plan.initialSort);
+    }
+  }
+
+  void synchronizeUrl(SeoCollectionState state, {required bool push}) {
+    final codec = plan.urlCodec;
+    if (codec == null) return;
+    try {
+      final current = web.window.location.href;
+      final url = web.URL(current);
+      url.searchParams
+        ..delete(codec.queryParameter)
+        ..delete(codec.categoryParameter)
+        ..delete(codec.sortParameter)
+        ..delete(codec.pageParameter);
+      final values = codec.encode(state);
+      if (values.query != null) {
+        url.searchParams.set(codec.queryParameter, values.query!);
+      }
+      if (values.category != null) {
+        url.searchParams.set(codec.categoryParameter, values.category!);
+      }
+      if (values.sort != null) {
+        url.searchParams.set(codec.sortParameter, values.sort!);
+      }
+      if (values.page != null) {
+        url.searchParams.set(codec.pageParameter, values.page!);
+      }
+      if (url.href == current) return;
+      if (push) {
+        web.window.history.pushState(null, '', url.href);
+      } else {
+        web.window.history.replaceState(null, '', url.href);
+      }
+    } catch (_) {
+      // URL persistence is optional; interaction remains fully functional.
+    }
+  }
+
+  void listenToHistory(void Function(SeoCollectionState) restore) {
+    if (plan.urlCodec == null) return;
+    web.window.addEventListener(
+      'popstate',
+      ((web.Event _) => restore(stateFromUrl())).toJS,
+    );
+  }
+
   void state(SeoCollectionState state) {
     final snapshot = selectSeoCollection(
       records: plan.records,
@@ -530,6 +620,7 @@ final class _CollectionApplyBoundary {
       pageSize: plan.pageSize,
       state: state,
     );
+    _search.value = snapshot.state.query;
     for (final index in snapshot.orderedIndices) {
       plan.itemsNode.appendChild(plan.items[index]);
     }

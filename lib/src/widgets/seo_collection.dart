@@ -79,6 +79,7 @@ class SeoCollection extends StatefulWidget {
     this.resultsLabel = 'results',
     this.noResultsLabel = 'No results',
     this.pageLabel = 'Page',
+    this.synchronizeUrl = false,
     this.controlTextStyle,
     this.selectedColor = const Color(0xFF2563EB),
     this.borderColor = const Color(0xFF94A3B8),
@@ -103,6 +104,12 @@ class SeoCollection extends StatefulWidget {
   final String resultsLabel;
   final String noResultsLabel;
   final String pageLabel;
+
+  /// Whether the DOM-first presentation stores collection state in the URL.
+  ///
+  /// Native Flutter presentations keep local state; browser history exists
+  /// only on the permanent HTML presentation.
+  final bool synchronizeUrl;
   final TextStyle? controlTextStyle;
   final Color selectedColor;
   final Color borderColor;
@@ -404,6 +411,7 @@ class _SeoCollectionState extends State<SeoCollection>
         resultsLabel: widget.resultsLabel,
         noResultsLabel: widget.noResultsLabel,
         pageLabel: widget.pageLabel,
+        synchronizeUrl: widget.synchronizeUrl,
       );
 }
 
