@@ -17,6 +17,9 @@ enum SeoDomFirstFeature {
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
   tabs,
 
+  /// Enhance a validated complete collection with search and pagination.
+  collection,
+
   /// Apply package-owned CSS motion to components carrying fixed markers.
   ///
   /// This feature adds no JavaScript and leaves reduced-motion users in the

@@ -19,6 +19,7 @@ library;
 
 export 'src/components/seo_component_format.dart';
 export 'src/components/seo_components.dart';
+export 'src/components/seo_collection_transition.dart';
 export 'src/components/seo_motion.dart' show SeoMotionPreset;
 export 'src/components/seo_rich_text.dart';
 export 'src/components/seo_tabs_transition.dart';
@@ -32,6 +33,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstFeatureScriptHtml,
         seoDomFirstFeatureStyleHtml,
         seoDomFirstScriptAttribute,
+        seoDomFirstCollectionStylesheet,
         seoDomFirstTabsStylesheet;
 export 'src/renderer/seo_interactions.dart';
 export 'src/renderer/seo_motion_stylesheet.dart' show seoMotionStylesheet;

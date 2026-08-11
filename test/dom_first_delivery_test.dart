@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
@@ -104,6 +105,47 @@ void main() {
       expect(seoDomFirstTabsRuntime, isNot(contains('outerHTML')));
       expect(seoDomFirstTabsRuntime, isNot(contains('document.write')));
       expect(seoDomFirstTabsRuntime, isNot(contains('eval(')));
+    });
+
+    test('compiled collection has an isolated runtime and style budget', () {
+      final gzipBytes =
+          gzip.encode(utf8.encode(seoDomFirstCollectionRuntime)).length;
+      final html = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.collection},
+        nonce: 'safe',
+      );
+      final style = seoDomFirstFeatureStyleHtml(
+        const {SeoDomFirstFeature.collection},
+      );
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(html, contains('data-esen-seo-dom-first-runtime'));
+      expect(html, contains('nonce="safe"'));
+      expect(style, contains('data-esen-component="collection"'));
+      expect(seoDomFirstCollectionRuntime.toLowerCase(),
+          isNot(contains('</script')));
+      expect(seoDomFirstCollectionRuntime, isNot(contains('innerHTML')));
+      expect(seoDomFirstCollectionRuntime, isNot(contains('outerHTML')));
+      expect(seoDomFirstCollectionRuntime, isNot(contains('document.write')));
+      expect(seoDomFirstCollectionRuntime, isNot(contains('eval(')));
+    });
+
+    test('DOM-first feature runtimes remain independently selectable', () {
+      final collectionOnly = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.collection},
+      );
+      final tabsOnly = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.tabs},
+      );
+      final both = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.tabs, SeoDomFirstFeature.collection},
+      );
+
+      expect(collectionOnly, contains(seoDomFirstCollectionRuntime));
+      expect(collectionOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(tabsOnly, contains(seoDomFirstTabsRuntime));
+      expect(tabsOnly, isNot(contains(seoDomFirstCollectionRuntime)));
+      expect('data-esen-seo-dom-first-runtime'.allMatches(both), hasLength(2));
     });
   });
 

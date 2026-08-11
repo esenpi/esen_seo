@@ -69,8 +69,9 @@ The HTML only exists on the web.
   frame — styled, readable content before the Flutter engine has
   loaded, with Flutter taking the screen over on its first frame.
 - **DOM-first routes (opt-in)**: let a pure route body remain the permanent
-  page without loading Flutter Web. The first slice supports `SeoTabs` through
-  one transition compiled from the same pure Dart source used by Flutter.
+  page without loading Flutter Web. `SeoTabs` and bounded `SeoCollection`
+  interactions run through transitions compiled from the same pure Dart
+  source used by Flutter.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -419,6 +420,52 @@ final seoRoutes = [
   ),
 ];
 ```
+
+A content index can use the same closed collection state on both sides. The
+route body receives pure component entries; the app presents the matching
+`SeoCollectionEntry` values through the native Flutter widget:
+
+```dart
+final articleComponents = <SeoCollectionComponentEntry>[
+  (
+    title: 'Fast Flutter content',
+    searchText: 'Semantic HTML and performance',
+    categories: ['Flutter', 'SEO'],
+    sortKey: 20260301,
+    nodes: [
+      SeoNode(tag: 'h2', children: [
+        SeoNode(
+          tag: 'a',
+          text: 'Fast Flutter content',
+          attributes: {'href': '/blog/fast-flutter-content'},
+        ),
+      ]),
+    ],
+  ),
+  // At least one more complete item.
+];
+
+SeoRoute(
+  path: '/blog',
+  delivery: SeoRouteDelivery.domFirst,
+  domFirstFeatures: const {SeoDomFirstFeature.collection},
+  meta: (_) => const SeoMeta(title: 'Blog'),
+  body: (_) => buildSeoCollectionNodes(
+    items: articleComponents,
+    interactionId: 'article-collection',
+    pageSize: 12,
+  ),
+);
+```
+
+`SeoCollection` supports search, one selected category, newest/oldest/title
+sorting and pagination. Its source always contains every item in a useful
+initial order; JavaScript only changes presentation after validating the whole
+component. Empty or invalid ids, duplicate DOM ids, malformed metadata,
+single-item collections, more than 2,000 items, more than 32 categories and
+search corpora above 4,096 UTF-16 code units deliberately degrade to complete
+static markup. The browser runtime is selected independently from tabs and
+from `enableInteractions`.
 
 The live DOM mirror is derived directly from the widget tree, so it does
 not require a second authored content tree. A server-rendered route
@@ -795,10 +842,11 @@ belong to Flutter's visible shell. The middleware uses the same
 `domFirstStylesheet` default. `domFirstNonce` can supply a per-response CSP
 nonce.
 
-The executable slice deliberately supports only package-owned transitions. It
-does not translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs`
-and the browser adapter execute the same pure transition while each
-presentation owns its current state. `SeoDomFirstFeature.motion` is separate:
+The executable slices deliberately support only package-owned transitions.
+They do not translate arbitrary Flutter `State`, Cubits or callbacks.
+`SeoTabs` and `SeoCollection` each share their pure transition with a separate
+browser adapter while each presentation owns its current state.
+`SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
 markers produced by the pure component builders. Custom application
 transitions, content effects, forms and client-side routing require later,

@@ -1,4 +1,5 @@
 import '../renderer/seo_node.dart';
+import 'seo_collection_transition.dart';
 import 'seo_component_format.dart';
 import 'seo_motion.dart';
 
@@ -10,6 +11,15 @@ typedef SeoBreadcrumbComponentEntry = ({String label, String? url});
 
 /// Pure input for one slide in [buildSeoCarouselNodes].
 typedef SeoCarouselComponentEntry = ({String label, List<SeoNode> nodes});
+
+/// Pure input for one entry in [buildSeoCollectionNodes].
+typedef SeoCollectionComponentEntry = ({
+  List<String> categories,
+  List<SeoNode> nodes,
+  String searchText,
+  int sortKey,
+  String title,
+});
 
 /// Pure input for one question in [buildSeoFaqNodes].
 typedef SeoFaqComponentEntry = ({String answer, String question});
@@ -202,6 +212,165 @@ List<SeoNode> buildSeoCarouselNodes({
               ...slides[i].nodes,
             ],
           ),
+      ],
+    ),
+  ];
+}
+
+/// Builds a complete collection that can be progressively searched and paged.
+///
+/// Every item remains present in the source document. Interaction markers are
+/// emitted only for bounded, unambiguous data and a valid [interactionId].
+List<SeoNode> buildSeoCollectionNodes({
+  required List<SeoCollectionComponentEntry> items,
+  String? interactionId,
+  String interactionLabel = 'Collection',
+  int pageSize = 12,
+  SeoCollectionSort initialSort = SeoCollectionSort.newest,
+  String searchLabel = 'Search',
+  String categoriesLabel = 'Categories',
+  String allCategoriesLabel = 'All',
+  String sortLabel = 'Sort',
+  String newestLabel = 'Newest',
+  String oldestLabel = 'Oldest',
+  String titleLabel = 'Title',
+  String previousLabel = 'Previous',
+  String nextLabel = 'Next',
+  String resultsLabel = 'results',
+  String noResultsLabel = 'No results',
+  String pageLabel = 'Page',
+}) {
+  if (items.isEmpty) return const [];
+  final categoryLabels = seoCollectionCategoryLabels(
+    items.map((item) => item.categories),
+  );
+
+  List<int> categoryIndexes(SeoCollectionComponentEntry item) {
+    return seoCollectionCategoryIndexes(item.categories, categoryLabels);
+  }
+
+  final records = [
+    for (final item in items)
+      SeoCollectionRecord(
+        categoryIndexes: categoryIndexes(item),
+        searchText: item.searchText,
+        sortKey: item.sortKey,
+        title: item.title,
+      ),
+  ];
+  final ordered = selectSeoCollection(
+    records: records,
+    categoryCount: categoryLabels.length,
+    pageSize: pageSize,
+    state: SeoCollectionState(sort: initialSort),
+  ).orderedIndices;
+  final candidate = interactionId?.trim();
+  final labels = [
+    interactionLabel,
+    searchLabel,
+    categoriesLabel,
+    allCategoriesLabel,
+    sortLabel,
+    newestLabel,
+    oldestLabel,
+    titleLabel,
+    previousLabel,
+    nextLabel,
+    resultsLabel,
+    noResultsLabel,
+    pageLabel,
+  ];
+  final interactive = candidate != null &&
+      isValidSeoInteractionId(candidate) &&
+      items.length >= 2 &&
+      items.length <= seoCollectionMaxItems &&
+      categoryLabels.length <= seoCollectionMaxCategories &&
+      labels.every((label) => label.trim().isNotEmpty && label.length <= 200) &&
+      categoryLabels.every((label) => label.length <= 200) &&
+      records.every((record) {
+        return record.normalizedTitle.isNotEmpty &&
+            record.normalizedTitle.length <= seoCollectionMaxSearchLength &&
+            record.normalizedSearchText.length <=
+                seoCollectionMaxSearchLength &&
+            isValidSeoCollectionSortKey(record.sortKey);
+      });
+  final id = interactive ? candidate : null;
+  final size = normalizeSeoCollectionPageSize(pageSize);
+
+  return [
+    SeoNode(
+      tag: 'section',
+      attributes: {
+        'class': 'esen-seo-collection',
+        if (id != null) ...{
+          'id': id,
+          'data-esen-component': 'collection',
+          'data-esen-label': interactionLabel,
+          'data-esen-page-size': '$size',
+          'data-esen-initial-sort': seoCollectionSortMarker(initialSort),
+          'data-esen-search-label': searchLabel,
+          'data-esen-categories-label': categoriesLabel,
+          'data-esen-all-label': allCategoriesLabel,
+          'data-esen-sort-label': sortLabel,
+          'data-esen-newest-label': newestLabel,
+          'data-esen-oldest-label': oldestLabel,
+          'data-esen-title-label': titleLabel,
+          'data-esen-previous-label': previousLabel,
+          'data-esen-next-label': nextLabel,
+          'data-esen-results-label': resultsLabel,
+          'data-esen-empty-label': noResultsLabel,
+          'data-esen-page-label': pageLabel,
+        },
+      },
+      children: [
+        if (id != null)
+          SeoNode(
+            tag: 'div',
+            attributes: const {
+              'data-esen-collection-categories': '',
+              'hidden': '',
+              'aria-hidden': 'true',
+            },
+            children: [
+              for (var index = 0; index < categoryLabels.length; index++)
+                SeoNode(
+                  tag: 'span',
+                  text: categoryLabels[index],
+                  attributes: {'data-esen-category-index': '$index'},
+                ),
+            ],
+          ),
+        SeoNode(
+          tag: 'div',
+          attributes: const {'data-esen-collection-items': ''},
+          children: [
+            for (var outputIndex = 0;
+                outputIndex < ordered.length;
+                outputIndex++)
+              SeoNode(
+                tag: 'article',
+                attributes: {
+                  'class': 'esen-seo-collection-item',
+                  if (id != null) ...{
+                    'id': '$id-item-$outputIndex',
+                    'data-esen-collection-item': '',
+                    'data-esen-item-order': '$outputIndex',
+                    'data-esen-item-title':
+                        records[ordered[outputIndex]].normalizedTitle,
+                    'data-esen-item-search': normalizeSeoCollectionText(
+                      items[ordered[outputIndex]].searchText,
+                    ),
+                    'data-esen-item-sort-key':
+                        '${items[ordered[outputIndex]].sortKey}',
+                    'data-esen-item-categories': categoryIndexes(
+                      items[ordered[outputIndex]],
+                    ).join(' '),
+                  },
+                },
+                children: items[ordered[outputIndex]].nodes,
+              ),
+          ],
+        ),
       ],
     ),
   ];

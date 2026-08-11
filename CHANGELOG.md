@@ -1,5 +1,13 @@
 ## Unreleased
 
+* Added `SeoCollection`, a complete searchable, single-category-filterable,
+  sortable and paginated content collection. Flutter and the separately
+  opt-in `SeoDomFirstFeature.collection` runtime share one prepared pure Dart
+  transition; the DOM-first adapter validates the complete bounded structure
+  before creating controls or changing visibility. Every item and native link
+  remains in the source without JavaScript. Invalid, ambiguous, oversized or
+  single-item collections stay complete static HTML, and sort keys are limited
+  to integers represented exactly on both the Dart VM and JavaScript.
 * Added an opt-in cross-platform motion pilot for `SeoBarChart`.
   `SeoMotionPreset.gentle` drives Flutter and CSS from the same pure timing
   model, with a capped entrance stagger and decorative pointer/press emphasis.
