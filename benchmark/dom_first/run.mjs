@@ -289,7 +289,7 @@ function report(metadata, summary, checks) {
     'separate field target remains 200 ms at p75 after release.',
     '',
   );
-  return `${lines.join('\n')}\n`;
+  return lines.join('\n');
 }
 
 function format(value) { return `${value.median} / ${value.p75}`; }

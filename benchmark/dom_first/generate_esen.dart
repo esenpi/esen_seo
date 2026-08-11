@@ -11,6 +11,10 @@ Future<void> main(List<String> arguments) async {
   }
   final css =
       await File('benchmark/dom_first/fixtures/shared.css').readAsString();
+  const runtimeReference = SeoDomFirstApplicationRuntime.tabs('benchmark-tabs');
+  final runtime = await SeoDirectoryRuntimeStore(
+    'benchmark/dom_first/fixtures/application/build/esen_seo/runtimes',
+  ).load(runtimeReference);
   final body = [
     SeoNode(tag: 'main', children: [
       SeoNode(tag: 'h1', text: 'Rendering targets'),
@@ -59,7 +63,7 @@ Future<void> main(List<String> arguments) async {
     meta: const SeoMeta(title: 'Tabs benchmark'),
     body: body,
     stylesheet: css,
-    features: const {SeoDomFirstFeature.tabs},
+    applicationRuntime: runtime,
   ).toHtmlDocument();
   final output = File(arguments.single);
   await output.parent.create(recursive: true);

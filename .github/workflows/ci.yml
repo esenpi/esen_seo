@@ -37,7 +37,7 @@ jobs:
       # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
       - name: Verify formatting
         run: >-
-          find lib test benchmark -name '*.dart'
+          find bin lib test benchmark tool -name '*.dart'
           ! -name 'seo_dom_first_tabs_runtime.g.dart'
           -exec dart format --output=none --set-exit-if-changed {} +
 
@@ -92,7 +92,24 @@ jobs:
       # eigentlich adressiert.
       - name: Build web
         working-directory: example
-        run: flutter build web --release
+        run: flutter build web --release --pwa-strategy=none
+
+      - name: Build the application-owned tabs runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --id example-tabs
+          --library package:example/application_tabs_transition.dart
+          --symbol transitionExampleTabs
+
+      - name: Verify the application-owned tabs runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --id example-tabs
+          --library package:example/application_tabs_transition.dart
+          --symbol transitionExampleTabs
+          --check
 
       # Und dann durch den echten Prerenderer, damit ein Fehler in der
       # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.

@@ -1,7 +1,7 @@
 // SSR server for the example app: bots get semantic HTML straight in the
 // page source, real users get the Flutter web app.
 //
-//   flutter build web
+//   flutter build web --pwa-strategy=none
 //   dart run bin/server.dart
 //
 //   curl -A "Googlebot/2.1" http://localhost:8080        → semantisches HTML
@@ -29,7 +29,13 @@ Future<void> main() async {
       // Dieselbe Routen-Tabelle wie die App (lib/seo_routes.dart):
       // Bots bekommen pro Route das fertige HTML-Dokument, dazu
       // sitemap.xml, robots.txt und echte 404er für unbekannte Pfade.
-      .addMiddleware(seoBotMiddleware(routes: seoRoutes, siteBase: siteBase))
+      .addMiddleware(seoBotMiddleware(
+        routes: seoRoutes,
+        siteBase: siteBase,
+        domFirstRuntimeStore: SeoDirectoryRuntimeStore(
+          'build/esen_seo/runtimes',
+        ),
+      ))
       .addHandler((request) async {
     final response = await staticHandler(request);
     // SPA-Fallback: Die App nutzt Path-URLs (cleanUrls). Unbekannte

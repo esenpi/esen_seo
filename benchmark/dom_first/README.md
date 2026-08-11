@@ -11,10 +11,22 @@ The Next.js fixture requires Node.js 20.9 or newer.
 cd benchmark/dom_first
 pnpm install
 pnpm run build:next
-cd ../..
+cd fixtures/application
+flutter pub get
+dart run esen_seo:esen_seo_runtime \
+  --id benchmark-tabs \
+  --library package:esen_seo_benchmark_app/tabs_transition.dart \
+  --symbol transitionBenchmarkTabs
+dart run esen_seo:esen_seo_runtime \
+  --id benchmark-tabs \
+  --library package:esen_seo_benchmark_app/tabs_transition.dart \
+  --symbol transitionBenchmarkTabs \
+  --check
+cd ../../../..
 dart run benchmark/dom_first/generate_esen.dart \
   benchmark/dom_first/build/esen/index.html
 cd benchmark/dom_first/fixtures/flutter
+flutter pub get
 flutter build web --release
 dart run bin/prerender.dart
 cd ../..

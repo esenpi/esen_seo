@@ -2,6 +2,7 @@ import 'package:esen_seo/esen_seo.dart';
 import 'package:flutter/material.dart';
 
 import 'docs_page.dart';
+import 'application_tabs_transition.dart';
 import 'seo_routes.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -18,6 +19,7 @@ final Map<String, WidgetBuilder> _pages = {
   '/': (_) => const HomePage(),
   '/demo': (_) => const DemoPage(),
   '/docs': (_) => const DocsPage(),
+  '/dom-first-application-tabs': (_) => const ApplicationTabsPage(),
 };
 
 class EsenSeoExampleApp extends StatelessWidget {
@@ -241,6 +243,41 @@ class DemoPage extends StatelessWidget {
       ).main,
     );
   }
+}
+
+class ApplicationTabsPage extends StatelessWidget {
+  const ApplicationTabsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 20,
+          children: [
+            Text(
+              'Application-owned Tabs',
+              style: Theme.of(context).textTheme.displaySmall,
+            ).h1,
+            const Para(
+              'The application transition stops at either end instead of '
+              'wrapping. Flutter and DOM-first call the same function.',
+            ),
+            SeoTabs(
+              interactionId: 'application-demo-tabs',
+              interactionLabel: 'Application rendering targets',
+              transition: transitionExampleTabs,
+              tabs: [
+                for (final tab in demoTabs)
+                  SeoTab(
+                    label: tab.label,
+                    content: Text(tab.content),
+                    nodes: demoTabPanelNodes(tab),
+                  ),
+              ],
+            ),
+          ],
+        ).main,
+      );
 }
 
 SeoNavItem _demoNavItem(DemoNavData item) => SeoNavItem(

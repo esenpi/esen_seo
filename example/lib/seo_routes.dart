@@ -268,6 +268,32 @@ final seoRoutes = [
     ],
   ),
   SeoRoute(
+    path: '/dom-first-application-tabs',
+    delivery: SeoRouteDelivery.domFirst,
+    applicationRuntime:
+        const SeoDomFirstApplicationRuntime.tabs('example-tabs'),
+    meta: (_) => SeoMeta(
+      title: 'Application Tabs — esen_seo',
+      description: 'Application-authored pure Dart state logic compiled for '
+          'the permanent semantic page.',
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'Application-owned Tabs'),
+      SeoNode(
+        tag: 'p',
+        text: 'The application transition stops at either end instead of '
+            'wrapping. Flutter and this DOM-first route call the same '
+            'pure Dart function.',
+      ),
+      ...buildSeoTabsNodes(
+        tabs: demoTabEntries(),
+        interactionId: 'application-demo-tabs',
+        interactionLabel: 'Application rendering targets',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
     path: '/docs',
     // Erscheint als <lastmod> in der sitemap.xml.
     lastModified: DateTime.utc(2026, 7, 31),

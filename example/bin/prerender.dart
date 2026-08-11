@@ -27,6 +27,9 @@ Future<void> main(List<String> args) async {
     // Test in test/seo_theme_css_test.dart. seoDefaultStylesheet bleibt
     // der Fallback für Apps ohne Theme-Brücke.
     stylesheet: visible ? seoThemeCss : null,
+    domFirstRuntimeStore: SeoDirectoryRuntimeStore(
+      'build/esen_seo/runtimes',
+    ),
   );
   stdout.writeln('Prerendered ${files.length} files:');
   for (final file in files) {

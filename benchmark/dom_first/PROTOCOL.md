@@ -17,7 +17,7 @@ Every cell carries equivalent content, CSS, fonts and tab behaviour:
 
 1. hand-written DOM as the practical floor;
 2. statically rendered Next.js as the competitive reference;
-3. esen_seo DOM-first with the compiled tabs transition;
+3. esen_seo DOM-first with the application-authored compiled tabs transition;
 4. the existing visible shell followed by a Flutter release build.
 
 ## Profile
