@@ -24,6 +24,7 @@ export 'src/components/seo_collection_url.dart';
 export 'src/components/seo_motion.dart' show SeoMotionPreset;
 export 'src/components/seo_rich_text.dart';
 export 'src/components/seo_tabs_transition.dart';
+export 'src/components/seo_theme_transition.dart';
 export 'src/meta/seo_meta.dart';
 export 'src/meta/seo_schema.dart';
 export 'src/renderer/html_renderer.dart';
@@ -32,10 +33,13 @@ export 'src/renderer/seo_container.dart'
 export 'src/renderer/seo_dom_first.dart'
     show
         seoDomFirstFeatureScriptHtml,
+        seoDomFirstFeatureBootstrapScriptHtml,
         seoDomFirstFeatureStyleHtml,
+        seoDomFirstBootstrapScriptAttribute,
         seoDomFirstScriptAttribute,
         seoDomFirstCollectionStylesheet,
-        seoDomFirstTabsStylesheet;
+        seoDomFirstTabsStylesheet,
+        seoDomFirstThemeToggleStylesheet;
 export 'src/renderer/seo_interactions.dart';
 export 'src/renderer/seo_motion_stylesheet.dart' show seoMotionStylesheet;
 export 'src/renderer/seo_node.dart';

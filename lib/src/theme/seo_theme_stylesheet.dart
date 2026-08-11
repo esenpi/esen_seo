@@ -46,6 +46,11 @@ import '../renderer/seo_theme_css.dart';
 /// visitors with a light OS preference get a light shell and a visible
 /// palette flip when Flutter takes over.
 ///
+/// Set [enableManualTheme] when a DOM-first route uses
+/// `SeoDomFirstFeature.themeToggle`. System mode then remains the fallback,
+/// while a validated preference on the document root can select either
+/// palette. The default is false so existing stylesheet bytes do not change.
+///
 /// [scriptCategory] feeds Material's typography geometry. Under
 /// Material 3 the three categories differ only in text baseline (which
 /// has no CSS equivalent), so the generated sizes are identical — the
@@ -55,6 +60,7 @@ String seoStylesheetFromTheme(
   ThemeData theme, {
   ThemeData? darkTheme,
   SeoThemeMode mode = SeoThemeMode.system,
+  bool enableManualTheme = false,
   SeoBodyRole bodyRole = SeoBodyRole.bodyLarge,
   ScriptCategory scriptCategory = ScriptCategory.englishLike,
 }) =>
@@ -64,6 +70,7 @@ String seoStylesheetFromTheme(
           ? null
           : _tokensFrom(darkTheme, scriptCategory, bodyRole),
       mode: mode,
+      enableManualTheme: enableManualTheme,
       bodyRole: bodyRole,
     );
 

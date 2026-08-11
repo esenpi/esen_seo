@@ -118,6 +118,12 @@ class SeoPage {
   String toHtmlDocument() {
     final language = HtmlRenderer.escapeAttribute(lang);
     final head = StringBuffer();
+    head.write(
+      seoDomFirstFeatureBootstrapScriptHtml(
+        domFirstFeatures,
+        nonce: interactionNonce,
+      ),
+    );
     if (stylesheet != null && stylesheet!.trim().isNotEmpty) {
       head.write(seoStyleTagHtml(stylesheet!, nonce: interactionNonce));
     }

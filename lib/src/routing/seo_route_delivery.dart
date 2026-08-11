@@ -20,6 +20,9 @@ enum SeoDomFirstFeature {
   /// Enhance a validated complete collection with search and pagination.
   collection,
 
+  /// Apply and persist a validated light/dark presentation preference.
+  themeToggle,
+
   /// Apply package-owned CSS motion to components carrying fixed markers.
   ///
   /// This feature adds no JavaScript and leaves reduced-motion users in the

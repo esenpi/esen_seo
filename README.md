@@ -986,6 +986,18 @@ Your dark theme rides along as a `prefers-color-scheme` block (only
 the tokens that differ). An app that forces `themeMode` passes
 `mode: SeoThemeMode.dark` (or `.light`) — that flag lives on
 `MaterialApp`, not on `ThemeData`, so the bridge cannot read it.
+
+For a manual light/dark control, generate the stylesheet with
+`enableManualTheme: true`, place a controlled `SeoThemeToggle` in the Flutter
+UI and select `SeoDomFirstFeature.themeToggle` on the corresponding DOM-first
+routes. The permanent HTML follows the operating-system preference until the
+visitor chooses explicitly; the closed `light`/`dark` value is then restored
+before first paint and reused across pages. Without JavaScript the control
+stays absent and the complete document still follows the system theme. Use
+exactly one toggle per DOM-first document; ambiguous duplicate controls stay
+inert. Manual selection is intended for `SeoThemeMode.system`, since a forced
+mode deliberately emits only its selected palette.
+
 Every value is validated against an allow list before it becomes CSS;
 what fails validation is dropped and the shell degrades to the default
 look rather than breaking.

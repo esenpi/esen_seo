@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
 
@@ -130,6 +131,55 @@ void main() {
       expect(seoDomFirstCollectionRuntime, isNot(contains('eval(')));
     });
 
+    test('theme toggle has a pre-paint bootstrap and isolated budget', () {
+      final gzipBytes =
+          gzip.encode(utf8.encode(seoDomFirstThemeToggleRuntime)).length;
+      final page = SeoPage.domFirstFromNodes(
+        body: buildSeoThemeToggleNodes(),
+        features: const {SeoDomFirstFeature.themeToggle},
+        interactionNonce: 'safe',
+      ).toHtmlDocument();
+      final bootstrapIndex = page.indexOf('data-esen-seo-dom-first-bootstrap');
+      final styleIndex = page.indexOf('data-esen-seo-style');
+      final bodyIndex = page.indexOf('<body>');
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(bootstrapIndex, greaterThan(0));
+      expect(styleIndex, greaterThan(bootstrapIndex));
+      expect(bodyIndex, greaterThan(styleIndex));
+      expect(page, contains('localStorage.getItem("esen.theme")'));
+      expect(page, contains('nonce="safe"'));
+      expect(page, contains('data-esen-component="theme-toggle"'));
+      expect(page, contains(seoDomFirstThemeToggleRuntime));
+      expect(seoDomFirstThemeToggleRuntime.toLowerCase(),
+          isNot(contains('</script')));
+      expect(seoDomFirstThemeToggleRuntime, isNot(contains('innerHTML')));
+      expect(seoDomFirstThemeToggleRuntime, isNot(contains('outerHTML')));
+      expect(seoDomFirstThemeToggleRuntime, isNot(contains('document.write')));
+      expect(seoDomFirstThemeToggleRuntime, isNot(contains('eval(')));
+    });
+
+    test('collection plus theme stays inside the route JavaScript budget', () {
+      final page = SeoPage.domFirstFromNodes(
+        body: buildSeoThemeToggleNodes(),
+        features: const {
+          SeoDomFirstFeature.collection,
+          SeoDomFirstFeature.themeToggle,
+        },
+      ).toHtmlDocument();
+      final scripts = RegExp(r'<script[^>]*>([\s\S]*?)</script>')
+          .allMatches(page)
+          .map((match) => match.group(1)!)
+          .where((script) => script.isNotEmpty);
+      final levelNineGzip = GZipCodec(level: 9);
+      final gzipBytes = scripts.fold<int>(
+        0,
+        (sum, script) => sum + levelNineGzip.encode(utf8.encode(script)).length,
+      );
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+    });
+
     test('DOM-first feature runtimes remain independently selectable', () {
       final collectionOnly = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.collection},
@@ -140,11 +190,17 @@ void main() {
       final both = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.tabs, SeoDomFirstFeature.collection},
       );
+      final themeOnly = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.themeToggle},
+      );
 
       expect(collectionOnly, contains(seoDomFirstCollectionRuntime));
       expect(collectionOnly, isNot(contains(seoDomFirstTabsRuntime)));
       expect(tabsOnly, contains(seoDomFirstTabsRuntime));
       expect(tabsOnly, isNot(contains(seoDomFirstCollectionRuntime)));
+      expect(themeOnly, contains(seoDomFirstThemeToggleRuntime));
+      expect(themeOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(themeOnly, isNot(contains(seoDomFirstCollectionRuntime)));
       expect('data-esen-seo-dom-first-runtime'.allMatches(both), hasLength(2));
     });
   });

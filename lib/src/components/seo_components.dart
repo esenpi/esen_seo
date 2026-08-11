@@ -44,6 +44,46 @@ typedef SeoTabComponentEntry = ({String label, List<SeoNode> nodes});
 /// Pure input for one step in [buildSeoStepperNodes].
 typedef SeoStepperComponentEntry = ({String label, List<SeoNode> nodes});
 
+/// Builds the inert marker upgraded by the package-owned theme runtime.
+///
+/// Without JavaScript the marker stays hidden and the document follows the
+/// system color scheme. Invalid labels deliberately produce no runtime marker,
+/// leaving the document on that safe fallback. A DOM-first document supports
+/// exactly one valid marker; multiple markers remain inert.
+List<SeoNode> buildSeoThemeToggleNodes({
+  String lightLabel = 'Light',
+  String darkLabel = 'Dark',
+  String lightSemanticLabel = 'Use light theme',
+  String darkSemanticLabel = 'Use dark theme',
+}) {
+  final light = lightLabel.trim();
+  final dark = darkLabel.trim();
+  final lightSemantic = lightSemanticLabel.trim();
+  final darkSemantic = darkSemanticLabel.trim();
+  final valid = _validThemeLabel(light) &&
+      _validThemeLabel(dark) &&
+      _validThemeLabel(lightSemantic) &&
+      _validThemeLabel(darkSemantic);
+  return [
+    SeoNode(
+      tag: 'span',
+      attributes: {
+        'class': 'esen-seo-theme-toggle',
+        'hidden': '',
+        if (valid) ...{
+          'data-esen-component': 'theme-toggle',
+          'data-esen-light-label': light,
+          'data-esen-dark-label': dark,
+          'data-esen-light-semantic-label': lightSemantic,
+          'data-esen-dark-semantic-label': darkSemantic,
+        },
+      },
+    ),
+  ];
+}
+
+bool _validThemeLabel(String value) => value.isNotEmpty && value.length <= 160;
+
 /// Default ARGB palette used by [buildSeoPieChartNodes].
 const List<int> seoPieChartDefaultPaletteArgb = [
   0xFF2563EB,

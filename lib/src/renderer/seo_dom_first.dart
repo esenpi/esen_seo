@@ -2,10 +2,12 @@
 library;
 
 import '../routing/seo_route_delivery.dart';
+import '../components/seo_theme_transition.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
+import 'seo_dom_first_theme_toggle_runtime.g.dart';
 import 'seo_motion_stylesheet.dart';
 import 'seo_stylesheet.dart';
 
@@ -38,6 +40,36 @@ const String seoDomFirstCollectionStylesheet = '''
 #$seoContainerId [data-esen-component="collection"] [hidden]{display:none}
 ''';
 
+/// Self-contained styling for the package-owned theme toggle control.
+const String seoDomFirstThemeToggleStylesheet = '''
+html{color-scheme:light}
+html[data-esen-theme="light"]{color-scheme:light}
+html[data-esen-theme="dark"]{color-scheme:dark}
+@media (prefers-color-scheme:dark){html:not([data-esen-theme="light"]):not([data-esen-theme="dark"]){color-scheme:dark}}
+#$seoContainerId [data-esen-component="theme-toggle"][data-esen-enhanced="true"]{display:inline-flex}
+#$seoContainerId .esen-seo-theme-toggle-button{display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-width:5.75rem;min-height:2.5rem;padding:.4375rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface-container-low,#eff5f2);color:var(--esen-color-on-surface,#171d1b);font:inherit;font-size:var(--esen-type-label-large-size,.875rem);font-weight:600;line-height:1;cursor:pointer}
+#$seoContainerId .esen-seo-theme-toggle-button:hover{background:var(--esen-color-surface-container,#e9efed)}
+#$seoContainerId .esen-seo-theme-toggle-button:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+''';
+
+/// Marks the pre-paint theme restoration script in a generated document.
+const String seoDomFirstBootstrapScriptAttribute =
+    'data-esen-seo-dom-first-bootstrap';
+
+/// Returns the package-owned pre-paint bootstrap for selected features.
+String seoDomFirstFeatureBootstrapScriptHtml(
+  Set<SeoDomFirstFeature> features, {
+  String? nonce,
+}) {
+  if (!features.contains(SeoDomFirstFeature.themeToggle)) return '';
+  final nonceAttribute = _nonceAttribute(nonce);
+  return '<script $seoDomFirstBootstrapScriptAttribute$nonceAttribute>'
+      '(function(){try{var v=localStorage.getItem('
+      '"$seoThemePreferenceStorageKey");if(v==="light"||v==="dark")'
+      'document.documentElement.setAttribute("data-esen-theme",v)'
+      '}catch(e){}})();</script>';
+}
+
 /// Returns the style tag needed by the selected DOM-first [features].
 String seoDomFirstFeatureStyleHtml(
   Set<SeoDomFirstFeature> features, {
@@ -49,6 +81,9 @@ String seoDomFirstFeatureStyleHtml(
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
+  }
+  if (features.contains(SeoDomFirstFeature.themeToggle)) {
+    css.write(seoDomFirstThemeToggleStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.motion)) {
     css.write(seoMotionStylesheet);
@@ -70,6 +105,10 @@ String seoDomFirstFeatureScriptHtml(
   if (features.contains(SeoDomFirstFeature.collection)) {
     scripts.write('<script $seoDomFirstScriptAttribute$nonceAttribute>'
         '$seoDomFirstCollectionRuntime</script>');
+  }
+  if (features.contains(SeoDomFirstFeature.themeToggle)) {
+    scripts.write('<script $seoDomFirstScriptAttribute$nonceAttribute>'
+        '$seoDomFirstThemeToggleRuntime</script>');
   }
   return scripts.toString();
 }

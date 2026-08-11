@@ -1,5 +1,13 @@
 ## Unreleased
 
+* Added `SeoThemeToggle`, a controlled Flutter light/dark control with a
+  separately selected `SeoDomFirstFeature.themeToggle` presentation. The
+  generated web adapter restores a closed `light`/`dark` preference before
+  first paint,
+  follows the system when no preference exists, persists changes best-effort
+  and keeps malformed markers inert. Theme CSS opts into explicit palette
+  selectors with `enableManualTheme: true`; existing stylesheet and document
+  bytes remain unchanged by default.
 * Added `SeoCollection`, a complete searchable, single-category-filterable,
   sortable and paginated content collection. Flutter and the separately
   opt-in `SeoDomFirstFeature.collection` runtime share one prepared pure Dart

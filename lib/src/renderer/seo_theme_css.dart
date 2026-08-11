@@ -212,6 +212,7 @@ String seoThemeCss({
   required SeoThemeTokens light,
   SeoThemeTokens? dark,
   SeoThemeMode mode = SeoThemeMode.system,
+  bool enableManualTheme = false,
   SeoBodyRole bodyRole = SeoBodyRole.bodyLarge,
 }) {
   final base = mode == SeoThemeMode.dark ? (dark ?? light) : light;
@@ -291,9 +292,18 @@ String seoThemeCss({
     // block already derives it that way.
     final flips = dark.dark != base.dark;
     if (diff.isNotEmpty || flips) {
-      buffer.write('@media (prefers-color-scheme:dark){#$seoContainerId{');
+      final systemSelector = enableManualTheme
+          ? 'html:not([data-esen-theme="light"])'
+              ':not([data-esen-theme="dark"]) #$seoContainerId'
+          : '#$seoContainerId';
+      buffer.write('@media (prefers-color-scheme:dark){$systemSelector{');
       diff.forEach((name, value) => buffer.write('$name:$value;'));
       buffer.write('color-scheme:${dark.dark ? 'dark' : 'light'}}}\n');
+      if (enableManualTheme) {
+        buffer.write('html[data-esen-theme="dark"] #$seoContainerId{');
+        diff.forEach((name, value) => buffer.write('$name:$value;'));
+        buffer.write('color-scheme:${dark.dark ? 'dark' : 'light'}}\n');
+      }
     }
   }
 

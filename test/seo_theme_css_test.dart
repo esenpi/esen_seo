@@ -180,6 +180,42 @@ void main() {
       expect(block, isNot(contains('--esen-type-')));
     });
 
+    test('manual mode adds explicit dark without changing default output', () {
+      final unchanged = seoStylesheetFromTheme(light, darkTheme: dark);
+      final manual = seoStylesheetFromTheme(
+        light,
+        darkTheme: dark,
+        enableManualTheme: true,
+      );
+
+      expect(unchanged, isNot(contains('data-esen-theme')));
+      expect(
+        manual,
+        contains('html[data-esen-theme="dark"] #esen-seo-content{'),
+      );
+      expect(
+        manual,
+        contains('html:not([data-esen-theme="light"])'
+            ':not([data-esen-theme="dark"]) #esen-seo-content{'),
+      );
+      expect(
+        manual,
+        isNot(contains('html[data-esen-theme="light"] #esen-seo-content{')),
+      );
+    });
+
+    test('manual mode is ignored when the app forces one palette', () {
+      final forced = seoStylesheetFromTheme(
+        light,
+        darkTheme: dark,
+        mode: SeoThemeMode.dark,
+        enableManualTheme: true,
+      );
+
+      expect(forced, isNot(contains('data-esen-theme')));
+      expect(forced, isNot(contains('@media')));
+    });
+
     test('forced dark: the dark palette IS the base, no media block', () {
       final css = seoStylesheetFromTheme(
         light,

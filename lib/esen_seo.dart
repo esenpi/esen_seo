@@ -39,3 +39,4 @@ export 'src/widgets/seo_rich_text.dart';
 export 'src/widgets/seo_stepper.dart';
 export 'src/widgets/seo_tabs.dart';
 export 'src/widgets/seo_testimonial.dart';
+export 'src/widgets/seo_theme_toggle.dart';
