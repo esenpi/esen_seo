@@ -31,6 +31,9 @@ typedef SeoNavComponentItem<T> = ({
   String? url,
 });
 
+/// Maximum supported nesting depth for a navigation tree.
+const int seoNavMaxDepth = 100;
+
 /// Pure input for one segment in [buildSeoPieChartNodes].
 typedef SeoPieChartComponentEntry = ({
   int? colorArgb,
@@ -574,7 +577,14 @@ List<SeoNode> buildSeoNavMenuNodes<T>({
     List<T> entries,
     String parentPath, {
     Map<String, String> attributes = const {},
+    int depth = 0,
   }) {
+    if (depth > seoNavMaxDepth) {
+      throw StateError(
+        'SeoNavMenu nests deeper than $seoNavMaxDepth levels - is its '
+        'item tree cyclic?',
+      );
+    }
     final children = <SeoNode>[];
     for (var index = 0; index < entries.length; index++) {
       final entry = entries[index];
@@ -593,6 +603,7 @@ List<SeoNode> buildSeoNavMenuNodes<T>({
             listNode(
               item.children,
               path,
+              depth: depth + 1,
               attributes: {
                 if (id != null) ...{
                   'id': '$id-submenu-$path',

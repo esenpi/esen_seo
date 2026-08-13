@@ -114,10 +114,15 @@ class _SeoNavMenuState extends State<SeoNavMenu>
     super.didUpdateWidget(oldWidget);
     // Einträge, die es nicht mehr gibt, dürfen nicht als offen gelten.
     final paths = <_SeoNavBranchKey>{};
-    void collect(List<SeoNavItem> items, _SeoNavBranchKey? parent) {
+    void collect(
+      List<SeoNavItem> items,
+      _SeoNavBranchKey? parent, {
+      int depth = 0,
+    }) {
+      _checkSeoNavDepth(depth);
       for (final branch in _branches(items, parent)) {
         paths.add(branch.path);
-        collect(branch.item.children, branch.path);
+        collect(branch.item.children, branch.path, depth: depth + 1);
       }
     }
 
@@ -132,7 +137,7 @@ class _SeoNavMenuState extends State<SeoNavMenu>
   Widget _buildMenu() {
     final entries = <Widget>[
       for (final branch in _branches(widget.items, null))
-        _buildBranch(branch.item, branch.path),
+        _buildBranch(branch.item, branch.path, depth: 0),
     ];
     return widget.direction == Axis.horizontal
         ? Wrap(spacing: 16, runSpacing: 8, children: entries)
@@ -150,7 +155,12 @@ class _SeoNavMenuState extends State<SeoNavMenu>
   ///
   /// The open set is keyed by a structural path, not the label alone, so two
   /// entries named "Mehr" at the same or different depths stay independent.
-  Widget _buildBranch(SeoNavItem item, _SeoNavBranchKey path) {
+  Widget _buildBranch(
+    SeoNavItem item,
+    _SeoNavBranchKey path, {
+    required int depth,
+  }) {
+    _checkSeoNavDepth(depth);
     final open = _open.contains(path);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -173,7 +183,11 @@ class _SeoNavMenuState extends State<SeoNavMenu>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final branch in _branches(item.children, path))
-                  _buildBranch(branch.item, branch.path),
+                  _buildBranch(
+                    branch.item,
+                    branch.path,
+                    depth: depth + 1,
+                  ),
               ],
             ),
           ),
@@ -249,6 +263,15 @@ class _SeoNavMenuState extends State<SeoNavMenu>
         label: widget.label,
         interactionId: widget.interactionId,
       );
+}
+
+void _checkSeoNavDepth(int depth) {
+  if (depth > seoNavMaxDepth) {
+    throw StateError(
+      'SeoNavMenu nests deeper than $seoNavMaxDepth levels - is its '
+      'item tree cyclic?',
+    );
+  }
 }
 
 List<({SeoNavItem item, _SeoNavBranchKey path})> _branches(

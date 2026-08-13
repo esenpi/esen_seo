@@ -91,6 +91,31 @@ void main() {
       expect('<ul>'.allMatches(EsenSeo.currentHtml), hasLength(3));
     });
 
+    test('an excessively deep tree fails before stack overflow', () {
+      var item = const SeoNavItem('Leaf');
+      for (var depth = 0; depth <= seoNavMaxDepth; depth++) {
+        item = SeoNavItem('Level $depth', children: [item]);
+      }
+
+      expect(
+        () => buildSeoNavMenuNodes(
+          items: [item],
+          itemView: (entry) => (
+            label: entry.label,
+            url: entry.url,
+            children: entry.children,
+          ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('nests deeper'),
+          ),
+        ),
+      );
+    });
+
     testWidgets('blank URLs are not links', (tester) async {
       await pumpSeo(
         tester,
