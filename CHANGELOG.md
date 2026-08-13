@@ -1,4 +1,4 @@
-## Unreleased
+## 0.10.0
 
 * Added the first application-authored DOM-first state slice. `SeoTabs` accepts
   a pure `SeoTabsTransition`, while a DOM-first route can select the same logic
@@ -38,6 +38,8 @@
   order, duplicate query terms and progressive components nested inside hidden
   tab or collection panels. DOM-first adapters now preserve source identity
   and can prepare valid descendants without exposing an inactive ancestor.
+  Multiple selected package runtimes now share one script block, keeping the
+  collection and theme-toggle combination inside its fixed gzip budget.
 * `SeoCollection(synchronizeUrl: true)` and `buildSeoCollectionNodes` can now
   opt a DOM-first collection into shareable, history-aware query state. Search
   replaces the current history entry; category, sort and page actions create
