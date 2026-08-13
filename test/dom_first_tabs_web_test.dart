@@ -105,7 +105,6 @@ void main() {
       unexpectedChild,
       invalidId,
       inertRoot,
-      hiddenRoot,
       ariaHiddenRoot,
     ]) {
       expect(root.querySelectorAll('button').length, 0);
@@ -115,6 +114,9 @@ void main() {
       expect(root.textContent, contains('Overview content'));
       expect(root.textContent, contains('Details content'));
     }
+    expect(hiddenParent.hasAttribute('hidden'), isTrue);
+    expect(hiddenRoot.querySelectorAll('[role="tab"]').length, 2);
+    expect(hiddenRoot.hasAttribute('data-esen-enhanced'), isTrue);
   });
 
   test('requires one unambiguous package-owned DOM-first container', () {

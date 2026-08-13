@@ -117,7 +117,7 @@ void main() {
     expect(root.hasAttribute('data-esen-enhanced'), isFalse);
   });
 
-  test('a hidden ancestor leaves the single control inert', () {
+  test('a hidden ancestor keeps the prepared control out of view', () {
     final container = _container(fixture);
     final hiddenParent = web.document.createElement('div')
       ..setAttribute('hidden', '');
@@ -126,9 +126,10 @@ void main() {
 
     _runGeneratedCandidate();
 
-    expect(root.hasAttribute('hidden'), isTrue);
-    expect(root.querySelectorAll('button').length, 0);
-    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(hiddenParent.hasAttribute('hidden'), isTrue);
+    expect(root.hasAttribute('hidden'), isFalse);
+    expect(root.querySelectorAll('button').length, 1);
+    expect(root.hasAttribute('data-esen-enhanced'), isTrue);
   });
 
   test('hostile-looking labels are copied only through text content', () {

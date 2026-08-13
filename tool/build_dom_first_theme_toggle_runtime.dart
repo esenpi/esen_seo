@@ -44,7 +44,7 @@ Future<void> main(List<String> arguments) async {
       'r.getAttribute("data-esen-enhanced")==="true"||'
       '[l,k,L,K].some(v=>!v||v.length>160))return;'
       'for(let e=r.parentElement;e&&e!==c;e=e.parentElement)'
-      'if(e.hasAttribute("hidden")||e.hasAttribute("inert")||'
+      'if(e.hasAttribute("inert")||'
       '(e.getAttribute("aria-hidden")||"").trim().toLowerCase()==="true")return;'
       'let b=d.createElement("button"),m=matchMedia("(prefers-color-scheme: dark)"),'
       'S=${js(seoThemePreferenceStorageKey)},p="system",'

@@ -403,7 +403,7 @@ List<SeoNode> buildSeoCollectionNodes({
                   if (id != null) ...{
                     'id': '$id-item-$outputIndex',
                     'data-esen-collection-item': '',
-                    'data-esen-item-order': '$outputIndex',
+                    'data-esen-item-order': '${ordered[outputIndex]}',
                     'data-esen-item-title':
                         records[ordered[outputIndex]].normalizedTitle,
                     'data-esen-item-search': normalizeSeoCollectionText(

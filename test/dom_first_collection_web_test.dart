@@ -156,13 +156,37 @@ void main() {
       unexpectedChild,
       unsafeSort,
       malformedUrlMarker,
-      hiddenRoot,
     ]) {
       expect(root.querySelectorAll('input').length, 0);
       expect(root.querySelectorAll('button').length, 0);
       expect(root.hasAttribute('data-esen-enhanced'), isFalse);
       expect(_visibleItems(root), hasLength(4));
     }
+    expect(hiddenParent.hasAttribute('hidden'), isTrue);
+    expect(hiddenRoot.querySelectorAll('input').length, 1);
+    expect(hiddenRoot.hasAttribute('data-esen-enhanced'), isTrue);
+  });
+
+  test('switching sort modes preserves source-order tie breaking', () {
+    final root = _collection(
+      _container(fixture),
+      'stable-order-collection',
+      initialSort: SeoCollectionSort.title,
+    );
+    final items = root.querySelectorAll('[data-esen-collection-item]');
+    for (var index = 0; index < items.length; index++) {
+      (items.item(index) as web.Element?)
+          ?.setAttribute('data-esen-item-sort-key', '1');
+    }
+
+    _runCompiledCandidate();
+    final sorts = root.querySelectorAll('[data-esen-collection-sort]');
+    (sorts.item(0)! as web.HTMLElement).dispatchEvent(web.MouseEvent('click'));
+
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Über Flutter',
+      'CMS',
+    ]);
   });
 
   test('hostile-looking labels remain text values', () {
@@ -400,13 +424,17 @@ web.HTMLElement _collection(
   String id, {
   bool synchronizeUrl = false,
   int pageSize = 2,
+  SeoCollectionSort initialSort = SeoCollectionSort.newest,
 }) {
   final root = web.document.createElement('section') as web.HTMLElement
     ..id = id
     ..setAttribute('data-esen-component', 'collection')
     ..setAttribute('data-esen-label', 'Blogartikel')
     ..setAttribute('data-esen-page-size', '$pageSize')
-    ..setAttribute('data-esen-initial-sort', 'newest')
+    ..setAttribute(
+      'data-esen-initial-sort',
+      seoCollectionSortMarker(initialSort),
+    )
     ..setAttribute('data-esen-search-label', 'Artikel suchen')
     ..setAttribute('data-esen-categories-label', 'Kategorien')
     ..setAttribute('data-esen-all-label', 'Alle')
@@ -435,18 +463,28 @@ web.HTMLElement _collection(
   }
   final items = web.document.createElement('div')
     ..setAttribute('data-esen-collection-items', '');
-  const data = [
+  const sourceData = [
     ('ueber flutter', 'ueber flutter seo html', '0', 40, 'Über Flutter'),
     ('cms', 'cms git publishing', '1', 30, 'CMS'),
     ('adapter', 'adapter javascript', '2', 20, 'Adapter'),
     ('alpha', 'alpha flutter basics', '0', 10, 'Alpha'),
   ];
-  for (final (index, entry) in data.indexed) {
+  final data = sourceData.indexed.toList()
+    ..sort((left, right) {
+      final compared = switch (initialSort) {
+        SeoCollectionSort.newest => right.$2.$4.compareTo(left.$2.$4),
+        SeoCollectionSort.oldest => left.$2.$4.compareTo(right.$2.$4),
+        SeoCollectionSort.title => left.$2.$1.compareTo(right.$2.$1),
+      };
+      return compared == 0 ? left.$1.compareTo(right.$1) : compared;
+    });
+  for (final (outputIndex, indexedEntry) in data.indexed) {
+    final (sourceIndex, entry) = indexedEntry;
     items.appendChild(
       web.document.createElement('article')
-        ..id = '$id-item-$index'
+        ..id = '$id-item-$outputIndex'
         ..setAttribute('data-esen-collection-item', '')
-        ..setAttribute('data-esen-item-order', '$index')
+        ..setAttribute('data-esen-item-order', '$sourceIndex')
         ..setAttribute('data-esen-item-title', entry.$1)
         ..setAttribute('data-esen-item-search', entry.$2)
         ..setAttribute('data-esen-item-categories', entry.$3)

@@ -217,7 +217,9 @@ SeoCollectionSnapshot selectSeoCollection({
           : null;
   final rawQuery = boundSeoCollectionQuery(state.query);
   final query = normalizeSeoCollectionText(rawQuery);
-  final terms = query.isEmpty ? const <String>[] : query.split(' ');
+  final terms = query.isEmpty
+      ? const <String>[]
+      : query.split(' ').toSet().toList(growable: false);
   final ordered = <int>[];
   for (var index = 0; index < records.length; index++) {
     final record = records[index];

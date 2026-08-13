@@ -164,8 +164,7 @@ final class _TabsApplyBoundary {
     web.Element? current = root;
     while (current != null) {
       final ariaHidden = current.getAttribute('aria-hidden');
-      if (current.hasAttribute('hidden') ||
-          current.hasAttribute('inert') ||
+      if (current.hasAttribute('inert') ||
           (ariaHidden != null && ariaHidden.trim().toLowerCase() == 'true')) {
         return true;
       }

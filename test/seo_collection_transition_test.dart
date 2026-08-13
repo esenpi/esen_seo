@@ -199,6 +199,10 @@ void main() {
       expect(html, contains('data-esen-page-size="1"'));
       expect(html, isNot(contains('data-esen-synchronize-url')));
       expect('data-esen-collection-item=""'.allMatches(html), hasLength(2));
+      expect(
+        html.indexOf('data-esen-item-order="1"'),
+        lessThan(html.indexOf('data-esen-item-order="0"')),
+      );
       expect(html, contains('data-esen-item-categories="0 1"'));
       expect(
           html, contains('data-esen-item-search="cms &amp; &lt;script&gt;"'));

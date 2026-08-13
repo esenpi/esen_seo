@@ -269,16 +269,28 @@ final class _CollectionApplyBoundary {
         itemChildren.length > seoCollectionMaxItems) {
       return null;
     }
-    final items = <web.HTMLElement>[];
-    final records = <SeoCollectionRecord>[];
+    final parsedItems = <({
+      int sourceIndex,
+      web.HTMLElement element,
+      SeoCollectionRecord record,
+    })>[];
+    final sourceIndexes = <int>{};
     for (var index = 0; index < itemChildren.length; index++) {
       final child = itemChildren.item(index);
+      final sourceIndexValue = child?.getAttribute('data-esen-item-order');
+      final sourceIndex =
+          sourceIndexValue == null || !_decimalIndex.hasMatch(sourceIndexValue)
+              ? null
+              : int.tryParse(sourceIndexValue);
       if (child == null ||
           child.tagName != 'ARTICLE' ||
           !child.hasAttribute('data-esen-collection-item') ||
           child.id != '$id-item-$index' ||
           _idCount(document, child.id) != 1 ||
-          child.getAttribute('data-esen-item-order') != '$index') {
+          sourceIndex == null ||
+          sourceIndex < 0 ||
+          sourceIndex >= itemChildren.length ||
+          !sourceIndexes.add(sourceIndex)) {
         return null;
       }
       final title = child.getAttribute('data-esen-item-title');
@@ -308,7 +320,6 @@ final class _CollectionApplyBoundary {
           categoryIndexes == null) {
         return null;
       }
-      items.add(child as web.HTMLElement);
       final record = SeoCollectionRecord(
         title: title,
         searchText: search,
@@ -318,8 +329,16 @@ final class _CollectionApplyBoundary {
       if (record.normalizedSearchText.length > seoCollectionMaxSearchLength) {
         return null;
       }
-      records.add(record);
+      parsedItems.add((
+        sourceIndex: sourceIndex,
+        element: child as web.HTMLElement,
+        record: record,
+      ));
     }
+    parsedItems
+        .sort((left, right) => left.sourceIndex.compareTo(right.sourceIndex));
+    final items = [for (final item in parsedItems) item.element];
+    final records = [for (final item in parsedItems) item.record];
 
     for (final controlId in [
       '$id-search',
@@ -389,8 +408,7 @@ final class _CollectionApplyBoundary {
     web.Element? current = root;
     while (current != null) {
       final ariaHidden = current.getAttribute('aria-hidden');
-      if (current.hasAttribute('hidden') ||
-          current.hasAttribute('inert') ||
+      if (current.hasAttribute('inert') ||
           (ariaHidden != null && ariaHidden.trim().toLowerCase() == 'true')) {
         return true;
       }
