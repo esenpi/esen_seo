@@ -102,27 +102,26 @@ class SeoNavMenu extends StatefulWidget {
 
 class _SeoNavMenuState extends State<SeoNavMenu>
     with SeoBlockState<SeoNavMenu> {
-  /// Which top-level entries currently show their submenu, keyed by
-  /// label — an index would point at a different entry as soon as the
-  /// menu changes (a prepended item would open someone else's submenu).
-  final Set<String> _open = {};
+  /// Which entries currently show their submenu.
+  ///
+  /// Paths encode parentage, semantic identity and the occurrence among
+  /// identical siblings. Prepending another label therefore cannot move an
+  /// open branch, while duplicate labels still remain independent.
+  final Set<_SeoNavBranchKey> _open = {};
 
   @override
   void didUpdateWidget(SeoNavMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Einträge, die es nicht mehr gibt, dürfen nicht als offen gelten.
-    final paths = <String>{};
-    void collect(SeoNavItem item, String parent) {
-      final path = '$parent/${item.label}';
-      paths.add(path);
-      for (final child in item.children) {
-        collect(child, path);
+    final paths = <_SeoNavBranchKey>{};
+    void collect(List<SeoNavItem> items, _SeoNavBranchKey? parent) {
+      for (final branch in _branches(items, parent)) {
+        paths.add(branch.path);
+        collect(branch.item.children, branch.path);
       }
     }
 
-    for (final item in widget.items) {
-      collect(item, '');
-    }
+    collect(widget.items, null);
     _open.removeWhere((path) => !paths.contains(path));
   }
 
@@ -132,7 +131,8 @@ class _SeoNavMenuState extends State<SeoNavMenu>
 
   Widget _buildMenu() {
     final entries = <Widget>[
-      for (var i = 0; i < widget.items.length; i++) _buildTopLevel(i),
+      for (final branch in _branches(widget.items, null))
+        _buildBranch(branch.item, branch.path),
     ];
     return widget.direction == Axis.horizontal
         ? Wrap(spacing: 16, runSpacing: 8, children: entries)
@@ -143,17 +143,14 @@ class _SeoNavMenuState extends State<SeoNavMenu>
           );
   }
 
-  Widget _buildTopLevel(int index) => _buildBranch(widget.items[index], '');
-
   /// Renders an entry and, when it is open, its children — recursively,
   /// so the visible menu goes as deep as the declared tree. The mirror
   /// already did; if the screen stopped at two levels, the grandchildren
   /// would exist in the HTML but be unreachable in the app.
   ///
-  /// The open set is keyed by the path of labels, not the label alone,
-  /// so two entries named "Mehr" at different depths stay independent.
-  Widget _buildBranch(SeoNavItem item, String parentPath) {
-    final path = '$parentPath/${item.label}';
+  /// The open set is keyed by a structural path, not the label alone, so two
+  /// entries named "Mehr" at the same or different depths stay independent.
+  Widget _buildBranch(SeoNavItem item, _SeoNavBranchKey path) {
     final open = _open.contains(path);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -175,7 +172,8 @@ class _SeoNavMenuState extends State<SeoNavMenu>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final child in item.children) _buildBranch(child, path),
+                for (final branch in _branches(item.children, path))
+                  _buildBranch(branch.item, branch.path),
               ],
             ),
           ),
@@ -251,4 +249,55 @@ class _SeoNavMenuState extends State<SeoNavMenu>
         label: widget.label,
         interactionId: widget.interactionId,
       );
+}
+
+List<({SeoNavItem item, _SeoNavBranchKey path})> _branches(
+  List<SeoNavItem> items,
+  _SeoNavBranchKey? parentPath,
+) {
+  final occurrences = <({String label, String? href}), int>{};
+  final branches = <({SeoNavItem item, _SeoNavBranchKey path})>[];
+  for (final item in items) {
+    final identity = (label: item.label, href: item.href);
+    final occurrence = occurrences.update(
+      identity,
+      (value) => value + 1,
+      ifAbsent: () => 0,
+    );
+    branches.add((
+      item: item,
+      path: _SeoNavBranchKey(
+        parent: parentPath,
+        label: item.label,
+        href: item.href,
+        occurrence: occurrence,
+      ),
+    ));
+  }
+  return branches;
+}
+
+final class _SeoNavBranchKey {
+  const _SeoNavBranchKey({
+    required this.parent,
+    required this.label,
+    required this.href,
+    required this.occurrence,
+  });
+
+  final _SeoNavBranchKey? parent;
+  final String label;
+  final String? href;
+  final int occurrence;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SeoNavBranchKey &&
+      other.parent == parent &&
+      other.label == label &&
+      other.href == href &&
+      other.occurrence == occurrence;
+
+  @override
+  int get hashCode => Object.hash(parent, label, href, occurrence);
 }

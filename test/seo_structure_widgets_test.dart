@@ -195,6 +195,43 @@ void main() {
       expect(find.text('tief'), findsNothing);
     });
 
+    testWidgets('same-named sibling branches stay independent', (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoNavMenu(items: [
+          SeoNavItem('Mehr', children: [SeoNavItem('Erstes Ziel')]),
+          SeoNavItem('Mehr', children: [SeoNavItem('Zweites Ziel')]),
+        ]),
+      );
+
+      await tester.tap(find.text('Mehr').first);
+      await tester.pump();
+
+      expect(find.text('Erstes Ziel'), findsOneWidget);
+      expect(find.text('Zweites Ziel'), findsNothing);
+    });
+
+    testWidgets('labels containing path separators cannot collide',
+        (tester) async {
+      await pumpSeo(
+        tester,
+        const SeoNavMenu(items: [
+          SeoNavItem('A/B', children: [SeoNavItem('Falscher Zweig')]),
+          SeoNavItem('A', children: [
+            SeoNavItem('B', children: [SeoNavItem('Richtiger Zweig')]),
+          ]),
+        ]),
+      );
+
+      await tester.tap(find.text('A'));
+      await tester.pump();
+      await tester.tap(find.text('B'));
+      await tester.pump();
+
+      expect(find.text('Richtiger Zweig'), findsOneWidget);
+      expect(find.text('Falscher Zweig'), findsNothing);
+    });
+
     testWidgets('a removed entry does not stay open', (tester) async {
       await pumpSeo(
         tester,
