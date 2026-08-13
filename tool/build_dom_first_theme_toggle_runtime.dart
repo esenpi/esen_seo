@@ -28,43 +28,42 @@ Future<void> main(List<String> arguments) async {
   ).state.preference;
   final lightValue = serializeSeoThemePreference(SeoThemePreference.light)!;
   final darkValue = serializeSeoThemePreference(SeoThemePreference.dark)!;
+  final fromLightValue = serializeSeoThemePreference(fromLight)!;
+  final fromDarkValue = serializeSeoThemePreference(fromDark)!;
+  if (fromLightValue != darkValue || fromDarkValue != lightValue) {
+    throw StateError('Theme toggle transition no longer flips the preference.');
+  }
 
   String js(String value) => jsonEncode(value);
 
   final javascript = '(()=>{'
-      'let d=document,c=d.getElementById("esen-seo-content"),'
-      'r=c&&c.querySelectorAll(\'[data-esen-component="theme-toggle"]\');'
-      'if(!c||c.getAttribute("data-esen-seo-dom-first")!=="true"||'
-      'd.querySelectorAll("#esen-seo-content").length!==1||r.length!==1)return;'
-      'r=r[0];let g=n=>{let v=r.getAttribute(n);return v&&v.trim()},'
-      'l=g("data-esen-light-label"),k=g("data-esen-dark-label"),'
-      'L=g("data-esen-light-semantic-label"),'
-      'K=g("data-esen-dark-semantic-label");'
-      'if(r.tagName!=="SPAN"||!r.hasAttribute("hidden")||r.children.length||'
-      'r.getAttribute("data-esen-enhanced")==="true"||'
-      '[l,k,L,K].some(v=>!v||v.length>160))return;'
-      'for(let e=r.parentElement;e&&e!==c;e=e.parentElement)'
-      'if(e.hasAttribute("inert")||'
-      '(e.getAttribute("aria-hidden")||"").trim().toLowerCase()==="true")return;'
+      'let d=document,C=d.querySelectorAll("#esen-seo-content"),c=C[0],'
+      'R=c&&c.querySelectorAll(\'[data-esen-component="theme-toggle"]\');'
+      'if(C.length!=1||c.dataset.esenSeoDomFirst!="true"||R.length!=1)return;'
+      'let r=R[0],'
+      'g=n=>(r.dataset[n]||"").trim(),'
+      'l=g("esenLightLabel"),k=g("esenDarkLabel"),'
+      'L=g("esenLightSemanticLabel"),K=g("esenDarkSemanticLabel");'
+      'if(r.localName!="span"||!r.hidden||r.childElementCount||'
+      'r.dataset.esenEnhanced=="true"||'
+      '![l,k,L,K].every(v=>v&&v.length<161))return;'
+      'for(let e=r;;e=e.parentElement){if(e.hasAttribute("inert")||'
+      '/^\\s*true\\s*\$/i.test(e.getAttribute("aria-hidden")))return;'
+      'if(e==c)break}'
       'let b=d.createElement("button"),m=matchMedia("(prefers-color-scheme: dark)"),'
-      'S=${js(seoThemePreferenceStorageKey)},p="system",'
-      'n={${js(lightValue)}:${js(serializeSeoThemePreference(fromLight)!)},'
-      '${js(darkValue)}:${js(serializeSeoThemePreference(fromDark)!)}};'
-      'try{let v=localStorage.getItem(S);if(v===${js(lightValue)}||'
-      'v===${js(darkValue)})p=v}catch(_){}'
-      'let a=()=>{let x=p===${js(darkValue)}||p==="system"&&m.matches,'
-      'h=d.documentElement;p==="system"?h.removeAttribute("data-esen-theme"):'
-      'h.setAttribute("data-esen-theme",p);b.textContent=x?l:k;'
+      'S=${js(seoThemePreferenceStorageKey)},P=[${js(lightValue)},${js(darkValue)}],p,'
+      'o=v=>{let i=P.indexOf(v);return i<0?null:!!i};'
+      'try{p=o(localStorage.getItem(S))}catch(_){}'
+      'let q=()=>p??m.matches,a=()=>{let x=q(),h=d.documentElement;'
+      'if(p==null)delete h.dataset.esenTheme;else h.dataset.esenTheme=P[+p];'
+      'b.textContent=x?l:k;'
       'b.dataset.esenDark=x;b.setAttribute("aria-label",x?L:K)};'
       'b.type="button";b.className="esen-seo-theme-toggle-button";'
-      'b.onclick=()=>{let x=p===${js(darkValue)}||p==="system"&&m.matches;'
-      'p=n[x?${js(darkValue)}:${js(lightValue)}];a();'
-      'try{localStorage.setItem(S,p)}catch(_){}};'
-      'r.append(b);r.removeAttribute("hidden");'
-      'r.setAttribute("data-esen-enhanced","true");a();'
+      'b.onclick=()=>{p=!q();a();'
+      'try{localStorage.setItem(S,P[+p])}catch(_){}};'
+      'r.append(b);r.hidden=false;r.dataset.esenEnhanced="true";a();'
       'm.addEventListener("change",a);addEventListener("storage",e=>{'
-      'if(e.key!==null&&e.key!==S)return;let v=e.newValue;'
-      'p=v===${js(lightValue)}||v===${js(darkValue)}?v:"system";a()})'
+      'if(e.key!=null&&e.key!=S)return;p=o(e.newValue);a()})'
       '})();';
 
   if (javascript.toLowerCase().contains('</script') ||

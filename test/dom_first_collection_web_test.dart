@@ -121,6 +121,31 @@ void main() {
         isTrue);
   });
 
+  test('combined feature script enhances collection and theme together', () {
+    final container = _container(fixture);
+    final collection = _collection(container, 'combined-collection');
+    final theme = web.document.createElement('span') as web.HTMLElement
+      ..setAttribute('hidden', '')
+      ..setAttribute('data-esen-component', 'theme-toggle')
+      ..setAttribute('data-esen-light-label', 'Light')
+      ..setAttribute('data-esen-dark-label', 'Dark')
+      ..setAttribute('data-esen-light-semantic-label', 'Use light theme')
+      ..setAttribute('data-esen-dark-semantic-label', 'Use dark theme');
+    container.appendChild(theme);
+    final html = seoDomFirstFeatureScriptHtml(const {
+      SeoDomFirstFeature.collection,
+      SeoDomFirstFeature.themeToggle,
+    });
+    final runtime =
+        RegExp(r'<script[^>]*>([\s\S]*?)</script>').firstMatch(html)!.group(1)!;
+
+    _runJavaScript(runtime);
+
+    expect(collection.querySelectorAll('input').length, 1);
+    expect(theme.querySelectorAll('button').length, 1);
+    expect(theme.hasAttribute('hidden'), isFalse);
+  });
+
   test('invalid or ambiguous roots remain entirely static', () {
     final container = _container(fixture);
     final duplicateA = _collection(container, 'duplicate-collection');
@@ -508,8 +533,11 @@ List<web.Element> _visibleItems(web.Element root) {
 }
 
 void _runCompiledCandidate() {
-  final script = web.document.createElement('script')
-    ..textContent = seoDomFirstCollectionRuntime;
+  _runJavaScript(seoDomFirstCollectionRuntime);
+}
+
+void _runJavaScript(String source) {
+  final script = web.document.createElement('script')..textContent = source;
   web.document.body?.appendChild(script);
   script.remove();
 }

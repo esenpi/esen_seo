@@ -201,7 +201,9 @@ void main() {
       expect(themeOnly, contains(seoDomFirstThemeToggleRuntime));
       expect(themeOnly, isNot(contains(seoDomFirstTabsRuntime)));
       expect(themeOnly, isNot(contains(seoDomFirstCollectionRuntime)));
-      expect('data-esen-seo-dom-first-runtime'.allMatches(both), hasLength(2));
+      expect(both, contains(seoDomFirstTabsRuntime));
+      expect(both, contains(seoDomFirstCollectionRuntime));
+      expect('data-esen-seo-dom-first-runtime'.allMatches(both), hasLength(1));
     });
   });
 

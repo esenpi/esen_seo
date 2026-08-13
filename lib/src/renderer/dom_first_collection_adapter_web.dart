@@ -420,13 +420,7 @@ final class _CollectionApplyBoundary {
 
   static int _idCount(web.Document document, String id) {
     if (id.isEmpty) return 0;
-    final elements = document.querySelectorAll('[id]');
-    var count = 0;
-    for (var index = 0; index < elements.length; index++) {
-      final element = elements.item(index);
-      if (element != null && (element as web.Element).id == id) count++;
-    }
-    return count;
+    return document.querySelectorAll('#$id').length;
   }
 
   void mount(_CollectionEventSink dispatch) {
@@ -573,10 +567,11 @@ final class _CollectionApplyBoundary {
     if (codec == null) return SeoCollectionState(sort: plan.initialSort);
     try {
       final url = web.URL(web.window.location.href);
-      List<String> values(String name) => [
-            for (final value in url.searchParams.getAll(name).toDart)
-              value.toDart,
-          ];
+      List<String> values(String name) {
+        final matches = url.searchParams.getAll(name);
+        return matches.length == 1 ? [matches[0].toDart] : const <String>[];
+      }
+
       return codec.decode(
         queryValues: values(codec.queryParameter),
         categoryValues: values(codec.categoryParameter),

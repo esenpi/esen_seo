@@ -68,10 +68,9 @@ String seoDomFirstFeatureBootstrapScriptHtml(
   if (!features.contains(SeoDomFirstFeature.themeToggle)) return '';
   final nonceAttribute = _nonceAttribute(nonce);
   return '<script $seoDomFirstBootstrapScriptAttribute$nonceAttribute>'
-      '(function(){try{var v=localStorage.getItem('
+      '(()=>{try{let v=localStorage.getItem('
       '"$seoThemePreferenceStorageKey");if(v==="light"||v==="dark")'
-      'document.documentElement.setAttribute("data-esen-theme",v)'
-      '}catch(e){}})();</script>';
+      'document.documentElement.dataset.esenTheme=v}catch(_){}})()</script>';
 }
 
 /// Returns the style tag needed by the selected DOM-first [features].
@@ -101,20 +100,25 @@ String seoDomFirstFeatureScriptHtml(
   String? nonce,
 }) {
   final nonceAttribute = _nonceAttribute(nonce);
-  final scripts = StringBuffer();
+  final runtime = StringBuffer();
+
+  void addRuntime(String javascript) {
+    if (runtime.isNotEmpty) runtime.write(';');
+    runtime.write(javascript);
+  }
+
   if (features.contains(SeoDomFirstFeature.tabs)) {
-    scripts.write('<script $seoDomFirstScriptAttribute$nonceAttribute>'
-        '$seoDomFirstTabsRuntime</script>');
+    addRuntime(seoDomFirstTabsRuntime);
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
-    scripts.write('<script $seoDomFirstScriptAttribute$nonceAttribute>'
-        '$seoDomFirstCollectionRuntime</script>');
+    addRuntime(seoDomFirstCollectionRuntime);
   }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
-    scripts.write('<script $seoDomFirstScriptAttribute$nonceAttribute>'
-        '$seoDomFirstThemeToggleRuntime</script>');
+    addRuntime(seoDomFirstThemeToggleRuntime);
   }
-  return scripts.toString();
+  if (runtime.isEmpty) return '';
+  return '<script $seoDomFirstScriptAttribute$nonceAttribute>'
+      '$runtime</script>';
 }
 
 String _nonceAttribute(String? nonce) {

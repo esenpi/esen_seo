@@ -1,8 +1,8 @@
 @TestOn('browser')
 library;
 
-import 'package:esen_seo/src/components/seo_theme_transition.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
+import 'package:esen_seo/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
 
@@ -81,6 +81,22 @@ void main() {
     );
   });
 
+  test('pre-paint bootstrap restores a valid stored preference', () {
+    web.window.localStorage.setItem(seoThemePreferenceStorageKey, 'dark');
+    final html = seoDomFirstFeatureBootstrapScriptHtml(
+      const {SeoDomFirstFeature.themeToggle},
+    );
+    final runtime =
+        RegExp(r'<script[^>]*>([\s\S]*?)</script>').firstMatch(html)!.group(1)!;
+
+    _runJavaScript(runtime);
+
+    expect(
+      web.document.documentElement?.getAttribute('data-esen-theme'),
+      'dark',
+    );
+  });
+
   test('multiple controls remain hidden and entirely unmodified', () {
     final container = _container(fixture);
     final first = _themeToggle(container);
@@ -132,6 +148,29 @@ void main() {
     expect(root.hasAttribute('data-esen-enhanced'), isTrue);
   });
 
+  test('an inert marker leaves the control untouched', () {
+    final container = _container(fixture);
+    final root = _themeToggle(container)..setAttribute('inert', '');
+
+    _runGeneratedCandidate();
+
+    expect(root.hasAttribute('hidden'), isTrue);
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+  });
+
+  test('an aria-hidden container leaves the control untouched', () {
+    final container = _container(fixture)
+      ..setAttribute('aria-hidden', ' TRUE ');
+    final root = _themeToggle(container);
+
+    _runGeneratedCandidate();
+
+    expect(root.hasAttribute('hidden'), isTrue);
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+  });
+
   test('hostile-looking labels are copied only through text content', () {
     final root = _themeToggle(_container(fixture))
       ..setAttribute('data-esen-dark-label', '<img src=x onerror=alert(1)>')
@@ -172,8 +211,11 @@ web.HTMLElement _themeToggle(web.Element parent) {
 }
 
 void _runGeneratedCandidate() {
-  final script = web.document.createElement('script')
-    ..textContent = seoDomFirstThemeToggleRuntime;
+  _runJavaScript(seoDomFirstThemeToggleRuntime);
+}
+
+void _runJavaScript(String source) {
+  final script = web.document.createElement('script')..textContent = source;
   web.document.body?.appendChild(script);
   script.remove();
 }
