@@ -854,8 +854,11 @@ translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs` and
 adapter while each presentation owns its current state.
 `SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
-markers produced by the pure component builders. Content effects, forms and
-client-side routing remain separate, deliberately unsupported capabilities.
+markers produced by the pure component builders. General forms,
+application-authored inputs, content effects and client-side routing remain
+separate, deliberately unsupported capabilities. `SeoCollection` owns one
+bounded local-search input: it submits nothing, performs no remote I/O and is
+created only after the complete collection structure has been validated.
 
 ### Application-owned tabs state
 
@@ -899,8 +902,9 @@ also rejects non-const top-level or static fields, so the transition cannot
 hold current state between calls. It then runs
 `dart compile js -O2 --csp --no-source-maps --fatal-warnings` and writes
 `product-tabs.js` plus a SHA-256 manifest below
-`build/esen_seo/runtimes/`. Compiler output above the fixed 25 KiB gzip budget,
-script-end tags and string-to-code constructors are refused.
+`build/esen_seo/runtimes/`. Compiler output above 512 KiB raw or the fixed
+25 KiB gzip budget, script-tokenizer hazards and string-to-code constructors
+are refused.
 
 This is a capability and held-state boundary, not a formal proof that arbitrary
 Dart is referentially transparent. Keep environment reads and side effects out
@@ -953,13 +957,16 @@ await prerenderSite(
 );
 ```
 
-Every delivery rechecks kind, logical id, SHA-256, byte sizes and the expected
-Dart compiler version. Missing, stale, foreign or manipulated artifacts fail
-by name instead of falling back to package logic or Flutter. A route may select
-either the package tabs feature or one application tabs runtime, never both.
-Cubit or another Flutter state manager may dispatch the same pure transition
-on the Flutter side, but it is not compiled and is not a dependency of
-`esen_seo`.
+On first load through a `SeoDirectoryRuntimeStore`, the store checks kind,
+logical id, SHA-256, byte sizes and the expected Dart compiler version, then
+caches the verified artifact for that store's lifetime. Missing, stale, foreign
+or inconsistent artifacts fail by name instead of falling back to package logic
+or Flutter. Treat the build directory as trusted deployment input: the hash
+detects a mismatched script and manifest, but cannot authenticate them against
+an actor who can replace both. A route may select either the package tabs
+feature or one application tabs runtime, never both. Cubit or another Flutter
+state manager may dispatch the same pure transition on the Flutter side, but it
+is not compiled and is not a dependency of `esen_seo`.
 
 For a hybrid site that serves Flutter and DOM-first routes from the same
 origin, disable Flutter's root-scoped application-shell cache:

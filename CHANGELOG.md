@@ -5,10 +5,17 @@
   through `SeoDomFirstApplicationRuntime.tabs`. The `esen_seo_runtime` build
   command parser-checks the application's complete import graph, compiles a
   CSP-compatible JavaScript artifact and writes a SHA-256 manifest outside
-  `lib/`. Middleware and prerendering require a runtime store and revalidate
-  identity, bytes, gzip budget and hash before route-scoped inline delivery;
-  missing, stale, foreign and manipulated artifacts fail closed. Existing
-  Flutter and non-opted-in route delivery remains unchanged.
+  `lib/`. Middleware and prerendering require a runtime store, which validates
+  identity, bytes, gzip budget and hash before caching the artifact for
+  route-scoped inline delivery; missing, stale, foreign and inconsistent
+  artifacts fail closed. Existing Flutter and non-opted-in route delivery
+  remains unchanged.
+* Hardened application runtime delivery with fixed raw-script and manifest
+  read limits, successful-verification caching and redirect resolution before
+  runtime loading. Runtime scripts now reject HTML script-tokenizer hazards in
+  addition to script-end tags and string-to-code constructors. The SHA-256
+  manifest is documented as a consistency check; the build directory remains
+  trusted deployment input.
 * Added `SeoThemeToggle`, a controlled Flutter light/dark control with a
   separately selected `SeoDomFirstFeature.themeToggle` presentation. The
   generated web adapter restores a closed `light`/`dark` preference before
@@ -27,6 +34,10 @@
   remains in the source without JavaScript. Invalid, ambiguous, oversized or
   single-item collections stay complete static HTML, and sort keys are limited
   to integers represented exactly on both the Dart VM and JavaScript.
+* Fixed collection sort stability when the initial sort differs from source
+  order, duplicate query terms and progressive components nested inside hidden
+  tab or collection panels. DOM-first adapters now preserve source identity
+  and can prepare valid descendants without exposing an inactive ancestor.
 * `SeoCollection(synchronizeUrl: true)` and `buildSeoCollectionNodes` can now
   opt a DOM-first collection into shareable, history-aware query state. Search
   replaces the current history entry; category, sort and page actions create
@@ -78,6 +89,10 @@
   `aria-controls` and Escape-to-close focus return. Linked parent entries keep
   a separate navigation link, while unlinked labels become the toggle only
   after enhancement.
+* Native `SeoNavMenu` disclosure state now uses structural branch identity, so
+  duplicate sibling labels and labels containing separators open independently.
+  Both pure and Flutter navigation walkers stop with a named `StateError` at
+  the shared maximum depth instead of overflowing the stack.
 * `SeoTabs(interactionId: ...)` can now opt a visible semantic page into
   package-owned progressive enhancement. All panels remain in the source;
   vanilla JavaScript adds validated ARIA tab controls, click handling, roving
@@ -92,6 +107,9 @@
   their alpha channel in CSS as `#rrggbbaa`. Opaque colors keep their
   existing `#rrggbb` output. Component and theme CSS now share the same
   pure ARGB serializer.
+* The application runtime builder supports analyzer 6 and 7. CI now executes
+  the browser adapter suites and verifies every generated DOM-first runtime,
+  in addition to the VM and static-analysis gates.
 
 ## 0.9.0
 
