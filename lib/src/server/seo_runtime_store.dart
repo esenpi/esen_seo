@@ -12,6 +12,15 @@ const int seoDomFirstRuntimeManifestSchema = 1;
 /// Maximum accepted application runtime size after level-9 gzip compression.
 const int seoDomFirstRuntimeMaxGzipBytes = 25 * 1024;
 
+/// Maximum accepted application runtime size before compression.
+///
+/// The separate ceiling bounds file reads, hashing, compression and browser
+/// parse work even when highly repetitive JavaScript compresses unusually
+/// well.
+const int seoDomFirstRuntimeMaxBytes = 512 * 1024;
+
+const int _seoDomFirstRuntimeMaxManifestBytes = 8 * 1024;
+
 /// Describes one compiled and content-addressed application runtime.
 final class SeoDomFirstRuntimeManifest {
   const SeoDomFirstRuntimeManifest({
@@ -108,6 +117,11 @@ final class SeoDomFirstRuntimeArtifact {
     required String dartVersion,
   }) {
     final encoded = utf8.encode(javascript);
+    if (encoded.isEmpty || encoded.length > seoDomFirstRuntimeMaxBytes) {
+      throw StateError(
+        'Runtime "${reference.id}" exceeds its uncompressed size budget.',
+      );
+    }
     final manifest = SeoDomFirstRuntimeManifest(
       schemaVersion: seoDomFirstRuntimeManifestSchema,
       id: reference.id,
@@ -124,7 +138,11 @@ final class SeoDomFirstRuntimeArtifact {
     );
   }
 
-  /// Verifies an artifact loaded from an untrusted or stale build directory.
+  /// Verifies identity and file consistency for a build-owned artifact.
+  ///
+  /// The manifest hash detects stale, partial or accidentally changed files;
+  /// it does not authenticate a coordinated replacement of both files. The
+  /// build directory remains trusted deployment input.
   factory SeoDomFirstRuntimeArtifact.verify({
     required SeoDomFirstApplicationRuntime reference,
     required SeoDomFirstRuntimeManifest manifest,
@@ -153,17 +171,24 @@ final class SeoDomFirstRuntimeArtifact {
     if (!_sha256.hasMatch(manifest.sha256)) {
       throw StateError('Invalid SHA-256 in runtime "${reference.id}".');
     }
+    if (manifest.bytes < 1 ||
+        manifest.bytes > seoDomFirstRuntimeMaxBytes ||
+        manifest.gzipBytes < 1 ||
+        manifest.gzipBytes > seoDomFirstRuntimeMaxGzipBytes) {
+      throw StateError('Runtime "${reference.id}" exceeds its size budget.');
+    }
     final encoded = utf8.encode(javascript);
+    if (encoded.length > seoDomFirstRuntimeMaxBytes) {
+      throw StateError(
+        'Runtime "${reference.id}" exceeds its uncompressed size budget.',
+      );
+    }
     final actualHash = sha256.convert(encoded).toString();
     final actualGzipBytes = GZipCodec(level: 9).encode(encoded).length;
     if (manifest.bytes != encoded.length ||
         manifest.gzipBytes != actualGzipBytes ||
         manifest.sha256 != actualHash) {
       throw StateError('Runtime "${reference.id}" failed integrity checks.');
-    }
-    if (javascript.isEmpty ||
-        manifest.gzipBytes > seoDomFirstRuntimeMaxGzipBytes) {
-      throw StateError('Runtime "${reference.id}" exceeds its size budget.');
     }
     final lower = javascript.toLowerCase();
     if (lower.contains('</script') ||
@@ -203,6 +228,11 @@ Future<SeoDomFirstRuntimeArtifact> loadSeoDomFirstRuntime(
 }
 
 /// Loads `<id>.json` and `<id>.js` from a build-owned directory.
+///
+/// A successful verification is cached for this store's lifetime. Build
+/// artifacts are immutable deployment inputs; create a new store after
+/// rebuilding them. Failed loads are evicted so a temporarily incomplete
+/// deployment can recover.
 final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
   SeoDirectoryRuntimeStore(
     this.directory, {
@@ -212,6 +242,8 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
 
   final String directory;
   final String expectedDartVersion;
+  final Map<SeoDomFirstApplicationRuntime, Future<SeoDomFirstRuntimeArtifact>>
+      _cache = {};
 
   @override
   Future<SeoDomFirstRuntimeArtifact> load(
@@ -220,6 +252,21 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
     if (!isValidSeoApplicationRuntimeId(reference.id)) {
       throw StateError('Invalid application runtime id "${reference.id}".');
     }
+    final cached = _cache[reference];
+    if (cached != null) return cached;
+    final pending = _load(reference);
+    _cache[reference] = pending;
+    try {
+      return await pending;
+    } catch (_) {
+      if (identical(_cache[reference], pending)) _cache.remove(reference);
+      rethrow;
+    }
+  }
+
+  Future<SeoDomFirstRuntimeArtifact> _load(
+    SeoDomFirstApplicationRuntime reference,
+  ) async {
     final manifestFile = File('$directory/${reference.id}.json');
     final javascriptFile = File('$directory/${reference.id}.js');
     if (!await manifestFile.exists() || !await javascriptFile.exists()) {
@@ -228,16 +275,32 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
       );
     }
     try {
-      final manifest = SeoDomFirstRuntimeManifest.fromJson(
-        jsonDecode(await manifestFile.readAsString()),
-      );
+      final SeoDomFirstRuntimeManifest manifest;
+      try {
+        manifest = SeoDomFirstRuntimeManifest.fromJson(
+          jsonDecode(await _readUtf8File(
+            manifestFile,
+            maxBytes: _seoDomFirstRuntimeMaxManifestBytes,
+            description: 'Runtime manifest "${reference.id}"',
+          )),
+        );
+      } on FormatException catch (error) {
+        throw StateError(
+          'Invalid manifest for application runtime "${reference.id}": '
+          '${error.message}',
+        );
+      }
       if (manifest.dartVersion != expectedDartVersion) {
         throw StateError(
           'Application runtime "${reference.id}" was built with Dart '
           '${manifest.dartVersion}, expected $expectedDartVersion.',
         );
       }
-      final javascript = await javascriptFile.readAsString();
+      final javascript = await _readUtf8File(
+        javascriptFile,
+        maxBytes: seoDomFirstRuntimeMaxBytes,
+        description: 'Application runtime "${reference.id}"',
+      );
       return SeoDomFirstRuntimeArtifact.verify(
         reference: reference,
         manifest: manifest,
@@ -247,12 +310,31 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
       throw StateError(
         'Cannot read application runtime "${reference.id}": $error',
       );
-    } on FormatException catch (error) {
-      throw StateError(
-        'Invalid manifest for application runtime "${reference.id}": '
-        '${error.message}',
-      );
     }
+  }
+}
+
+Future<String> _readUtf8File(
+  File file, {
+  required int maxBytes,
+  required String description,
+}) async {
+  final handle = await file.open();
+  try {
+    if (await handle.length() > maxBytes) {
+      throw StateError('$description exceeds $maxBytes bytes.');
+    }
+    final bytes = await handle.read(maxBytes + 1);
+    if (bytes.length > maxBytes) {
+      throw StateError('$description exceeds $maxBytes bytes.');
+    }
+    try {
+      return utf8.decode(bytes);
+    } on FormatException catch (error) {
+      throw StateError('$description is not valid UTF-8: ${error.message}');
+    }
+  } finally {
+    await handle.close();
   }
 }
 

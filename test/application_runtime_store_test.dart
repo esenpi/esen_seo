@@ -43,6 +43,22 @@ void main() {
         );
       });
     }
+
+    test('rejects highly compressible output above the raw byte ceiling', () {
+      final oversized = List.filled(
+        seoDomFirstRuntimeMaxBytes + 1,
+        'a',
+      ).join();
+
+      expect(
+        () => SeoDomFirstRuntimeArtifact.create(
+          reference: reference,
+          javascript: oversized,
+          dartVersion: dartVersion,
+        ),
+        throwsStateError,
+      );
+    });
   });
 
   group('directory runtime store', () {
@@ -62,13 +78,60 @@ void main() {
     tearDown(() => directory.delete(recursive: true));
 
     test('loads matching JavaScript and manifest', () async {
-      final loaded = await SeoDirectoryRuntimeStore(directory.path).load(
-        reference,
-      );
+      final store = SeoDirectoryRuntimeStore(directory.path);
+      final loaded = await store.load(reference);
 
       expect(loaded.reference, reference);
       expect(loaded.javascript, javascript);
       expect(loaded.manifest.sha256, artifact.manifest.sha256);
+
+      await File('${directory.path}/application-tabs.js').delete();
+      expect(await store.load(reference), same(loaded));
+    });
+
+    test('bounds runtime files before reading or compressing them', () async {
+      await File('${directory.path}/application-tabs.js').writeAsString(
+        List.filled(seoDomFirstRuntimeMaxBytes + 1, ' ').join(),
+      );
+
+      await expectLater(
+        SeoDirectoryRuntimeStore(directory.path).load(reference),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('exceeds'),
+          ),
+        ),
+      );
+    });
+
+    test('bounds the manifest before parsing it', () async {
+      await File('${directory.path}/application-tabs.json').writeAsString(
+        List.filled(8 * 1024 + 1, ' ').join(),
+      );
+
+      await expectLater(
+        SeoDirectoryRuntimeStore(directory.path).load(reference),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('exceeds'),
+          ),
+        ),
+      );
+    });
+
+    test('evicts a failed load so a completed deployment can recover',
+        () async {
+      final store = SeoDirectoryRuntimeStore(directory.path);
+      await File('${directory.path}/application-tabs.js').delete();
+
+      await expectLater(store.load(reference), throwsStateError);
+      await _write(directory, artifact);
+
+      expect((await store.load(reference)).javascript, javascript);
     });
 
     test('rejects tampered JavaScript', () async {

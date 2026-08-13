@@ -156,6 +156,31 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('a DOM-first redirect does not load an unused runtime', () async {
+      final store = _MemoryStore(_artifact());
+      final route = SeoRoute.dynamic(
+        path: '/old',
+        delivery: SeoRouteDelivery.domFirst,
+        applicationRuntime: _reference,
+        resolve: (_) => const SeoRedirect('/new'),
+      );
+      final handler = const Pipeline()
+          .addMiddleware(seoBotMiddleware(
+            routes: [route],
+            siteBase: 'https://x.dev',
+            domFirstRuntimeStore: store,
+          ))
+          .addHandler((_) => Response.ok('flutter'));
+
+      final response = await handler(
+        Request('GET', Uri.parse('https://x.dev/old')),
+      );
+
+      expect(response.statusCode, 301);
+      expect(response.headers['location'], '/new');
+      expect(store.loads, 0);
+    });
   });
 
   group('prerender delivery', () {

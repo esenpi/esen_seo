@@ -354,13 +354,6 @@ Middleware seoBotMiddleware({
       if (routes != null) {
         final match = matchSeoRoute(routes, path);
         if (match != null && match.route.isDomFirst) {
-          final runtimeReference = match.route.applicationRuntime;
-          final applicationRuntime = runtimeReference == null
-              ? null
-              : await loadSeoDomFirstRuntime(
-                  domFirstRuntimeStore!,
-                  runtimeReference,
-                );
           final SeoResolution resolution;
           try {
             resolution = await match.resolve(
@@ -380,6 +373,13 @@ Middleware seoBotMiddleware({
                 :final meta,
                 :final headers,
               ):
+              final runtimeReference = match.route.applicationRuntime;
+              final applicationRuntime = runtimeReference == null
+                  ? null
+                  : await loadSeoDomFirstRuntime(
+                      domFirstRuntimeStore!,
+                      runtimeReference,
+                    );
               final pageBody = statusCode >= 400 && body.isEmpty
                   ? _statusBody(statusCode)
                   : body;
