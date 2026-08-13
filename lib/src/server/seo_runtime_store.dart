@@ -192,6 +192,7 @@ final class SeoDomFirstRuntimeArtifact {
     }
     final lower = javascript.toLowerCase();
     if (lower.contains('</script') ||
+        javascript.contains('<!--') ||
         _eval.hasMatch(javascript) ||
         _functionConstructor.hasMatch(javascript)) {
       throw StateError('Runtime "${reference.id}" contains forbidden code.');

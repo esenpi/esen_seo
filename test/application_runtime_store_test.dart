@@ -28,6 +28,7 @@ void main() {
 
     for (final forbidden in const [
       '</ScRiPt>',
+      '<!--',
       'eval("code")',
       'new Function("return 1")',
       'Function("return 1")',

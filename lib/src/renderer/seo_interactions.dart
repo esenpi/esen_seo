@@ -610,15 +610,18 @@ const String seoInteractionRuntime = r'''
 })();
 ''';
 
-final RegExp _scriptClose = RegExp(r'</\s*script', caseSensitive: false);
+final RegExp _scriptTokenizerTrap = RegExp(
+  r'<!--|</\s*script',
+  caseSensitive: false,
+);
 
 /// Wraps the trusted runtime in an inline script tag.
 ///
 /// [nonce] is optional. When supplied it is escaped as an HTML attribute so
 /// callers can satisfy a nonce-based Content Security Policy.
 String seoInteractionScriptHtml({String? nonce}) {
-  if (_scriptClose.hasMatch(seoInteractionRuntime)) {
-    throw StateError('The interaction runtime contains a script close tag.');
+  if (_scriptTokenizerTrap.hasMatch(seoInteractionRuntime)) {
+    throw StateError('The interaction runtime contains unsafe inline code.');
   }
   final value = nonce?.trim();
   final nonceAttribute = value == null || value.isEmpty

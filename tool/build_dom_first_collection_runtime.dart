@@ -39,8 +39,9 @@ Future<void> main(List<String> arguments) async {
     }
 
     final javascript = await File(output).readAsString();
-    if (javascript.toLowerCase().contains('</script')) {
-      stderr.writeln('Refusing a runtime containing a script end tag.');
+    if (javascript.toLowerCase().contains('</script') ||
+        javascript.contains('<!--')) {
+      stderr.writeln('Refusing a runtime containing unsafe inline code.');
       exitCode = 1;
       return;
     }

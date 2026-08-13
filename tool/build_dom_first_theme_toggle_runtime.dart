@@ -67,8 +67,9 @@ Future<void> main(List<String> arguments) async {
       'p=v===${js(lightValue)}||v===${js(darkValue)}?v:"system";a()})'
       '})();';
 
-  if (javascript.toLowerCase().contains('</script')) {
-    stderr.writeln('Refusing a runtime containing a script end tag.');
+  if (javascript.toLowerCase().contains('</script') ||
+      javascript.contains('<!--')) {
+    stderr.writeln('Refusing a runtime containing unsafe inline code.');
     exitCode = 1;
     return;
   }
