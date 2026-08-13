@@ -38,7 +38,7 @@ jobs:
       - name: Verify formatting
         run: >-
           find bin lib test benchmark tool -name '*.dart'
-          ! -name 'seo_dom_first_tabs_runtime.g.dart'
+          ! -name 'seo_dom_first_*_runtime.g.dart'
           -exec dart format --output=none --set-exit-if-changed {} +
 
       - name: Analyze package
@@ -46,6 +46,14 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - name: Test browser adapters
+        run: >-
+          flutter test --platform chrome
+          test/seo_interactions_web_test.dart
+          test/dom_first_tabs_web_test.dart
+          test/dom_first_collection_web_test.dart
+          test/dom_first_theme_toggle_web_test.dart
 
   example:
     name: example app
@@ -149,10 +157,18 @@ jobs:
       - name: Verify the compiled tabs runtime is current
         run: dart run tool/build_dom_first_tabs_runtime.dart
 
+      - name: Verify the compiled collection runtime is current
+        run: dart run tool/build_dom_first_collection_runtime.dart
+
+      - name: Verify the compiled theme runtime is current
+        run: dart run tool/build_dom_first_theme_toggle_runtime.dart
+
       - name: Verify generated runtime formatting with its producer
         run: >-
           dart format --output=none --set-exit-if-changed
           lib/src/renderer/seo_dom_first_tabs_runtime.g.dart
+          lib/src/renderer/seo_dom_first_collection_runtime.g.dart
+          lib/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart
 
   server:
     name: server path without Flutter
