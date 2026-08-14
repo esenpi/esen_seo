@@ -6,6 +6,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
 import '../routing/seo_application_runtime.dart';
+import '../routing/seo_application_runtime_artifact.dart';
 import '../server/seo_runtime_store.dart';
 
 /// Inputs for one application-authored tabs runtime build.
@@ -23,17 +24,79 @@ final class SeoTabsRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one application-authored stepper runtime build.
+final class SeoStepperRuntimeBuildRequest {
+  const SeoStepperRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.symbol,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String symbol;
+  final String outputDirectory;
+}
+
 /// Compiles one checked application transition and writes its verified files.
 Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
   SeoTabsRuntimeBuildRequest request, {
   String? packageRoot,
   bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.tabs(request.id),
+        library: request.library,
+        symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked stepper transition and writes its verified files.
+Future<SeoDomFirstRuntimeArtifact> buildSeoStepperApplicationRuntime(
+  SeoStepperRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.stepper(request.id),
+        library: request.library,
+        symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+final class _ApplicationRuntimeBuildRequest {
+  const _ApplicationRuntimeBuildRequest({
+    required this.reference,
+    required this.library,
+    required this.symbol,
+    required this.outputDirectory,
+  });
+
+  final SeoDomFirstApplicationRuntime reference;
+  final String library;
+  final String symbol;
+  final String outputDirectory;
+}
+
+Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
+  _ApplicationRuntimeBuildRequest request, {
+  String? packageRoot,
+  required bool write,
 }) async {
   final root = Directory(packageRoot ?? Directory.current.path).absolute;
-  final reference = SeoDomFirstApplicationRuntime.tabs(request.id);
+  final reference = request.reference;
   if (!isValidSeoApplicationRuntimeId(reference.id)) {
     throw ArgumentError.value(
-      request.id,
+      reference.id,
       'id',
       'must start with a lowercase letter and contain at most 64 lowercase '
           'letters, digits, underscores or dashes',
@@ -75,10 +138,16 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
   try {
     final entrypoint = File('${scratch.path}/entrypoint.dart');
     final compiled = File('${scratch.path}/runtime.js');
-    await entrypoint.writeAsString(_entrypointSource(
-      libraryUri,
-      request.symbol,
-    ));
+    await entrypoint.writeAsString(switch (reference) {
+      SeoDomFirstTabsApplicationRuntime() => _tabsEntrypointSource(
+          libraryUri,
+          request.symbol,
+        ),
+      SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
+          libraryUri,
+          request.symbol,
+        ),
+    });
 
     final result = await Process.run(
       Platform.resolvedExecutable,
@@ -98,7 +167,7 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
     );
     if (result.exitCode != 0) {
       throw StateError(
-        'Application tabs runtime compilation failed.\n'
+        'Application ${reference.kind} runtime compilation failed.\n'
         '${result.stdout}${result.stderr}',
       );
     }
@@ -120,7 +189,7 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
   }
 }
 
-String _entrypointSource(Uri library, String symbol) => '''
+String _tabsEntrypointSource(Uri library, String symbol) => '''
 import 'package:esen_seo/src/components/seo_tabs_transition.dart';
 import 'package:esen_seo/src/renderer/dom_first_tabs_adapter_web.dart';
 import ${jsonEncode(library.toString())} as application;
@@ -131,6 +200,21 @@ SeoTabsState _applicationTransition(
 ) => application.$symbol(state, action);
 
 void main() => enhanceSeoDomFirstTabs(
+  transition: _applicationTransition,
+);
+''';
+
+String _stepperEntrypointSource(Uri library, String symbol) => '''
+import 'package:esen_seo/src/components/seo_stepper_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+SeoStepperState _applicationTransition(
+  SeoStepperState state,
+  SeoStepperAction action,
+) => application.$symbol(state, action);
+
+void main() => enhanceSeoDomFirstSteppers(
   transition: _applicationTransition,
 );
 ''';
@@ -180,9 +264,9 @@ Future<void> _writeArtifact(
   SeoDomFirstRuntimeArtifact artifact,
 ) async {
   await output.create(recursive: true);
-  final id = artifact.reference.id;
-  final javascript = File('${output.path}/$id.js');
-  final manifest = File('${output.path}/$id.json');
+  final stem = seoApplicationRuntimeArtifactStem(artifact.reference);
+  final javascript = File('${output.path}/$stem.js');
+  final manifest = File('${output.path}/$stem.json');
   final temporarySuffix = '.tmp.$pid.${DateTime.now().microsecondsSinceEpoch}';
   final temporaryJavascript = File('${javascript.path}$temporarySuffix');
   final temporaryManifest = File('${manifest.path}$temporarySuffix');
@@ -311,7 +395,9 @@ final class _PackageGraph {
       if (segments.first == 'esen_seo' &&
           (rawUri == 'package:esen_seo/core.dart' ||
               rawUri ==
-                  'package:esen_seo/src/components/seo_tabs_transition.dart')) {
+                  'package:esen_seo/src/components/seo_tabs_transition.dart' ||
+              rawUri ==
+                  'package:esen_seo/src/components/seo_stepper_transition.dart')) {
         return File('');
       }
       if (segments.first != applicationPackage) {

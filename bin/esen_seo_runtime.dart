@@ -16,15 +16,34 @@ Future<void> main(List<String> arguments) async {
     final values = _arguments(
       arguments.where((value) => value != '--check').toList(),
     );
-    final artifact = await buildSeoTabsApplicationRuntime(
-      SeoTabsRuntimeBuildRequest(
-        id: _required(values, 'id'),
-        library: _required(values, 'library'),
-        symbol: _required(values, 'symbol'),
-        outputDirectory: values['output'] ?? 'build/esen_seo/runtimes',
-      ),
-      write: !check,
-    );
+    final id = _required(values, 'id');
+    final library = _required(values, 'library');
+    final symbol = _required(values, 'symbol');
+    final output = values['output'] ?? 'build/esen_seo/runtimes';
+    final kind = values['kind'] ?? 'tabs';
+    final artifact = switch (kind) {
+      'tabs' => await buildSeoTabsApplicationRuntime(
+          SeoTabsRuntimeBuildRequest(
+            id: id,
+            library: library,
+            symbol: symbol,
+            outputDirectory: output,
+          ),
+          write: !check,
+        ),
+      'stepper' => await buildSeoStepperApplicationRuntime(
+          SeoStepperRuntimeBuildRequest(
+            id: id,
+            library: library,
+            symbol: symbol,
+            outputDirectory: output,
+          ),
+          write: !check,
+        ),
+      _ => throw FormatException(
+          'Unknown runtime kind "$kind"; expected "tabs" or "stepper".',
+        ),
+    };
     stdout.writeln(
       '${check ? 'Verified' : 'Built'} ${artifact.reference.kind} runtime '
       '"${artifact.reference.id}": '
@@ -46,7 +65,7 @@ Future<void> main(List<String> arguments) async {
 }
 
 Map<String, String> _arguments(List<String> arguments) {
-  const allowed = {'id', 'library', 'symbol', 'output'};
+  const allowed = {'id', 'library', 'symbol', 'output', 'kind'};
   final values = <String, String>{};
   for (var index = 0; index < arguments.length; index++) {
     final argument = arguments[index];
@@ -81,5 +100,6 @@ Usage: dart run esen_seo:esen_seo_runtime \\
   --id <runtime-id> \\
   --library package:<app>/<file.dart> \\
   --symbol <top-level-transition> \\
+  [--kind tabs|stepper] \\
   [--output build/esen_seo/runtimes] [--check]
 ''';

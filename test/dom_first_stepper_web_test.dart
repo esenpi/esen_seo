@@ -198,6 +198,37 @@ void main() {
     expect(third.getAttribute('aria-current'), 'step');
   });
 
+  test('application transition owns boundary control availability', () {
+    final container = _container(fixture);
+    final root = _stepper(container, 'wrapping-stepper', initialIndex: 0);
+
+    SeoStepperState wrap(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      if (action is SeoStepperPrevious && state.index == 0) {
+        return SeoStepperState(index: state.count - 1, count: state.count);
+      }
+      return transitionSeoStepper(state, action);
+    }
+
+    enhanceSeoDomFirstSteppers(transition: wrap);
+    final previous = root
+        .querySelectorAll('[data-esen-stepper-control]')
+        .item(0)! as web.HTMLElement;
+    expect(previous.getAttribute('aria-disabled'), 'false');
+    expect(previous.hasAttribute('disabled'), isFalse);
+
+    previous.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    expect(
+      root.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 3 / 3',
+    );
+  });
+
   test('RTL horizontal arrows follow visual direction', () {
     final container = _container(fixture);
     final root = _stepper(container, 'rtl-stepper', initialIndex: 1)

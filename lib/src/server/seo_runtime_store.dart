@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 import '../routing/seo_application_runtime.dart';
+import '../routing/seo_application_runtime_artifact.dart';
 
 /// Current on-disk format of an application DOM-first runtime manifest.
 const int seoDomFirstRuntimeManifestSchema = 1;
@@ -228,7 +229,7 @@ Future<SeoDomFirstRuntimeArtifact> loadSeoDomFirstRuntime(
   return artifact;
 }
 
-/// Loads `<id>.json` and `<id>.js` from a build-owned directory.
+/// Loads `<kind>-<id>.json` and `<kind>-<id>.js` from a build-owned directory.
 ///
 /// A successful verification is cached for this store's lifetime. Build
 /// artifacts are immutable deployment inputs; create a new store after
@@ -268,8 +269,9 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
   Future<SeoDomFirstRuntimeArtifact> _load(
     SeoDomFirstApplicationRuntime reference,
   ) async {
-    final manifestFile = File('$directory/${reference.id}.json');
-    final javascriptFile = File('$directory/${reference.id}.js');
+    final stem = seoApplicationRuntimeArtifactStem(reference);
+    final manifestFile = File('$directory/$stem.json');
+    final javascriptFile = File('$directory/$stem.js');
     if (!await manifestFile.exists() || !await javascriptFile.exists()) {
       throw StateError(
         'Application runtime "${reference.id}" is missing from $directory.',

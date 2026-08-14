@@ -89,12 +89,15 @@ class SeoPage {
         ),
         enableInteractions = false,
         domFirstFeatures = Set.unmodifiable(features) {
-    if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime &&
-        features.contains(SeoDomFirstFeature.tabs)) {
+    final runtimeFeature = applicationRuntime == null
+        ? null
+        : _applicationRuntimeFeature(applicationRuntime!.reference);
+    if (runtimeFeature != null && features.contains(runtimeFeature)) {
       throw ArgumentError.value(
         applicationRuntime!.reference,
         'applicationRuntime',
-        'cannot be combined with the package-owned tabs runtime',
+        'cannot be combined with the package-owned '
+            '${applicationRuntime!.reference.kind} runtime',
       );
     }
   }
@@ -142,6 +145,8 @@ class SeoPage {
       ...domFirstFeatures,
       if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime)
         SeoDomFirstFeature.tabs,
+      if (applicationRuntime?.reference is SeoDomFirstStepperApplicationRuntime)
+        SeoDomFirstFeature.stepper,
     };
     final head = StringBuffer();
     head.write(
@@ -190,6 +195,14 @@ class SeoPage {
         '</html>';
   }
 }
+
+SeoDomFirstFeature _applicationRuntimeFeature(
+  SeoDomFirstApplicationRuntime reference,
+) =>
+    switch (reference) {
+      SeoDomFirstTabsApplicationRuntime() => SeoDomFirstFeature.tabs,
+      SeoDomFirstStepperApplicationRuntime() => SeoDomFirstFeature.stepper,
+    };
 
 String _applicationRuntimeScriptHtml(
   SeoDomFirstRuntimeArtifact artifact, {

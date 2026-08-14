@@ -179,6 +179,33 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('stepper builds use the same pre-compilation safety boundary', () async {
+    await write('lib/transition.dart', "import 'dart:io';");
+
+    await expectLater(
+      buildSeoStepperApplicationRuntime(
+        const SeoStepperRuntimeBuildRequest(
+          id: 'fixture-stepper',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionStepper',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      buildSeoStepperApplicationRuntime(
+        const SeoStepperRuntimeBuildRequest(
+          id: '../stepper',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionStepper',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 final class _UnexpectedSuccess {

@@ -32,6 +32,20 @@ SeoStepperState applySeoStepperTransition(
   return result;
 }
 
+/// Whether [action] can move the normalized [state] through [transition].
+///
+/// Presentations use this to expose the same control availability as the
+/// transition they execute. The transition must therefore remain pure and
+/// inexpensive; invalid output and exceptions make the action unavailable.
+bool canApplySeoStepperAction(
+  SeoStepperTransition transition,
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final current = _normalizedSeoStepperState(state);
+  return applySeoStepperTransition(transition, current, action) != current;
+}
+
 /// The complete shared state needed to select one step.
 final class SeoStepperState {
   const SeoStepperState({required this.index, required this.count});

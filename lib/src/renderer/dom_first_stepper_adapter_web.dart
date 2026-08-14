@@ -28,9 +28,26 @@ void _enhanceStepper(
     index: apply.initialIndex,
   );
 
+  void render({required bool moveFocus}) {
+    apply.state(
+      state,
+      previousEnabled: canApplySeoStepperAction(
+        transition,
+        state,
+        const SeoStepperPrevious(),
+      ),
+      nextEnabled: canApplySeoStepperAction(
+        transition,
+        state,
+        const SeoStepperNext(),
+      ),
+      moveFocus: moveFocus,
+    );
+  }
+
   void dispatch(SeoStepperAction action, {required bool moveFocus}) {
     state = applySeoStepperTransition(transition, state, action);
-    apply.state(state, moveFocus: moveFocus);
+    render(moveFocus: moveFocus);
   }
 
   apply.mount((index, event, moveFocus) {
@@ -43,7 +60,7 @@ void _enhanceStepper(
     };
     dispatch(action, moveFocus: moveFocus);
   });
-  apply.state(state, moveFocus: false);
+  render(moveFocus: false);
 }
 
 enum _StepperControlEvent { select, next, previous, first, last }
@@ -347,7 +364,12 @@ final class _StepperApplyBoundary {
     return button;
   }
 
-  void state(SeoStepperState state, {required bool moveFocus}) {
+  void state(
+    SeoStepperState state, {
+    required bool previousEnabled,
+    required bool nextEnabled,
+    required bool moveFocus,
+  }) {
     for (var index = 0; index < _buttons.length; index++) {
       final selected = index == state.index;
       final button = _buttons[index];
@@ -364,12 +386,14 @@ final class _StepperApplyBoundary {
     }
     _previous.setAttribute(
       'aria-disabled',
-      state.index == 0 ? 'true' : 'false',
+      previousEnabled ? 'false' : 'true',
     );
     _next.setAttribute(
       'aria-disabled',
-      state.index == state.count - 1 ? 'true' : 'false',
+      nextEnabled ? 'false' : 'true',
     );
+    _previous.toggleAttribute('disabled', !previousEnabled);
+    _next.toggleAttribute('disabled', !nextEnabled);
     _status.textContent =
         '${plan.positionLabel} ${state.index + 1} / ${state.count}';
     if (moveFocus) _buttons[state.index].focus();
