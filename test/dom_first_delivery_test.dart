@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -131,6 +132,31 @@ void main() {
       expect(seoDomFirstCollectionRuntime, isNot(contains('eval(')));
     });
 
+    test('compiled stepper has an isolated runtime and style budget', () {
+      final gzipBytes =
+          gzip.encode(utf8.encode(seoDomFirstStepperRuntime)).length;
+      final html = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.stepper},
+        nonce: 'safe',
+      );
+      final style = seoDomFirstFeatureStyleHtml(
+        const {SeoDomFirstFeature.stepper},
+      );
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(html, contains('data-esen-seo-dom-first-runtime'));
+      expect(html, contains('nonce="safe"'));
+      expect(style, contains('data-esen-component="stepper"'));
+      expect(
+        seoDomFirstStepperRuntime.toLowerCase(),
+        isNot(contains('</script')),
+      );
+      expect(seoDomFirstStepperRuntime, isNot(contains('innerHTML')));
+      expect(seoDomFirstStepperRuntime, isNot(contains('outerHTML')));
+      expect(seoDomFirstStepperRuntime, isNot(contains('document.write')));
+      expect(seoDomFirstStepperRuntime, isNot(contains('eval(')));
+    });
+
     test('theme toggle has a pre-paint bootstrap and isolated budget', () {
       final gzipBytes =
           gzip.encode(utf8.encode(seoDomFirstThemeToggleRuntime)).length;
@@ -193,14 +219,23 @@ void main() {
       final themeOnly = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.themeToggle},
       );
+      final stepperOnly = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.stepper},
+      );
 
       expect(collectionOnly, contains(seoDomFirstCollectionRuntime));
       expect(collectionOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(collectionOnly, isNot(contains(seoDomFirstStepperRuntime)));
       expect(tabsOnly, contains(seoDomFirstTabsRuntime));
       expect(tabsOnly, isNot(contains(seoDomFirstCollectionRuntime)));
+      expect(tabsOnly, isNot(contains(seoDomFirstStepperRuntime)));
+      expect(stepperOnly, contains(seoDomFirstStepperRuntime));
+      expect(stepperOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(stepperOnly, isNot(contains(seoDomFirstCollectionRuntime)));
       expect(themeOnly, contains(seoDomFirstThemeToggleRuntime));
       expect(themeOnly, isNot(contains(seoDomFirstTabsRuntime)));
       expect(themeOnly, isNot(contains(seoDomFirstCollectionRuntime)));
+      expect(themeOnly, isNot(contains(seoDomFirstStepperRuntime)));
       expect(both, contains(seoDomFirstTabsRuntime));
       expect(both, contains(seoDomFirstCollectionRuntime));
       expect('data-esen-seo-dom-first-runtime'.allMatches(both), hasLength(1));

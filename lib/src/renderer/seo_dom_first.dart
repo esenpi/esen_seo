@@ -7,6 +7,7 @@ import '../routing/seo_route_delivery.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
+import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
 import 'seo_dom_first_theme_toggle_runtime.g.dart';
 import 'seo_motion_stylesheet.dart';
@@ -22,6 +23,20 @@ const String seoDomFirstTabsStylesheet = '''
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"]{border-bottom-color:currentColor;font-weight:600}
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>section[data-esen-tab-panel][hidden]{display:none}
+''';
+
+/// Structural styles for the compiled DOM-first stepper control.
+const String seoDomFirstStepperStylesheet = '''
+#$seoContainerId [data-esen-component="stepper"]>[data-esen-step-list]{list-style:none;padding:0}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]{font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button][aria-current="step"]{font-weight:600}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-controls{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-block:.75rem}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:.5rem .75rem;cursor:pointer;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control][aria-disabled="true"]{opacity:.4;cursor:default}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-status{display:inline-block;min-width:6rem;text-align:center}
+#$seoContainerId [data-esen-component="stepper"][data-esen-enhanced="true"] [data-esen-step-panel][hidden]{display:none}
 ''';
 
 /// Structural styles for the compiled DOM-first collection control.
@@ -82,6 +97,9 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.tabs)) {
     css.write(seoDomFirstTabsStylesheet);
   }
+  if (features.contains(SeoDomFirstFeature.stepper)) {
+    css.write(seoDomFirstStepperStylesheet);
+  }
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
   }
@@ -109,6 +127,9 @@ String seoDomFirstFeatureScriptHtml(
 
   if (features.contains(SeoDomFirstFeature.tabs)) {
     addRuntime(seoDomFirstTabsRuntime);
+  }
+  if (features.contains(SeoDomFirstFeature.stepper)) {
+    addRuntime(seoDomFirstStepperRuntime);
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
     addRuntime(seoDomFirstCollectionRuntime);
