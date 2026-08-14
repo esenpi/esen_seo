@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../components/seo_components.dart';
+import '../components/seo_stepper_transition.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
 
@@ -43,6 +44,7 @@ class SeoStepper extends StatefulWidget {
     this.previousLabel = 'Back',
     this.nextLabel = 'Next',
     this.positionLabel = 'Step',
+    this.transition = transitionSeoStepper,
     this.stepLabelStyle,
     this.activeStepLabelStyle,
     this.onStepChanged,
@@ -72,6 +74,9 @@ class SeoStepper extends StatefulWidget {
   /// Prefix of the live HTML position, for example `Step 2 / 4`.
   final String positionLabel;
 
+  /// Pure selection logic shared with an optional application web runtime.
+  final SeoStepperTransition transition;
+
   /// Flutter style of inactive step labels.
   final TextStyle? stepLabelStyle;
 
@@ -87,19 +92,22 @@ class SeoStepper extends StatefulWidget {
 
 class _SeoStepperState extends State<SeoStepper>
     with SeoBlockState<SeoStepper> {
-  late int _index;
+  late SeoStepperState _stepperState;
   late Set<int> _visited;
 
   @override
   void initState() {
     super.initState();
-    _index = _initialIndex();
+    _stepperState = _initialState();
     _visited = {if (widget.steps.isNotEmpty) _index};
   }
 
-  int _initialIndex() => widget.steps.isEmpty
-      ? 0
-      : widget.initialIndex.clamp(0, widget.steps.length - 1);
+  int get _index => _stepperState.index;
+
+  SeoStepperState _initialState() => initialSeoStepperState(
+        count: widget.steps.length,
+        index: widget.initialIndex,
+      );
 
   @override
   void didUpdateWidget(SeoStepper oldWidget) {
@@ -109,16 +117,20 @@ class _SeoStepperState extends State<SeoStepper>
       replaced = widget.steps[i].label != oldWidget.steps[i].label;
     }
     if (widget.steps.isEmpty) {
-      _index = 0;
+      _stepperState = _initialState();
       _visited.clear();
       return;
     }
     if (replaced ||
         widget.initialIndex != oldWidget.initialIndex ||
         _index >= widget.steps.length) {
-      _index = _initialIndex();
+      _stepperState = _initialState();
       _visited = {_index};
     } else {
+      _stepperState = initialSeoStepperState(
+        count: widget.steps.length,
+        index: _index,
+      );
       _visited.removeWhere((index) => index >= widget.steps.length);
       _visited.add(_index);
     }
@@ -174,7 +186,7 @@ class _SeoStepperState extends State<SeoStepper>
         label: step.label,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => _activate(index),
+          onTap: () => _activate(SeoStepperSelect(index)),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
@@ -212,7 +224,7 @@ class _SeoStepperState extends State<SeoStepper>
             child: _buildControl(
               label: widget.previousLabel,
               enabled: _index > 0,
-              onTap: () => _activate(_index - 1),
+              onTap: () => _activate(const SeoStepperPrevious()),
             ),
           ),
           Expanded(
@@ -227,7 +239,7 @@ class _SeoStepperState extends State<SeoStepper>
             child: _buildControl(
               label: widget.nextLabel,
               enabled: _index < widget.steps.length - 1,
-              onTap: () => _activate(_index + 1),
+              onTap: () => _activate(const SeoStepperNext()),
             ),
           ),
         ],
@@ -266,13 +278,18 @@ class _SeoStepperState extends State<SeoStepper>
         ),
       );
 
-  void _activate(int index) {
-    if (index < 0 || index >= widget.steps.length || index == _index) return;
+  void _activate(SeoStepperAction action) {
+    final next = applySeoStepperTransition(
+      widget.transition,
+      _stepperState,
+      action,
+    );
+    if (next == _stepperState) return;
     setState(() {
-      _index = index;
-      _visited.add(index);
+      _stepperState = next;
+      _visited.add(next.index);
     });
-    widget.onStepChanged?.call(index);
+    widget.onStepChanged?.call(next.index);
   }
 
   @override
