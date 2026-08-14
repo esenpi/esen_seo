@@ -1,3 +1,11 @@
+## Unreleased
+
+* Added application-authored `SeoStepperTransition` compilation and typed
+  `SeoDomFirstApplicationRuntime.stepper` delivery. The same pure state logic
+  can now drive native Flutter and the validated DOM-first stepper adapter.
+  Runtime artifact filenames include their closed adapter kind, so equal
+  logical ids for tabs and steppers remain independent.
+
 ## 0.10.0
 
 * Added the first application-authored DOM-first state slice. `SeoTabs` accepts
