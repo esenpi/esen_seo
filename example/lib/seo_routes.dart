@@ -115,10 +115,14 @@ List<SeoStepperComponentEntry> demoStepperEntries() => [
         (label: step.label, nodes: demoStepperBodyNodes(step)),
     ];
 
-List<SeoNode> demoStepperNodes() => buildSeoStepperNodes(
+List<SeoNode> demoStepperNodes({
+  String interactionId = 'demo-stepper',
+  String interactionLabel = 'Publishing flow',
+}) =>
+    buildSeoStepperNodes(
       steps: demoStepperEntries(),
-      interactionId: 'demo-stepper',
-      interactionLabel: 'Publishing flow',
+      interactionId: interactionId,
+      interactionLabel: interactionLabel,
     );
 
 List<SeoNode> demoCarouselNodes() => buildSeoCarouselNodes(
@@ -289,6 +293,31 @@ final seoRoutes = [
         tabs: demoTabEntries(),
         interactionId: 'application-demo-tabs',
         interactionLabel: 'Application rendering targets',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
+    path: '/dom-first-application-stepper',
+    delivery: SeoRouteDelivery.domFirst,
+    applicationRuntime:
+        const SeoDomFirstApplicationRuntime.stepper('example-stepper'),
+    meta: (_) => SeoMeta(
+      title: 'Application Stepper — esen_seo',
+      description: 'Application-authored pure Dart stepper logic compiled '
+          'for the permanent semantic page.',
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'Application-owned Stepper'),
+      SeoNode(
+        tag: 'p',
+        text: 'The application transition wraps previous and next at either '
+            'end. Flutter and this DOM-first route call the same pure Dart '
+            'function.',
+      ),
+      ...demoStepperNodes(
+        interactionId: 'application-demo-stepper',
+        interactionLabel: 'Application publishing flow',
       ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],

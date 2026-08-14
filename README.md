@@ -850,8 +850,9 @@ nonce.
 
 The built-in executable slices use package-owned transitions. They do not
 translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs` and
-`SeoCollection` each share their pure transition with a separate browser
-adapter while each presentation owns its current state.
+`SeoStepper` share their pure transitions with separate browser adapters;
+`SeoCollection` does the same with its prepared transition. Each presentation
+owns its current state.
 `SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
 markers produced by the pure component builders. General forms,
@@ -860,11 +861,11 @@ separate, deliberately unsupported capabilities. `SeoCollection` owns one
 bounded local-search input: it submits nothing, performs no remote I/O and is
 created only after the complete collection structure has been validated.
 
-### Application-owned tabs state
+### Application-owned state
 
-One DOM-first route can instead execute a tabs transition authored in the
-application. Write it as a state-free top-level Dart function under `lib/` and
-pass the same function to Flutter:
+A DOM-first route can instead execute a tabs or stepper transition authored in
+the application. Write it as a state-free top-level Dart function under `lib/`
+and pass the same function to Flutter:
 
 ```dart
 // lib/product_tabs_transition.dart — pure Dart, no Flutter import
@@ -886,13 +887,50 @@ SeoTabs(
 );
 ```
 
-Compile only that transition and the package-owned tabs adapter:
+`SeoStepper` accepts the equivalent `SeoStepperTransition`. For example, an
+application can wrap previous and next at the ends while keeping direct,
+first and last selection unchanged:
+
+```dart
+SeoStepperState transitionProductStepper(
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final current = initialSeoStepperState(
+    count: state.count,
+    index: state.index,
+  );
+  if (current.count == 0) return current;
+  final last = current.count - 1;
+  if (action is SeoStepperNext && current.index == last) {
+    return SeoStepperState(index: 0, count: current.count);
+  }
+  if (action is SeoStepperPrevious && current.index == 0) {
+    return SeoStepperState(index: last, count: current.count);
+  }
+  return transitionSeoStepper(current, action);
+}
+
+SeoStepper(
+  transition: transitionProductStepper,
+  steps: flutterProductSteps,
+);
+```
+
+Compile only the selected transition and its package-owned adapter. Tabs is
+the default kind for backward compatibility; select stepper explicitly:
 
 ```shell
 dart run esen_seo:esen_seo_runtime \
   --id product-tabs \
   --library package:my_app/product_tabs_transition.dart \
   --symbol transitionProductTabs
+
+dart run esen_seo:esen_seo_runtime \
+  --kind stepper \
+  --id product-stepper \
+  --library package:my_app/product_stepper_transition.dart \
+  --symbol transitionProductStepper
 ```
 
 The command parses the complete application import/export/part graph before
@@ -901,7 +939,7 @@ conditional and deferred imports, path escapes and invalid identifiers. It
 also rejects non-const top-level or static fields, so the transition cannot
 hold current state between calls. It then runs
 `dart compile js -O2 --csp --no-source-maps --fatal-warnings` and writes
-`product-tabs.js` plus a SHA-256 manifest below
+`tabs-product-tabs.js` plus a SHA-256 manifest below
 `build/esen_seo/runtimes/`. Compiler output above 512 KiB raw or the fixed
 25 KiB gzip budget, script-tokenizer hazards and string-to-code constructors
 are refused.
@@ -939,6 +977,11 @@ SeoRoute(
 );
 ```
 
+For a stepper route use
+`SeoDomFirstApplicationRuntime.stepper('product-stepper')` together with
+`buildSeoStepperNodes`. Runtime kind is part of the artifact filename, so tabs
+and stepper transitions with the same logical id cannot overwrite each other.
+
 Finally give the server or prerenderer the build-owned directory:
 
 ```dart
@@ -963,10 +1006,10 @@ caches the verified artifact for that store's lifetime. Missing, stale, foreign
 or inconsistent artifacts fail by name instead of falling back to package logic
 or Flutter. Treat the build directory as trusted deployment input: the hash
 detects a mismatched script and manifest, but cannot authenticate them against
-an actor who can replace both. A route may select either the package tabs
-feature or one application tabs runtime, never both. Cubit or another Flutter
-state manager may dispatch the same pure transition on the Flutter side, but it
-is not compiled and is not a dependency of `esen_seo`.
+an actor who can replace both. A route may select either the package tabs or
+stepper feature or one matching application runtime, never both. Cubit or
+another Flutter state manager may dispatch the same pure transition on the
+Flutter side, but it is not compiled and is not a dependency of `esen_seo`.
 
 For a hybrid site that serves Flutter and DOM-first routes from the same
 origin, disable Flutter's root-scoped application-shell cache:

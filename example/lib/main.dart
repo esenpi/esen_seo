@@ -1,8 +1,9 @@
 import 'package:esen_seo/esen_seo.dart';
 import 'package:flutter/material.dart';
 
-import 'docs_page.dart';
+import 'application_stepper_transition.dart';
 import 'application_tabs_transition.dart';
+import 'docs_page.dart';
 import 'seo_routes.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -19,6 +20,7 @@ final Map<String, WidgetBuilder> _pages = {
   '/': (_) => const HomePage(),
   '/demo': (_) => const DemoPage(),
   '/docs': (_) => const DocsPage(),
+  '/dom-first-application-stepper': (_) => const ApplicationStepperPage(),
   '/dom-first-application-tabs': (_) => const ApplicationTabsPage(),
 };
 
@@ -272,6 +274,41 @@ class ApplicationTabsPage extends StatelessWidget {
                     label: tab.label,
                     content: Text(tab.content),
                     nodes: demoTabPanelNodes(tab),
+                  ),
+              ],
+            ),
+          ],
+        ).main,
+      );
+}
+
+class ApplicationStepperPage extends StatelessWidget {
+  const ApplicationStepperPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 20,
+          children: [
+            Text(
+              'Application-owned Stepper',
+              style: Theme.of(context).textTheme.displaySmall,
+            ).h1,
+            const Para(
+              'The application transition wraps previous and next at either '
+              'end. Flutter and DOM-first call the same function.',
+            ),
+            SeoStepper(
+              interactionId: 'application-demo-stepper',
+              interactionLabel: 'Application publishing flow',
+              transition: transitionExampleStepper,
+              steps: [
+                for (final step in demoStepperSteps)
+                  SeoStep(
+                    label: step.label,
+                    content: Text(step.content),
+                    nodes: demoStepperBodyNodes(step),
                   ),
               ],
             ),

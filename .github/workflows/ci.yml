@@ -120,6 +120,25 @@ jobs:
           --symbol transitionExampleTabs
           --check
 
+      - name: Build the application-owned stepper runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind stepper
+          --id example-stepper
+          --library package:example/application_stepper_transition.dart
+          --symbol transitionExampleStepper
+
+      - name: Verify the application-owned stepper runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind stepper
+          --id example-stepper
+          --library package:example/application_stepper_transition.dart
+          --symbol transitionExampleStepper
+          --check
+
       # Und dann durch den echten Prerenderer, damit ein Fehler in der
       # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.
       - name: Prerender
@@ -134,6 +153,13 @@ jobs:
             grep -q "$needle" build/web/index.html \
               || { echo "::error::missing in prerendered index.html: $needle"; exit 1; }
           done
+          stepper=build/web/dom-first-application-stepper/index.html
+          test -s "$stepper"
+          grep -q 'data-esen-seo-dom-first-application-runtime="example-stepper"' "$stepper"
+          if grep -q 'flutter_bootstrap.js\|main.dart.js' "$stepper"; then
+            echo "::error::DOM-first application stepper loads Flutter"
+            exit 1
+          fi
           test -s build/web/sitemap.xml
           test -s build/web/robots.txt
           echo "prerendered output looks sane"
