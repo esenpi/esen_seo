@@ -93,5 +93,35 @@ void main() {
       expect(received, const SeoStepperState(index: 1, count: 2));
       expect(result, received);
     });
+
+    test('control availability follows the selected transition', () {
+      SeoStepperState wrap(
+        SeoStepperState state,
+        SeoStepperAction action,
+      ) {
+        if (action is SeoStepperPrevious && state.index == 0) {
+          return SeoStepperState(index: state.count - 1, count: state.count);
+        }
+        return transitionSeoStepper(state, action);
+      }
+
+      const state = SeoStepperState(index: 0, count: 3);
+      expect(
+        canApplySeoStepperAction(
+          transitionSeoStepper,
+          state,
+          const SeoStepperPrevious(),
+        ),
+        isFalse,
+      );
+      expect(
+        canApplySeoStepperAction(
+          wrap,
+          state,
+          const SeoStepperPrevious(),
+        ),
+        isTrue,
+      );
+    });
   });
 }

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
 
 const _reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
+const _stepperReference =
+    SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _javascript = '(function(){var applicationTabs=true;})();';
 
 SeoDomFirstRuntimeArtifact _artifact([
@@ -30,6 +32,20 @@ List<SeoNode> _tabsNodes() => buildSeoTabsNodes(
       interactionId: 'application-tabs-control',
     );
 
+List<SeoNode> _stepperNodes() => buildSeoStepperNodes(
+      steps: [
+        (
+          label: 'Draft',
+          nodes: [SeoNode(tag: 'p', text: 'Draft content')],
+        ),
+        (
+          label: 'Publish',
+          nodes: [SeoNode(tag: 'p', text: 'Publish content')],
+        ),
+      ],
+      interactionId: 'application-stepper-control',
+    );
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -46,6 +62,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.stepper},
+          applicationRuntime: _stepperReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -81,6 +107,15 @@ void main() {
       expect(route.domFirstFeatures, {SeoDomFirstFeature.collection});
     });
 
+    test('runtime identity includes its closed adapter kind', () {
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(const SeoDomFirstApplicationRuntime.stepper('same-id')),
+      );
+      expect(_reference.kind, 'tabs');
+      expect(_stepperReference.kind, 'stepper');
+    });
+
     test('page embeds only the verified application script with CSP data', () {
       final artifact = _artifact();
       final html = SeoPage.domFirstFromNodes(
@@ -103,6 +138,24 @@ void main() {
       expect(
         'data-esen-seo-dom-first-runtime'.allMatches(html),
         isEmpty,
+      );
+    });
+
+    test('stepper runtime selects only the matching structural stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _stepperNodes(),
+        applicationRuntime: _artifact(_stepperReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="stepper"'));
+      expect(html, contains(seoDomFirstStepperStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-stepper"',
+        ),
       );
     });
   });

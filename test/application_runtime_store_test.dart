@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
+  const stepperReference =
+      SeoDomFirstApplicationRuntime.stepper('application-tabs');
   const javascript = '(function(){var value=1;return value;})();';
   final dartVersion = Platform.version.split(' ').first;
 
@@ -86,12 +88,34 @@ void main() {
       expect(loaded.javascript, javascript);
       expect(loaded.manifest.sha256, artifact.manifest.sha256);
 
-      await File('${directory.path}/application-tabs.js').delete();
+      await _javascriptFile(directory, reference).delete();
       expect(await store.load(reference), same(loaded));
     });
 
+    test('keeps equal ids of different runtime kinds independent', () async {
+      const stepperJavascript = '(function(){var step=2;return step;})();';
+      final stepperArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: stepperReference,
+        javascript: stepperJavascript,
+        dartVersion: dartVersion,
+      );
+      await _write(directory, stepperArtifact);
+
+      final store = SeoDirectoryRuntimeStore(directory.path);
+      expect((await store.load(reference)).javascript, javascript);
+      expect(
+        (await store.load(stepperReference)).javascript,
+        stepperJavascript,
+      );
+      expect(await _javascriptFile(directory, reference).exists(), isTrue);
+      expect(
+        await _javascriptFile(directory, stepperReference).exists(),
+        isTrue,
+      );
+    });
+
     test('bounds runtime files before reading or compressing them', () async {
-      await File('${directory.path}/application-tabs.js').writeAsString(
+      await _javascriptFile(directory, reference).writeAsString(
         List.filled(seoDomFirstRuntimeMaxBytes + 1, ' ').join(),
       );
 
@@ -108,7 +132,7 @@ void main() {
     });
 
     test('bounds the manifest before parsing it', () async {
-      await File('${directory.path}/application-tabs.json').writeAsString(
+      await _manifestFile(directory, reference).writeAsString(
         List.filled(8 * 1024 + 1, ' ').join(),
       );
 
@@ -127,7 +151,7 @@ void main() {
     test('evicts a failed load so a completed deployment can recover',
         () async {
       final store = SeoDirectoryRuntimeStore(directory.path);
-      await File('${directory.path}/application-tabs.js').delete();
+      await _javascriptFile(directory, reference).delete();
 
       await expectLater(store.load(reference), throwsStateError);
       await _write(directory, artifact);
@@ -136,7 +160,7 @@ void main() {
     });
 
     test('rejects tampered JavaScript', () async {
-      await File('${directory.path}/application-tabs.js')
+      await _javascriptFile(directory, reference)
           .writeAsString('$javascript// changed');
 
       await expectLater(
@@ -147,8 +171,7 @@ void main() {
 
     test('rejects stale and foreign manifest identity', () async {
       final json = artifact.manifest.toJson()..['id'] = 'other-tabs';
-      await File('${directory.path}/application-tabs.json')
-          .writeAsString(jsonEncode(json));
+      await _manifestFile(directory, reference).writeAsString(jsonEncode(json));
 
       await expectLater(
         SeoDirectoryRuntimeStore(directory.path).load(reference),
@@ -176,8 +199,7 @@ void main() {
       final json = artifact.manifest.toJson()
         ..remove('sha256')
         ..['unexpected'] = true;
-      await File('${directory.path}/application-tabs.json')
-          .writeAsString(jsonEncode(json));
+      await _manifestFile(directory, reference).writeAsString(jsonEncode(json));
 
       await expectLater(
         SeoDirectoryRuntimeStore(directory.path).load(reference),
@@ -186,7 +208,7 @@ void main() {
     });
 
     test('names a missing artifact instead of falling back', () async {
-      await File('${directory.path}/application-tabs.js').delete();
+      await _javascriptFile(directory, reference).delete();
 
       await expectLater(
         SeoDirectoryRuntimeStore(directory.path).load(reference),
@@ -206,8 +228,29 @@ Future<void> _write(
   Directory directory,
   SeoDomFirstRuntimeArtifact artifact,
 ) async {
-  await File('${directory.path}/${artifact.reference.id}.js')
+  await _javascriptFile(directory, artifact.reference)
       .writeAsString(artifact.javascript);
-  await File('${directory.path}/${artifact.reference.id}.json')
+  await _manifestFile(directory, artifact.reference)
       .writeAsString(jsonEncode(artifact.manifest.toJson()));
 }
+
+File _javascriptFile(
+  Directory directory,
+  SeoDomFirstApplicationRuntime reference,
+) =>
+    File(
+      '${directory.path}/'
+      '${_artifactStem(reference)}.js',
+    );
+
+File _manifestFile(
+  Directory directory,
+  SeoDomFirstApplicationRuntime reference,
+) =>
+    File(
+      '${directory.path}/'
+      '${_artifactStem(reference)}.json',
+    );
+
+String _artifactStem(SeoDomFirstApplicationRuntime reference) =>
+    '${reference.kind}-${reference.id}';

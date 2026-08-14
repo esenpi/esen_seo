@@ -66,4 +66,33 @@ void main() {
     expect(find.text('Body 0'), findsOneWidget);
     expect(find.text('Body 2'), findsNothing);
   });
+
+  testWidgets('Flutter control availability follows the application transition',
+      (tester) async {
+    SeoStepperState wrap(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      if (action is SeoStepperPrevious && state.index == 0) {
+        return SeoStepperState(index: state.count - 1, count: state.count);
+      }
+      return transitionSeoStepper(state, action);
+    }
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoStepper(
+          transition: wrap,
+          steps: steps(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Back'));
+    await tester.pump();
+
+    expect(find.text('Body 2'), findsOneWidget);
+    expect(find.text('Body 0'), findsNothing);
+  });
 }

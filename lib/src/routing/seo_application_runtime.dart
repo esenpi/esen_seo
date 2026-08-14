@@ -12,6 +12,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.tabs(String id) =
       SeoDomFirstTabsApplicationRuntime;
 
+  /// Uses an application-authored transition with the package stepper adapter.
+  const factory SeoDomFirstApplicationRuntime.stepper(String id) =
+      SeoDomFirstStepperApplicationRuntime;
+
   /// The logical build-artifact identity.
   final String id;
 
@@ -35,6 +39,15 @@ final class SeoDomFirstTabsApplicationRuntime
 
   @override
   String get kind => 'tabs';
+}
+
+/// An application-authored transition executed by the stepper adapter.
+final class SeoDomFirstStepperApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstStepperApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'stepper';
 }
 
 /// Whether [id] is safe as a logical identity and artifact file component.

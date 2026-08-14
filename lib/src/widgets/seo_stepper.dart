@@ -223,7 +223,7 @@ class _SeoStepperState extends State<SeoStepper>
           Expanded(
             child: _buildControl(
               label: widget.previousLabel,
-              enabled: _index > 0,
+              enabled: _canActivate(const SeoStepperPrevious()),
               onTap: () => _activate(const SeoStepperPrevious()),
             ),
           ),
@@ -238,7 +238,7 @@ class _SeoStepperState extends State<SeoStepper>
           Expanded(
             child: _buildControl(
               label: widget.nextLabel,
-              enabled: _index < widget.steps.length - 1,
+              enabled: _canActivate(const SeoStepperNext()),
               onTap: () => _activate(const SeoStepperNext()),
             ),
           ),
@@ -276,6 +276,12 @@ class _SeoStepperState extends State<SeoStepper>
             ),
           ),
         ),
+      );
+
+  bool _canActivate(SeoStepperAction action) => canApplySeoStepperAction(
+        widget.transition,
+        _stepperState,
+        action,
       );
 
   void _activate(SeoStepperAction action) {
