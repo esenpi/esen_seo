@@ -39,6 +39,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstBootstrapScriptAttribute,
         seoDomFirstScriptAttribute,
         seoDomFirstCollectionStylesheet,
+        seoDomFirstStepperStylesheet,
         seoDomFirstTabsStylesheet,
         seoDomFirstThemeToggleStylesheet;
 export 'src/renderer/seo_interactions.dart';
