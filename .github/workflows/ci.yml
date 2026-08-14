@@ -154,6 +154,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # This job uses the exact toolchain recorded by the committed theme
+      # stylesheet. Verify drift before any update-mode test can rewrite it.
+      # The separate example job still regenerates on latest stable to retain
+      # forward-compatibility coverage.
+      - name: Install example dependencies for the theme drift guard
+        working-directory: example
+        run: flutter pub get
+
+      - name: Verify the committed example theme stylesheet
+        working-directory: example
+        run: flutter test test/seo_theme_css_test.dart
+
       - name: Verify the compiled tabs runtime is current
         run: dart run tool/build_dom_first_tabs_runtime.dart
 
