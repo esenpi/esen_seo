@@ -24,7 +24,10 @@ void main() {
       expect(css, contains('--esen-color-secondary-container:#'));
       expect(css, contains('color-scheme:light;'));
       // The heading chain is the Material scale.
-      expect(css, contains('font-size:var(--esen-type-headline-large-size)'));
+      expect(
+        css,
+        contains('font-size:var(--esen-type-headline-large-size,2rem)'),
+      );
       // M3 headlineLarge: 32px = 2rem, weight 400, height 1.25.
       expect(css, contains('--esen-type-headline-large-size:2rem'));
       expect(css, contains('--esen-type-headline-large-weight:400'));
@@ -295,6 +298,33 @@ void main() {
   });
 
   group('the choke point — hostile token values', () {
+    test('missing heading tokens fall back to the Material type scale', () {
+      final css = seoThemeCss(
+        light: const SeoThemeTokens(dark: false, properties: {}),
+      );
+
+      for (final rule in const [
+        'font-size:var(--esen-type-headline-large-size,2rem);'
+            'font-weight:var(--esen-type-headline-large-weight,400)',
+        'font-size:var(--esen-type-headline-medium-size,1.75rem);'
+            'font-weight:var(--esen-type-headline-medium-weight,400)',
+        'font-size:var(--esen-type-headline-small-size,1.5rem);'
+            'font-weight:var(--esen-type-headline-small-weight,400)',
+        'font-size:var(--esen-type-title-large-size,1.375rem);'
+            'font-weight:var(--esen-type-title-large-weight,400)',
+        'font-size:var(--esen-type-title-medium-size,1rem);'
+            'font-weight:var(--esen-type-title-medium-weight,500)',
+        'font-size:var(--esen-type-title-small-size,0.875rem);'
+            'font-weight:var(--esen-type-title-small-weight,500)',
+        'font-size:var(--esen-type-body-medium-size,0.875rem);'
+            'font-weight:var(--esen-type-body-medium-weight,400)',
+        'font-size:var(--esen-type-body-small-size,0.75rem);'
+            'font-weight:var(--esen-type-body-small-weight,400)',
+      ]) {
+        expect(css, contains(rule));
+      }
+    });
+
     test('a CSS breakout in fontFamily is dropped, not escaped', () {
       const payload = 'a"}#esen-seo-content{position:fixed!important}';
       final css = seoStylesheetFromTheme(ThemeData(fontFamily: payload));

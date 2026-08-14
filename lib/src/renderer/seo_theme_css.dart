@@ -196,9 +196,15 @@ const String _sansFallback =
     'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
 const String _monoFallback = 'ui-monospace,SFMono-Regular,Menlo,monospace';
 
-String _typeVars(String element, String role) => '#$seoContainerId $element{'
-    'font-size:var(--esen-type-$role-size);'
-    'font-weight:var(--esen-type-$role-weight);'
+String _typeVars(
+  String element,
+  String role, {
+  required String sizeFallback,
+  required String weightFallback,
+}) =>
+    '#$seoContainerId $element{'
+    'font-size:var(--esen-type-$role-size,$sizeFallback);'
+    'font-weight:var(--esen-type-$role-weight,$weightFallback);'
     'line-height:var(--esen-type-$role-line,normal);'
     'letter-spacing:var(--esen-type-$role-tracking,0)}';
 
@@ -243,12 +249,42 @@ String seoThemeCss({
     ..write(seoLayoutSpacingRules)
     // Headings from the Material scale. All six get rules — the default
     // stylesheet styles only h1–h3, which is a documented deviation.
-    ..write('${_typeVars('h1', 'headline-large')}\n')
-    ..write('${_typeVars('h2', 'headline-medium')}\n')
-    ..write('${_typeVars('h3', 'headline-small')}\n')
-    ..write('${_typeVars('h4', 'title-large')}\n')
-    ..write('${_typeVars('h5', 'title-medium')}\n')
-    ..write('${_typeVars('h6', 'title-small')}\n')
+    ..write('${_typeVars(
+      'h1',
+      'headline-large',
+      sizeFallback: '2rem',
+      weightFallback: '400',
+    )}\n')
+    ..write('${_typeVars(
+      'h2',
+      'headline-medium',
+      sizeFallback: '1.75rem',
+      weightFallback: '400',
+    )}\n')
+    ..write('${_typeVars(
+      'h3',
+      'headline-small',
+      sizeFallback: '1.5rem',
+      weightFallback: '400',
+    )}\n')
+    ..write('${_typeVars(
+      'h4',
+      'title-large',
+      sizeFallback: '1.375rem',
+      weightFallback: '400',
+    )}\n')
+    ..write('${_typeVars(
+      'h5',
+      'title-medium',
+      sizeFallback: '1rem',
+      weightFallback: '500',
+    )}\n')
+    ..write('${_typeVars(
+      'h6',
+      'title-small',
+      sizeFallback: '0.875rem',
+      weightFallback: '500',
+    )}\n')
     ..write('#$seoContainerId a{'
         'color:var(--esen-color-link,#0b57d0);text-decoration:underline}\n')
     ..write('#$seoContainerId blockquote{'
@@ -265,11 +301,26 @@ String seoThemeCss({
     ..write('#$seoContainerId th,#$seoContainerId td{'
         'text-align:left;padding:.375rem .75rem;'
         'border-bottom:1px solid var(--esen-color-divider,#d0d0d0)}\n')
-    ..write('${_typeVars('th', 'title-small')}\n')
-    ..write('${_typeVars('td', 'body-medium')}\n')
+    ..write('${_typeVars(
+      'th',
+      'title-small',
+      sizeFallback: '0.875rem',
+      weightFallback: '500',
+    )}\n')
+    ..write('${_typeVars(
+      'td',
+      'body-medium',
+      sizeFallback: '0.875rem',
+      weightFallback: '400',
+    )}\n')
     ..write('#$seoContainerId figcaption{'
         'color:var(--esen-color-on-surface-variant,#4a4a4a)}\n')
-    ..write('${_typeVars('figcaption', 'body-small')}\n');
+    ..write('${_typeVars(
+      'figcaption',
+      'body-small',
+      sizeFallback: '0.75rem',
+      weightFallback: '400',
+    )}\n');
 
   // The dark palette rides in a media block — but only the tokens that
   // actually differ, and only in system mode. Forced modes have no
