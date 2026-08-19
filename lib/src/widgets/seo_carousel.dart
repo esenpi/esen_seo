@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../components/seo_carousel_transition.dart';
 import '../components/seo_components.dart';
 import '../renderer/seo_node.dart';
 import 'seo_block.dart';
@@ -42,6 +43,7 @@ class SeoCarousel extends StatefulWidget {
     this.interactionLabel = 'Carousel',
     this.previousLabel = 'Previous slide',
     this.nextLabel = 'Next slide',
+    this.transition = transitionSeoCarousel,
     this.slideLabelStyle,
     this.positionStyle,
     this.onPageChanged,
@@ -75,6 +77,9 @@ class SeoCarousel extends StatefulWidget {
   /// Accessible label of the next-slide control.
   final String nextLabel;
 
+  /// Pure selection logic shared with an optional application web runtime.
+  final SeoCarouselTransition transition;
+
   /// Style of the visible Flutter slide heading.
   final TextStyle? slideLabelStyle;
 
@@ -90,19 +95,23 @@ class SeoCarousel extends StatefulWidget {
 
 class _SeoCarouselState extends State<SeoCarousel>
     with SeoBlockState<SeoCarousel> {
-  late int _index;
+  late SeoCarouselState _carouselState;
   late final PageController _controller;
+  int? _programmaticTarget;
 
   @override
   void initState() {
     super.initState();
-    _index = _initialIndex();
+    _carouselState = _initialState();
     _controller = PageController(initialPage: _index);
   }
 
-  int _initialIndex() => widget.slides.isEmpty
-      ? 0
-      : widget.initialIndex.clamp(0, widget.slides.length - 1);
+  int get _index => _carouselState.index;
+
+  SeoCarouselState _initialState() => initialSeoCarouselState(
+        count: widget.slides.length,
+        index: widget.initialIndex,
+      );
 
   @override
   void didUpdateWidget(SeoCarousel oldWidget) {
@@ -112,18 +121,23 @@ class _SeoCarouselState extends State<SeoCarousel>
       replaced = widget.slides[i].label != oldWidget.slides[i].label;
     }
     if (widget.slides.isEmpty) {
-      _index = 0;
+      _carouselState = _initialState();
       return;
     }
     if (replaced ||
         widget.initialIndex != oldWidget.initialIndex ||
         _index >= widget.slides.length) {
-      _index = _initialIndex();
+      _carouselState = _initialState();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _controller.hasClients && widget.slides.isNotEmpty) {
           _controller.jumpToPage(_index);
         }
       });
+    } else {
+      _carouselState = initialSeoCarouselState(
+        count: widget.slides.length,
+        index: _index,
+      );
     }
   }
 
@@ -146,11 +160,7 @@ class _SeoCarouselState extends State<SeoCarousel>
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.slides.length,
-            onPageChanged: (index) {
-              if (index == _index) return;
-              setState(() => _index = index);
-              widget.onPageChanged?.call(index);
-            },
+            onPageChanged: _selectPage,
             itemBuilder: (context, index) => _buildSlide(widget.slides[index]),
           ),
         ),
@@ -186,8 +196,8 @@ class _SeoCarouselState extends State<SeoCarousel>
         _buildControl(
           label: widget.previousLabel,
           symbol: isRtl ? '\u203a' : '\u2039',
-          enabled: _index > 0,
-          onTap: () => _goTo(_index - 1),
+          enabled: _canActivate(const SeoCarouselPrevious()),
+          onTap: () => _activate(const SeoCarouselPrevious()),
         ),
         SizedBox(
           width: 64,
@@ -200,8 +210,8 @@ class _SeoCarouselState extends State<SeoCarousel>
         _buildControl(
           label: widget.nextLabel,
           symbol: isRtl ? '\u2039' : '\u203a',
-          enabled: _index < widget.slides.length - 1,
-          onTap: () => _goTo(_index + 1),
+          enabled: _canActivate(const SeoCarouselNext()),
+          onTap: () => _activate(const SeoCarouselNext()),
         ),
       ],
     );
@@ -235,15 +245,63 @@ class _SeoCarouselState extends State<SeoCarousel>
         ),
       );
 
-  void _goTo(int index) {
-    if (index < 0 || index >= widget.slides.length || !_controller.hasClients) {
-      return;
-    }
-    _controller.animateToPage(
-      index,
+  bool _canActivate(SeoCarouselAction action) => canApplySeoCarouselAction(
+        widget.transition,
+        _carouselState,
+        action,
+      );
+
+  void _activate(SeoCarouselAction action) {
+    if (!_controller.hasClients) return;
+    final next = applySeoCarouselTransition(
+      widget.transition,
+      _carouselState,
+      action,
+    );
+    if (next == _carouselState) return;
+    _programmaticTarget = next.index;
+    setState(() => _carouselState = next);
+    widget.onPageChanged?.call(next.index);
+    final target = next.index;
+    _controller
+        .animateToPage(
+      next.index,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
+    )
+        .whenComplete(() {
+      if (!mounted || _programmaticTarget != target) return;
+      _programmaticTarget = null;
+      _synchronizePage(_carouselState.index);
+    });
+  }
+
+  void _selectPage(int index) {
+    final target = _programmaticTarget;
+    if (target != null) {
+      if (index == target) _programmaticTarget = null;
+      return;
+    }
+    final next = applySeoCarouselTransition(
+      widget.transition,
+      _carouselState,
+      SeoCarouselSelect(index),
     );
+    if (next != _carouselState) {
+      setState(() => _carouselState = next);
+      widget.onPageChanged?.call(next.index);
+    }
+    if (next.index != index) _synchronizePage(next.index);
+  }
+
+  void _synchronizePage(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      final page = _controller.page;
+      if (page == null || page.round() != index) {
+        _controller.jumpToPage(index);
+      }
+    });
   }
 
   @override
