@@ -102,6 +102,18 @@ void main() {
     expect(await build(), isA<StateError>());
   });
 
+  test('rejects conditional part syntax through the Dart parser', () async {
+    await write(
+      'lib/transition.dart',
+      "part 'helper.dart' if (dart.library.io) 'io.dart';",
+    );
+
+    final error = await build();
+
+    expect(error, isA<StateError>());
+    expect((error as StateError).message, contains('Cannot parse'));
+  });
+
   test('rejects held top-level and static application state', () async {
     await write('lib/transition.dart', 'var selected = 0;');
 
