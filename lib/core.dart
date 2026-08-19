@@ -19,6 +19,7 @@ library;
 
 export 'src/components/seo_component_format.dart';
 export 'src/components/seo_components.dart';
+export 'src/components/seo_carousel_transition.dart';
 export 'src/components/seo_collection_transition.dart';
 export 'src/components/seo_collection_url.dart';
 export 'src/components/seo_motion.dart' show SeoMotionPreset;
