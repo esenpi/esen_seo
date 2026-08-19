@@ -475,9 +475,6 @@ final class _PureApplicationGraph {
           directive.configurations.isNotEmpty) {
         throw StateError('Conditional import or export is forbidden in $path.');
       }
-      if (directive is PartDirective && directive.configurations.isNotEmpty) {
-        throw StateError('Conditional part is forbidden in $path.');
-      }
       if (directive is! ImportDirective &&
           directive is! ExportDirective &&
           directive is! PartDirective) {

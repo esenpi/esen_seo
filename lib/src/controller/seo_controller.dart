@@ -409,6 +409,17 @@ class SeoController {
   }
 }
 
+/// Captures the controller's semantic tree for package-owned parity tooling.
+List<SeoNode> collectSeoNodesForParity(Element root) {
+  return SeoController.instance.collectNodes(root);
+}
+
+/// Enables and resets the controller for package-owned parity tooling.
+void prepareSeoControllerForParity() {
+  SeoController.debugForceEnable = true;
+  SeoController.instance.resetForTest();
+}
+
 /// Mutable state carried through one traversal pass.
 class _TraversalState {
   _TraversalState(this.mode);

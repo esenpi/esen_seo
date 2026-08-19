@@ -30,8 +30,10 @@ jobs:
 
       - run: flutter --version
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Install dependencies with the latest supported analyzer
+        run: |
+          flutter pub get
+          flutter pub upgrade analyzer
 
       # pana bewertet die Formatierung — ein Verstoß kostet Punkte auf
       # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
@@ -55,6 +57,26 @@ jobs:
           test/dom_first_stepper_web_test.dart
           test/dom_first_collection_web_test.dart
           test/dom_first_theme_toggle_web_test.dart
+
+  analyzer-minimum:
+    name: analyzer 6.11 compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.27.4'
+          cache: true
+
+      - name: Install the minimum supported analyzer
+        run: flutter pub add 'override:analyzer:6.11.0'
+
+      - name: Analyze package
+        run: flutter analyze
+
+      - name: Test the application runtime builder
+        run: flutter test test/application_runtime_builder_test.dart
 
   example:
     name: example app

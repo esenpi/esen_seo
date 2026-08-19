@@ -27,7 +27,7 @@ List<SeoNode> captureSeoNodes() {
       'captureSeoNodes() found no widget tree — pump one first.',
     );
   }
-  return SeoController.instance.collectNodes(root);
+  return collectSeoNodesForParity(root);
 }
 
 /// Prepares the SEO pipeline for a parity test.
@@ -36,8 +36,7 @@ List<SeoNode> captureSeoNodes() {
 /// false, so the mirror is off by default and every `.seo()` call is a
 /// no-op; without this the captured tree is empty.
 void enableSeoForParity() {
-  SeoController.debugForceEnable = true;
-  SeoController.instance.resetForTest();
+  prepareSeoControllerForParity();
 }
 
 /// Checks that the app renders what the route table promises.
