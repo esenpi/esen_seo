@@ -1,10 +1,20 @@
-## Unreleased
+## 0.11.0
 
 * Added application-authored `SeoStepperTransition` compilation and typed
   `SeoDomFirstApplicationRuntime.stepper` delivery. The same pure state logic
   can now drive native Flutter and the validated DOM-first stepper adapter.
-  Runtime artifact filenames include their closed adapter kind, so equal
-  logical ids for tabs and steppers remain independent.
+* Added a shared pure `SeoCarouselTransition`, a separately selected
+  `SeoDomFirstFeature.carousel` runtime and application-authored Carousel
+  compilation through `SeoDomFirstApplicationRuntime.carousel`. The browser
+  adapter validates the complete bounded structure before mutation, keeps all
+  slides readable without JavaScript and supports native controls plus
+  LTR/RTL Arrow, Home and End navigation. Runtime artifact filenames include
+  their closed adapter kind, so equal logical ids for tabs, carousels and
+  steppers remain independent.
+* Expanded the `analyzer` constraint through `14.x`, removed reliance on an
+  obsolete AST member and added minimum/latest analyzer CI lanes. Internal
+  parity bridges no longer trigger `visibleForTesting` warnings in downstream
+  package analysis.
 
 ## 0.10.0
 
