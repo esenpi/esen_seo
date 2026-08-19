@@ -6,6 +6,7 @@ import '../components/seo_theme_transition.dart';
 import '../routing/seo_route_delivery.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
+import 'seo_dom_first_carousel_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
@@ -23,6 +24,16 @@ const String seoDomFirstTabsStylesheet = '''
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"]{border-bottom-color:currentColor;font-weight:600}
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>section[data-esen-tab-panel][hidden]{display:none}
+''';
+
+/// Structural styles for the compiled DOM-first carousel control.
+const String seoDomFirstCarouselStylesheet = '''
+#$seoContainerId [data-esen-component="carousel"]>.esen-seo-carousel-controls{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-block:.75rem}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;height:2.5rem;padding:0;cursor:pointer}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control][disabled]{opacity:.4;cursor:default}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-status{display:inline-block;min-width:4rem;text-align:center}
+#$seoContainerId [data-esen-component="carousel"][data-esen-enhanced="true"]>section[data-esen-carousel-slide][hidden]{display:none}
 ''';
 
 /// Structural styles for the compiled DOM-first stepper control.
@@ -97,6 +108,9 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.tabs)) {
     css.write(seoDomFirstTabsStylesheet);
   }
+  if (features.contains(SeoDomFirstFeature.carousel)) {
+    css.write(seoDomFirstCarouselStylesheet);
+  }
   if (features.contains(SeoDomFirstFeature.stepper)) {
     css.write(seoDomFirstStepperStylesheet);
   }
@@ -127,6 +141,9 @@ String seoDomFirstFeatureScriptHtml(
 
   if (features.contains(SeoDomFirstFeature.tabs)) {
     addRuntime(seoDomFirstTabsRuntime);
+  }
+  if (features.contains(SeoDomFirstFeature.carousel)) {
+    addRuntime(seoDomFirstCarouselRuntime);
   }
   if (features.contains(SeoDomFirstFeature.stepper)) {
     addRuntime(seoDomFirstStepperRuntime);

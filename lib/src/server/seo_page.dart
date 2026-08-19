@@ -145,6 +145,9 @@ class SeoPage {
       ...domFirstFeatures,
       if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime)
         SeoDomFirstFeature.tabs,
+      if (applicationRuntime?.reference
+          is SeoDomFirstCarouselApplicationRuntime)
+        SeoDomFirstFeature.carousel,
       if (applicationRuntime?.reference is SeoDomFirstStepperApplicationRuntime)
         SeoDomFirstFeature.stepper,
     };
@@ -201,6 +204,7 @@ SeoDomFirstFeature _applicationRuntimeFeature(
 ) =>
     switch (reference) {
       SeoDomFirstTabsApplicationRuntime() => SeoDomFirstFeature.tabs,
+      SeoDomFirstCarouselApplicationRuntime() => SeoDomFirstFeature.carousel,
       SeoDomFirstStepperApplicationRuntime() => SeoDomFirstFeature.stepper,
     };
 

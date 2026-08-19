@@ -276,6 +276,14 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
       'cannot be combined with the package-owned tabs runtime',
     );
   }
+  if (runtime is SeoDomFirstCarouselApplicationRuntime &&
+      features.contains(SeoDomFirstFeature.carousel)) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'cannot be combined with the package-owned carousel runtime',
+    );
+  }
   if (runtime is SeoDomFirstStepperApplicationRuntime &&
       features.contains(SeoDomFirstFeature.stepper)) {
     throw ArgumentError.value(

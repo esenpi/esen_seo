@@ -54,6 +54,7 @@ jobs:
           flutter test --platform chrome
           test/seo_interactions_web_test.dart
           test/dom_first_tabs_web_test.dart
+          test/dom_first_carousel_web_test.dart
           test/dom_first_stepper_web_test.dart
           test/dom_first_collection_web_test.dart
           test/dom_first_theme_toggle_web_test.dart
@@ -161,6 +162,25 @@ jobs:
           --symbol transitionExampleStepper
           --check
 
+      - name: Build the application-owned carousel runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind carousel
+          --id example-carousel
+          --library package:example/application_carousel_transition.dart
+          --symbol transitionExampleCarousel
+
+      - name: Verify the application-owned carousel runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind carousel
+          --id example-carousel
+          --library package:example/application_carousel_transition.dart
+          --symbol transitionExampleCarousel
+          --check
+
       # Und dann durch den echten Prerenderer, damit ein Fehler in der
       # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.
       - name: Prerender
@@ -180,6 +200,13 @@ jobs:
           grep -q 'data-esen-seo-dom-first-application-runtime="example-stepper"' "$stepper"
           if grep -q 'flutter_bootstrap.js\|main.dart.js' "$stepper"; then
             echo "::error::DOM-first application stepper loads Flutter"
+            exit 1
+          fi
+          carousel=build/web/dom-first-application-carousel/index.html
+          test -s "$carousel"
+          grep -q 'data-esen-seo-dom-first-application-runtime="example-carousel"' "$carousel"
+          if grep -q 'flutter_bootstrap.js\|main.dart.js' "$carousel"; then
+            echo "::error::DOM-first application carousel loads Flutter"
             exit 1
           fi
           test -s build/web/sitemap.xml
@@ -218,6 +245,9 @@ jobs:
       - name: Verify the compiled tabs runtime is current
         run: dart run tool/build_dom_first_tabs_runtime.dart
 
+      - name: Verify the compiled carousel runtime is current
+        run: dart run tool/build_dom_first_carousel_runtime.dart
+
       - name: Verify the compiled collection runtime is current
         run: dart run tool/build_dom_first_collection_runtime.dart
 
@@ -231,6 +261,7 @@ jobs:
         run: >-
           dart format --output=none --set-exit-if-changed
           lib/src/renderer/seo_dom_first_tabs_runtime.g.dart
+          lib/src/renderer/seo_dom_first_carousel_runtime.g.dart
           lib/src/renderer/seo_dom_first_stepper_runtime.g.dart
           lib/src/renderer/seo_dom_first_collection_runtime.g.dart
           lib/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart

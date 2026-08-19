@@ -218,6 +218,34 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('carousel builds use the same pre-compilation safety boundary',
+      () async {
+    await write('lib/transition.dart', "import 'dart:io';");
+
+    await expectLater(
+      buildSeoCarouselApplicationRuntime(
+        const SeoCarouselRuntimeBuildRequest(
+          id: 'fixture-carousel',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionCarousel',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      buildSeoCarouselApplicationRuntime(
+        const SeoCarouselRuntimeBuildRequest(
+          id: '../carousel',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionCarousel',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 final class _UnexpectedSuccess {

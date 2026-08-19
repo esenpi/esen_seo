@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
 
 const _reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
+const _carouselReference =
+    SeoDomFirstApplicationRuntime.carousel('application-carousel');
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _javascript = '(function(){var applicationTabs=true;})();';
@@ -46,6 +48,20 @@ List<SeoNode> _stepperNodes() => buildSeoStepperNodes(
       interactionId: 'application-stepper-control',
     );
 
+List<SeoNode> _carouselNodes() => buildSeoCarouselNodes(
+      slides: [
+        (
+          label: 'First',
+          nodes: [SeoNode(tag: 'p', text: 'First slide')],
+        ),
+        (
+          label: 'Second',
+          nodes: [SeoNode(tag: 'p', text: 'Second slide')],
+        ),
+      ],
+      interactionId: 'application-carousel-control',
+    );
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -62,6 +78,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.carousel},
+          applicationRuntime: _carouselReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -112,7 +138,12 @@ void main() {
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.stepper('same-id')),
       );
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(const SeoDomFirstApplicationRuntime.carousel('same-id')),
+      );
       expect(_reference.kind, 'tabs');
+      expect(_carouselReference.kind, 'carousel');
       expect(_stepperReference.kind, 'stepper');
     });
 
@@ -155,6 +186,26 @@ void main() {
         contains(
           'data-esen-seo-dom-first-application-runtime='
           '"application-stepper"',
+        ),
+      );
+    });
+
+    test('carousel runtime selects only the matching structural stylesheet',
+        () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _carouselNodes(),
+        applicationRuntime: _artifact(_carouselReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="carousel"'));
+      expect(html, contains(seoDomFirstCarouselStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-carousel"',
         ),
       );
     });

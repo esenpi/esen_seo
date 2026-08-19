@@ -8,6 +8,8 @@ void main() {
   const reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
   const stepperReference =
       SeoDomFirstApplicationRuntime.stepper('application-tabs');
+  const carouselReference =
+      SeoDomFirstApplicationRuntime.carousel('application-tabs');
   const javascript = '(function(){var value=1;return value;})();';
   final dartVersion = Platform.version.split(' ').first;
 
@@ -94,12 +96,19 @@ void main() {
 
     test('keeps equal ids of different runtime kinds independent', () async {
       const stepperJavascript = '(function(){var step=2;return step;})();';
+      const carouselJavascript = '(function(){var slide=3;return slide;})();';
       final stepperArtifact = SeoDomFirstRuntimeArtifact.create(
         reference: stepperReference,
         javascript: stepperJavascript,
         dartVersion: dartVersion,
       );
       await _write(directory, stepperArtifact);
+      final carouselArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: carouselReference,
+        javascript: carouselJavascript,
+        dartVersion: dartVersion,
+      );
+      await _write(directory, carouselArtifact);
 
       final store = SeoDirectoryRuntimeStore(directory.path);
       expect((await store.load(reference)).javascript, javascript);
@@ -107,9 +116,17 @@ void main() {
         (await store.load(stepperReference)).javascript,
         stepperJavascript,
       );
+      expect(
+        (await store.load(carouselReference)).javascript,
+        carouselJavascript,
+      );
       expect(await _javascriptFile(directory, reference).exists(), isTrue);
       expect(
         await _javascriptFile(directory, stepperReference).exists(),
+        isTrue,
+      );
+      expect(
+        await _javascriptFile(directory, carouselReference).exists(),
         isTrue,
       );
     });

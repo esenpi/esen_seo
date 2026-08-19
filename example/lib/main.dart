@@ -1,6 +1,7 @@
 import 'package:esen_seo/esen_seo.dart';
 import 'package:flutter/material.dart';
 
+import 'application_carousel_transition.dart';
 import 'application_stepper_transition.dart';
 import 'application_tabs_transition.dart';
 import 'docs_page.dart';
@@ -20,6 +21,7 @@ final Map<String, WidgetBuilder> _pages = {
   '/': (_) => const HomePage(),
   '/demo': (_) => const DemoPage(),
   '/docs': (_) => const DocsPage(),
+  '/dom-first-application-carousel': (_) => const ApplicationCarouselPage(),
   '/dom-first-application-stepper': (_) => const ApplicationStepperPage(),
   '/dom-first-application-tabs': (_) => const ApplicationTabsPage(),
 };
@@ -309,6 +311,45 @@ class ApplicationStepperPage extends StatelessWidget {
                     label: step.label,
                     content: Text(step.content),
                     nodes: demoStepperBodyNodes(step),
+                  ),
+              ],
+            ),
+          ],
+        ).main,
+      );
+}
+
+class ApplicationCarouselPage extends StatelessWidget {
+  const ApplicationCarouselPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 20,
+          children: [
+            Text(
+              'Application-owned Carousel',
+              style: Theme.of(context).textTheme.displaySmall,
+            ).h1,
+            const Para(
+              'The application transition wraps previous and next at either '
+              'end. Flutter and DOM-first call the same function.',
+            ),
+            SeoCarousel(
+              height: 180,
+              interactionId: 'application-demo-carousel',
+              interactionLabel: 'Application rendering carousel',
+              transition: transitionExampleCarousel,
+              slides: [
+                for (final slide in demoCarouselSlides)
+                  SeoCarouselSlide(
+                    label: slide.label,
+                    content: Align(
+                      alignment: Alignment.topLeft,
+                      child: Text(slide.content),
+                    ),
+                    nodes: demoCarouselSlideNodes(slide),
                   ),
               ],
             ),

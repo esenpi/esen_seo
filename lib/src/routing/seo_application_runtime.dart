@@ -12,6 +12,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.tabs(String id) =
       SeoDomFirstTabsApplicationRuntime;
 
+  /// Uses an application-authored transition with the package carousel adapter.
+  const factory SeoDomFirstApplicationRuntime.carousel(String id) =
+      SeoDomFirstCarouselApplicationRuntime;
+
   /// Uses an application-authored transition with the package stepper adapter.
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
@@ -39,6 +43,15 @@ final class SeoDomFirstTabsApplicationRuntime
 
   @override
   String get kind => 'tabs';
+}
+
+/// An application-authored transition executed by the carousel adapter.
+final class SeoDomFirstCarouselApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstCarouselApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'carousel';
 }
 
 /// An application-authored transition executed by the stepper adapter.

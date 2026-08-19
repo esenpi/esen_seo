@@ -125,10 +125,14 @@ List<SeoNode> demoStepperNodes({
       interactionLabel: interactionLabel,
     );
 
-List<SeoNode> demoCarouselNodes() => buildSeoCarouselNodes(
+List<SeoNode> demoCarouselNodes({
+  String interactionId = 'demo-carousel',
+  String interactionLabel = 'Rendering carousel',
+}) =>
+    buildSeoCarouselNodes(
       slides: demoCarouselEntries(),
-      interactionId: 'demo-carousel',
-      interactionLabel: 'Rendering carousel',
+      interactionId: interactionId,
+      interactionLabel: interactionLabel,
     );
 
 List<SeoNode> demoNavNodes() => buildSeoNavMenuNodes(
@@ -272,6 +276,35 @@ final seoRoutes = [
     ],
   ),
   SeoRoute(
+    path: '/dom-first-carousel',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: const {SeoDomFirstFeature.carousel},
+    meta: (_) => SeoMeta(
+      title: 'DOM-first Carousel — esen_seo',
+      description: 'A complete semantic carousel progressively enhanced by '
+          'the package-owned compiled Dart transition.',
+      schemas: [
+        SeoSchema.breadcrumbs([
+          (name: 'Home', url: '$siteBase/'),
+          (name: 'DOM-first Carousel', url: '$siteBase/dom-first-carousel'),
+        ]),
+      ],
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'DOM-first Carousel'),
+      SeoNode(
+        tag: 'p',
+        text: 'Every slide is present before JavaScript runs. The compiled '
+            'adapter adds accessible navigation without loading Flutter.',
+      ),
+      ...demoCarouselNodes(
+        interactionId: 'dom-first-demo-carousel',
+        interactionLabel: 'Rendering carousel',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
     path: '/dom-first-application-tabs',
     delivery: SeoRouteDelivery.domFirst,
     applicationRuntime:
@@ -318,6 +351,31 @@ final seoRoutes = [
       ...demoStepperNodes(
         interactionId: 'application-demo-stepper',
         interactionLabel: 'Application publishing flow',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
+    path: '/dom-first-application-carousel',
+    delivery: SeoRouteDelivery.domFirst,
+    applicationRuntime:
+        const SeoDomFirstApplicationRuntime.carousel('example-carousel'),
+    meta: (_) => SeoMeta(
+      title: 'Application Carousel — esen_seo',
+      description: 'Application-authored pure Dart carousel logic compiled '
+          'for the permanent semantic page.',
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'Application-owned Carousel'),
+      SeoNode(
+        tag: 'p',
+        text: 'The application transition wraps previous and next at either '
+            'end. Flutter and this DOM-first route call the same pure Dart '
+            'function.',
+      ),
+      ...demoCarouselNodes(
+        interactionId: 'application-demo-carousel',
+        interactionLabel: 'Application rendering carousel',
       ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],

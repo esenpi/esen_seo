@@ -24,6 +24,21 @@ final class SeoTabsRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one application-authored carousel runtime build.
+final class SeoCarouselRuntimeBuildRequest {
+  const SeoCarouselRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.symbol,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String symbol;
+  final String outputDirectory;
+}
+
 /// Inputs for one application-authored stepper runtime build.
 final class SeoStepperRuntimeBuildRequest {
   const SeoStepperRuntimeBuildRequest({
@@ -48,6 +63,23 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
     _buildApplicationRuntime(
       _ApplicationRuntimeBuildRequest(
         reference: SeoDomFirstApplicationRuntime.tabs(request.id),
+        library: request.library,
+        symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked carousel transition and writes its verified files.
+Future<SeoDomFirstRuntimeArtifact> buildSeoCarouselApplicationRuntime(
+  SeoCarouselRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.carousel(request.id),
         library: request.library,
         symbol: request.symbol,
         outputDirectory: request.outputDirectory,
@@ -143,6 +175,10 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
           libraryUri,
           request.symbol,
         ),
+      SeoDomFirstCarouselApplicationRuntime() => _carouselEntrypointSource(
+          libraryUri,
+          request.symbol,
+        ),
       SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
           libraryUri,
           request.symbol,
@@ -200,6 +236,21 @@ SeoTabsState _applicationTransition(
 ) => application.$symbol(state, action);
 
 void main() => enhanceSeoDomFirstTabs(
+  transition: _applicationTransition,
+);
+''';
+
+String _carouselEntrypointSource(Uri library, String symbol) => '''
+import 'package:esen_seo/src/components/seo_carousel_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_carousel_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+SeoCarouselState _applicationTransition(
+  SeoCarouselState state,
+  SeoCarouselAction action,
+) => application.$symbol(state, action);
+
+void main() => enhanceSeoDomFirstCarousels(
   transition: _applicationTransition,
 );
 ''';
@@ -396,6 +447,8 @@ final class _PackageGraph {
           (rawUri == 'package:esen_seo/core.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_tabs_transition.dart' ||
+              rawUri ==
+                  'package:esen_seo/src/components/seo_carousel_transition.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_stepper_transition.dart')) {
         return File('');
