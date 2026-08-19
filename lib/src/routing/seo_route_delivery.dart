@@ -17,6 +17,9 @@ enum SeoDomFirstFeature {
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
   tabs,
 
+  /// Enhance validated SeoCarousel markup through its shared transition.
+  carousel,
+
   /// Enhance validated SeoStepper markup through its shared transition.
   stepper,
 

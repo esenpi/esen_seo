@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
@@ -132,6 +133,31 @@ void main() {
       expect(seoDomFirstCollectionRuntime, isNot(contains('eval(')));
     });
 
+    test('compiled carousel has an isolated runtime and style budget', () {
+      final gzipBytes =
+          gzip.encode(utf8.encode(seoDomFirstCarouselRuntime)).length;
+      final html = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.carousel},
+        nonce: 'safe',
+      );
+      final style = seoDomFirstFeatureStyleHtml(
+        const {SeoDomFirstFeature.carousel},
+      );
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(html, contains('data-esen-seo-dom-first-runtime'));
+      expect(html, contains('nonce="safe"'));
+      expect(style, contains('data-esen-component="carousel"'));
+      expect(
+        seoDomFirstCarouselRuntime.toLowerCase(),
+        isNot(contains('</script')),
+      );
+      expect(seoDomFirstCarouselRuntime, isNot(contains('innerHTML')));
+      expect(seoDomFirstCarouselRuntime, isNot(contains('outerHTML')));
+      expect(seoDomFirstCarouselRuntime, isNot(contains('document.write')));
+      expect(seoDomFirstCarouselRuntime, isNot(contains('eval(')));
+    });
+
     test('compiled stepper has an isolated runtime and style budget', () {
       final gzipBytes =
           gzip.encode(utf8.encode(seoDomFirstStepperRuntime)).length;
@@ -213,6 +239,9 @@ void main() {
       final tabsOnly = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.tabs},
       );
+      final carouselOnly = seoDomFirstFeatureScriptHtml(
+        const {SeoDomFirstFeature.carousel},
+      );
       final both = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.tabs, SeoDomFirstFeature.collection},
       );
@@ -225,15 +254,23 @@ void main() {
 
       expect(collectionOnly, contains(seoDomFirstCollectionRuntime));
       expect(collectionOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(collectionOnly, isNot(contains(seoDomFirstCarouselRuntime)));
       expect(collectionOnly, isNot(contains(seoDomFirstStepperRuntime)));
       expect(tabsOnly, contains(seoDomFirstTabsRuntime));
+      expect(tabsOnly, isNot(contains(seoDomFirstCarouselRuntime)));
       expect(tabsOnly, isNot(contains(seoDomFirstCollectionRuntime)));
       expect(tabsOnly, isNot(contains(seoDomFirstStepperRuntime)));
+      expect(carouselOnly, contains(seoDomFirstCarouselRuntime));
+      expect(carouselOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(carouselOnly, isNot(contains(seoDomFirstCollectionRuntime)));
+      expect(carouselOnly, isNot(contains(seoDomFirstStepperRuntime)));
       expect(stepperOnly, contains(seoDomFirstStepperRuntime));
       expect(stepperOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(stepperOnly, isNot(contains(seoDomFirstCarouselRuntime)));
       expect(stepperOnly, isNot(contains(seoDomFirstCollectionRuntime)));
       expect(themeOnly, contains(seoDomFirstThemeToggleRuntime));
       expect(themeOnly, isNot(contains(seoDomFirstTabsRuntime)));
+      expect(themeOnly, isNot(contains(seoDomFirstCarouselRuntime)));
       expect(themeOnly, isNot(contains(seoDomFirstCollectionRuntime)));
       expect(themeOnly, isNot(contains(seoDomFirstStepperRuntime)));
       expect(both, contains(seoDomFirstTabsRuntime));
