@@ -246,6 +246,34 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('collection builds use the same pre-compilation safety boundary',
+      () async {
+    await write('lib/transition.dart', "import 'dart:io';");
+
+    await expectLater(
+      buildSeoCollectionApplicationRuntime(
+        const SeoCollectionRuntimeBuildRequest(
+          id: 'fixture-collection',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionCollection',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      buildSeoCollectionApplicationRuntime(
+        const SeoCollectionRuntimeBuildRequest(
+          id: '../collection',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionCollection',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 final class _UnexpectedSuccess {

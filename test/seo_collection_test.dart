@@ -39,7 +39,10 @@ List<SeoCollectionEntry> _items() => [
       ),
     ];
 
-Future<void> _pump(WidgetTester tester) async {
+Future<void> _pump(
+  WidgetTester tester, {
+  SeoCollectionTransition transition = transitionSeoCollection,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
@@ -61,12 +64,37 @@ Future<void> _pump(WidgetTester tester) async {
             resultsLabel: 'Artikel',
             noResultsLabel: 'Keine Artikel',
             pageLabel: 'Seite',
+            transition: transition,
           ),
         ),
       ),
     ),
   );
   EsenSeo.refresh();
+}
+
+SeoCollectionState _titleWhileSearching(
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+}) {
+  final next = transitionSeoCollection(
+    state,
+    action,
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
+  if (action is! SeoCollectionSetQuery || next.query.isEmpty) return next;
+  return transitionSeoCollection(
+    next,
+    const SeoCollectionSetSort(SeoCollectionSort.title),
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
 }
 
 void main() {
@@ -131,6 +159,21 @@ void main() {
     expect(find.text('Alle'), findsOneWidget);
     expect(find.text('Neueste'), findsOneWidget);
     expect(find.text('›'), findsNothing);
+  });
+
+  testWidgets('Flutter executes the application-owned transition',
+      (tester) async {
+    await _pump(tester, transition: _titleWhileSearching);
+
+    await tester.enterText(find.byType(EditableText), 'flutter');
+    await tester.pump();
+
+    expect(find.text('Alpha card'), findsOneWidget);
+    expect(find.text('Flutter card'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Alpha card')).dy,
+      lessThan(tester.getTopLeft(find.text('Flutter card')).dy),
+    );
   });
 
   testWidgets('content updates preserve a selected category by label',

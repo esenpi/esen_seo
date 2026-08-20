@@ -11,24 +11,110 @@ import 'seo_container.dart';
 ///
 /// Discovery and validation are read-only. Only a complete [_CollectionPlan]
 /// can cross the apply boundary and mutate the visible document.
-void enhanceSeoDomFirstCollections() {
-  for (final apply in _CollectionApplyBoundary.discover(web.document)) {
-    _enhanceCollection(apply);
+void enhanceSeoDomFirstCollections({
+  SeoCollectionTransition transition = transitionSeoCollection,
+  bool enableUrlSynchronization = true,
+}) {
+  for (final apply in _CollectionApplyBoundary.discover(
+    web.document,
+    enableUrlSynchronization: enableUrlSynchronization,
+  )) {
+    if (enableUrlSynchronization) {
+      _enhanceSynchronizedCollection(apply, transition);
+    } else {
+      _enhanceLocalCollection(apply, transition);
+    }
   }
 }
 
-void _enhanceCollection(_CollectionApplyBoundary apply) {
-  var state = apply.stateFromUrl();
+void _enhanceLocalCollection(
+  _CollectionApplyBoundary apply,
+  SeoCollectionTransition transition,
+) {
+  var state = SeoCollectionState(sort: apply.initialSort);
+
+  void render() {
+    apply.state(
+      state,
+      previousEnabled: canApplySeoCollectionAction(
+        transition,
+        state,
+        const SeoCollectionPreviousPage(),
+        records: apply.records,
+        categoryCount: apply.categoryCount,
+        pageSize: apply.pageSize,
+      ),
+      nextEnabled: canApplySeoCollectionAction(
+        transition,
+        state,
+        const SeoCollectionNextPage(),
+        records: apply.records,
+        categoryCount: apply.categoryCount,
+        pageSize: apply.pageSize,
+      ),
+    );
+  }
 
   void dispatch(SeoCollectionAction action) {
-    state = transitionSeoCollection(
+    state = applySeoCollectionTransition(
+      transition,
       state,
       action,
       records: apply.records,
       categoryCount: apply.categoryCount,
       pageSize: apply.pageSize,
     );
-    apply.state(state);
+    render();
+  }
+
+  apply.mount(dispatch);
+  state = selectSeoCollection(
+    records: apply.records,
+    categoryCount: apply.categoryCount,
+    pageSize: apply.pageSize,
+    state: state,
+  ).state;
+  render();
+}
+
+void _enhanceSynchronizedCollection(
+  _CollectionApplyBoundary apply,
+  SeoCollectionTransition transition,
+) {
+  var state = apply.stateFromUrl();
+
+  void render() {
+    apply.state(
+      state,
+      previousEnabled: canApplySeoCollectionAction(
+        transition,
+        state,
+        const SeoCollectionPreviousPage(),
+        records: apply.records,
+        categoryCount: apply.categoryCount,
+        pageSize: apply.pageSize,
+      ),
+      nextEnabled: canApplySeoCollectionAction(
+        transition,
+        state,
+        const SeoCollectionNextPage(),
+        records: apply.records,
+        categoryCount: apply.categoryCount,
+        pageSize: apply.pageSize,
+      ),
+    );
+  }
+
+  void dispatch(SeoCollectionAction action) {
+    state = applySeoCollectionTransition(
+      transition,
+      state,
+      action,
+      records: apply.records,
+      categoryCount: apply.categoryCount,
+      pageSize: apply.pageSize,
+    );
+    render();
     apply.synchronizeUrl(
       state,
       push: action is! SeoCollectionSetQuery,
@@ -42,7 +128,7 @@ void _enhanceCollection(_CollectionApplyBoundary apply) {
     pageSize: apply.pageSize,
     state: state,
   ).state;
-  apply.state(state);
+  render();
   apply.synchronizeUrl(state, push: false);
   apply.listenToHistory((restored) {
     state = selectSeoCollection(
@@ -51,7 +137,7 @@ void _enhanceCollection(_CollectionApplyBoundary apply) {
       pageSize: apply.pageSize,
       state: restored,
     ).state;
-    apply.state(state);
+    render();
     apply.synchronizeUrl(state, push: false);
   });
 }
@@ -138,7 +224,10 @@ final class _CollectionApplyBoundary {
   SeoCollectionSort get initialSort => plan.initialSort;
   List<SeoCollectionRecord> get records => plan.records;
 
-  static List<_CollectionApplyBoundary> discover(web.Document document) {
+  static List<_CollectionApplyBoundary> discover(
+    web.Document document, {
+    required bool enableUrlSynchronization,
+  }) {
     final container = document.getElementById(seoContainerId);
     if (container == null ||
         container.getAttribute(seoDomFirstAttribute) != 'true' ||
@@ -152,7 +241,12 @@ final class _CollectionApplyBoundary {
     for (var index = 0; index < roots.length; index++) {
       final node = roots.item(index);
       if (node == null) continue;
-      final plan = _validate(document, container, node as web.Element);
+      final plan = _validate(
+        document,
+        container,
+        node as web.Element,
+        enableUrlSynchronization: enableUrlSynchronization,
+      );
       if (plan != null) {
         boundaries.add(_CollectionApplyBoundary(document, plan));
       }
@@ -163,14 +257,18 @@ final class _CollectionApplyBoundary {
   static _CollectionPlan? _validate(
     web.Document document,
     web.Element container,
-    web.Element root,
-  ) {
+    web.Element root, {
+    required bool enableUrlSynchronization,
+  }) {
     if (root.getAttribute('data-esen-enhanced') == 'true' ||
         _hiddenByAncestor(root, container)) {
       return null;
     }
     final urlMarker = root.getAttribute('data-esen-synchronize-url');
-    if (urlMarker != null && urlMarker != 'true') return null;
+    if ((urlMarker != null && urlMarker != 'true') ||
+        (urlMarker == 'true' && !enableUrlSynchronization)) {
+      return null;
+    }
     final id = root.id;
     if (!isValidSeoInteractionId(id) || _idCount(document, id) != 1) {
       return null;
@@ -338,7 +436,9 @@ final class _CollectionApplyBoundary {
     parsedItems
         .sort((left, right) => left.sourceIndex.compareTo(right.sourceIndex));
     final items = [for (final item in parsedItems) item.element];
-    final records = [for (final item in parsedItems) item.record];
+    final records = List<SeoCollectionRecord>.unmodifiable(
+      [for (final item in parsedItems) item.record],
+    );
 
     for (final controlId in [
       '$id-search',
@@ -626,7 +726,11 @@ final class _CollectionApplyBoundary {
     );
   }
 
-  void state(SeoCollectionState state) {
+  void state(
+    SeoCollectionState state, {
+    required bool previousEnabled,
+    required bool nextEnabled,
+  }) {
     final snapshot = selectSeoCollection(
       records: plan.records,
       categoryCount: plan.categories.length,
@@ -668,11 +772,8 @@ final class _CollectionApplyBoundary {
     } else {
       _pagination.removeAttribute('hidden');
     }
-    _disabled(_previous, snapshot.state.page <= 0);
-    _disabled(
-      _next,
-      snapshot.pageCount == 0 || snapshot.state.page >= snapshot.pageCount - 1,
-    );
+    _disabled(_previous, !previousEnabled);
+    _disabled(_next, !nextEnabled);
     _pageStatus.textContent = snapshot.pageCount == 0
         ? '${plan.labels.page} 0 / 0'
         : '${plan.labels.page} ${snapshot.state.page + 1} / '

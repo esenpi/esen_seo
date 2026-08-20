@@ -1,6 +1,15 @@
 /// Pure collection state shared by Flutter and the compiled DOM-first adapter.
 library;
 
+/// State-free collection logic shared by Flutter and DOM-first presentations.
+typedef SeoCollectionTransition = SeoCollectionState Function(
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+});
+
 /// Largest collection the progressive adapter will enhance.
 const int seoCollectionMaxItems = 2000;
 
@@ -315,3 +324,77 @@ SeoCollectionState transitionSeoCollection(
     state: candidate,
   ).state;
 }
+
+/// Executes [transition] within the closed collection state contract.
+///
+/// Presentation owners provide immutable records. Application logic cannot
+/// introduce an oversized query, an unknown category or a page outside the
+/// current result set. Exceptions and invalid results leave the last valid
+/// state unchanged on both Flutter and DOM-first presentations.
+SeoCollectionState applySeoCollectionTransition(
+  SeoCollectionTransition transition,
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+}) {
+  final current = selectSeoCollection(
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+    state: state,
+  ).state;
+  try {
+    final result = transition(
+      current,
+      action,
+      records: records,
+      categoryCount: categoryCount,
+      pageSize: normalizeSeoCollectionPageSize(pageSize),
+    );
+    final canonical = selectSeoCollection(
+      records: records,
+      categoryCount: categoryCount,
+      pageSize: pageSize,
+      state: result,
+    ).state;
+    return _sameSeoCollectionState(canonical, result) ? canonical : current;
+  } catch (_) {
+    return current;
+  }
+}
+
+/// Whether [action] can change canonical collection state through [transition].
+///
+/// Presentations use this only for previous/next availability. The transition
+/// must stay pure and inexpensive, and [state] must already be canonical for
+/// the supplied records. Exceptions and invalid output make the action
+/// unavailable.
+bool canApplySeoCollectionAction(
+  SeoCollectionTransition transition,
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+}) {
+  final next = applySeoCollectionTransition(
+    transition,
+    state,
+    action,
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
+  return !_sameSeoCollectionState(next, state);
+}
+
+bool _sameSeoCollectionState(
+  SeoCollectionState left,
+  SeoCollectionState right,
+) =>
+    left.query == right.query &&
+    left.categoryIndex == right.categoryIndex &&
+    left.sort == right.sort &&
+    left.page == right.page;

@@ -67,6 +67,7 @@ class SeoCollection extends StatefulWidget {
     this.interactionLabel = 'Collection',
     this.pageSize = 12,
     this.initialSort = SeoCollectionSort.newest,
+    this.transition = transitionSeoCollection,
     this.searchLabel = 'Search',
     this.categoriesLabel = 'Categories',
     this.allCategoriesLabel = 'All',
@@ -92,6 +93,9 @@ class SeoCollection extends StatefulWidget {
   final String interactionLabel;
   final int pageSize;
   final SeoCollectionSort initialSort;
+
+  /// Pure state logic shared with an optional application web runtime.
+  final SeoCollectionTransition transition;
   final String searchLabel;
   final String categoriesLabel;
   final String allCategoriesLabel;
@@ -108,7 +112,9 @@ class SeoCollection extends StatefulWidget {
   /// Whether the DOM-first presentation stores collection state in the URL.
   ///
   /// Native Flutter presentations keep local state; browser history exists
-  /// only on the permanent HTML presentation.
+  /// only on the permanent HTML presentation. The application-owned
+  /// collection runtime currently requires this to remain false; package-owned
+  /// collection enhancement supports it.
   final bool synchronizeUrl;
   final TextStyle? controlTextStyle;
   final Color selectedColor;
@@ -182,7 +188,7 @@ class _SeoCollectionState extends State<SeoCollection>
     final categories = _categoryLabels(items);
     return (
       categories: categories,
-      records: [
+      records: List<SeoCollectionRecord>.unmodifiable([
         for (final item in items)
           SeoCollectionRecord(
             title: item.title,
@@ -191,7 +197,7 @@ class _SeoCollectionState extends State<SeoCollection>
                 seoCollectionCategoryIndexes(item.categories, categories),
             sortKey: item.sortKey,
           ),
-      ],
+      ]),
     );
   }
 
@@ -202,8 +208,18 @@ class _SeoCollectionState extends State<SeoCollection>
         state: _state,
       );
 
+  bool _canApply(SeoCollectionAction action) => canApplySeoCollectionAction(
+        widget.transition,
+        _state,
+        action,
+        records: _collectionData.records,
+        categoryCount: _collectionData.categories.length,
+        pageSize: widget.pageSize,
+      );
+
   void _dispatch(SeoCollectionAction action) {
-    final next = transitionSeoCollection(
+    final next = applySeoCollectionTransition(
+      widget.transition,
       _state,
       action,
       records: _collectionData.records,
@@ -340,7 +356,7 @@ class _SeoCollectionState extends State<SeoCollection>
               _control(
                 label: widget.previousLabel,
                 visibleLabel: '\u2039',
-                enabled: snapshot.state.page > 0,
+                enabled: _canApply(const SeoCollectionPreviousPage()),
                 onTap: () => _dispatch(const SeoCollectionPreviousPage()),
               ),
               Expanded(
@@ -354,7 +370,7 @@ class _SeoCollectionState extends State<SeoCollection>
               _control(
                 label: widget.nextLabel,
                 visibleLabel: '\u203a',
-                enabled: snapshot.state.page < snapshot.pageCount - 1,
+                enabled: _canApply(const SeoCollectionNextPage()),
                 onTap: () => _dispatch(const SeoCollectionNextPage()),
               ),
             ],

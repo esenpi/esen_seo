@@ -9,6 +9,13 @@ const siteBase = 'https://esen.software';
 
 typedef DemoTabData = ({String content, String label});
 typedef DemoCarouselData = ({String content, String label});
+typedef DemoCollectionData = ({
+  List<String> categories,
+  String content,
+  String searchText,
+  int sortKey,
+  String title,
+});
 typedef DemoStepperData = ({String content, String label});
 
 class DemoNavData {
@@ -73,6 +80,30 @@ const demoCarouselSlides = <DemoCarouselData>[
   ),
 ];
 
+const demoCollectionItems = <DemoCollectionData>[
+  (
+    title: 'Semantic routes',
+    content: 'One route table feeds Flutter and permanent HTML.',
+    searchText: 'routing flutter html',
+    categories: ['Architecture'],
+    sortKey: 30,
+  ),
+  (
+    title: 'Compiled transitions',
+    content: 'Pure application state logic runs in the browser.',
+    searchText: 'dart javascript state',
+    categories: ['Runtime'],
+    sortKey: 20,
+  ),
+  (
+    title: 'Complete source',
+    content: 'Every item remains readable without JavaScript.',
+    searchText: 'seo no javascript content',
+    categories: ['Architecture'],
+    sortKey: 10,
+  ),
+];
+
 const demoStepperSteps = <DemoStepperData>[
   (
     label: 'Choose content',
@@ -105,6 +136,31 @@ List<SeoCarouselComponentEntry> demoCarouselEntries() => [
       for (final slide in demoCarouselSlides)
         (label: slide.label, nodes: demoCarouselSlideNodes(slide)),
     ];
+
+List<SeoCollectionComponentEntry> demoCollectionEntries() => [
+      for (final item in demoCollectionItems)
+        (
+          title: item.title,
+          searchText: item.searchText,
+          categories: item.categories,
+          sortKey: item.sortKey,
+          nodes: [
+            SeoNode(tag: 'h2', text: item.title),
+            SeoNode(tag: 'p', text: item.content),
+          ],
+        ),
+    ];
+
+List<SeoNode> demoCollectionNodes({
+  String interactionId = 'demo-collection',
+  String interactionLabel = 'Article collection',
+}) =>
+    buildSeoCollectionNodes(
+      items: demoCollectionEntries(),
+      interactionId: interactionId,
+      interactionLabel: interactionLabel,
+      pageSize: 2,
+    );
 
 List<SeoNode> demoStepperBodyNodes(DemoStepperData step) => [
       SeoNode(tag: 'p', text: step.content),
@@ -376,6 +432,31 @@ final seoRoutes = [
       ...demoCarouselNodes(
         interactionId: 'application-demo-carousel',
         interactionLabel: 'Application rendering carousel',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
+    path: '/dom-first-application-collection',
+    delivery: SeoRouteDelivery.domFirst,
+    applicationRuntime:
+        const SeoDomFirstApplicationRuntime.collection('example-collection'),
+    meta: (_) => SeoMeta(
+      title: 'Application Collection — esen_seo',
+      description: 'Application-authored pure Dart collection logic compiled '
+          'for the permanent semantic page.',
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'Application-owned Collection'),
+      SeoNode(
+        tag: 'p',
+        text: 'The application transition starts category views with a clear '
+            'search and title order. Flutter and this DOM-first route call '
+            'the same pure Dart function.',
+      ),
+      ...demoCollectionNodes(
+        interactionId: 'application-demo-collection',
+        interactionLabel: 'Application article collection',
       ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],

@@ -16,6 +16,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.carousel(String id) =
       SeoDomFirstCarouselApplicationRuntime;
 
+  /// Uses application-authored logic with the package collection adapter.
+  const factory SeoDomFirstApplicationRuntime.collection(String id) =
+      SeoDomFirstCollectionApplicationRuntime;
+
   /// Uses an application-authored transition with the package stepper adapter.
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
@@ -52,6 +56,15 @@ final class SeoDomFirstCarouselApplicationRuntime
 
   @override
   String get kind => 'carousel';
+}
+
+/// An application-authored transition executed by the collection adapter.
+final class SeoDomFirstCollectionApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstCollectionApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'collection';
 }
 
 /// An application-authored transition executed by the stepper adapter.

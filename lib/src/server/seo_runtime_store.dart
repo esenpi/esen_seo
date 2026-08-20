@@ -176,7 +176,12 @@ final class SeoDomFirstRuntimeArtifact {
         manifest.bytes > seoDomFirstRuntimeMaxBytes ||
         manifest.gzipBytes < 1 ||
         manifest.gzipBytes > seoDomFirstRuntimeMaxGzipBytes) {
-      throw StateError('Runtime "${reference.id}" exceeds its size budget.');
+      throw StateError(
+        'Runtime "${reference.id}" exceeds its size budget '
+        '(${manifest.bytes} raw, ${manifest.gzipBytes} gzip bytes; maximum '
+        '$seoDomFirstRuntimeMaxBytes raw, $seoDomFirstRuntimeMaxGzipBytes '
+        'gzip bytes).',
+      );
     }
     final encoded = utf8.encode(javascript);
     if (encoded.length > seoDomFirstRuntimeMaxBytes) {

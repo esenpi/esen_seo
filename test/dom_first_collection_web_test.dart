@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
+import 'package:esen_seo/src/renderer/dom_first_collection_adapter_web.dart';
 import 'package:esen_seo/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
@@ -119,6 +120,75 @@ void main() {
             .querySelector('.esen-seo-collection-pagination')
             ?.hasAttribute('hidden'),
         isTrue);
+  });
+
+  test('application transition drives the validated browser adapter', () {
+    final root = _collection(_container(fixture), 'application-collection');
+
+    enhanceSeoDomFirstCollections(
+      transition: _titleWhileSearching,
+      enableUrlSynchronization: false,
+    );
+    final search = root.querySelector('input')! as web.HTMLInputElement;
+    search.value = 'flutter';
+    search.dispatchEvent(web.Event('input'));
+
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Alpha',
+      'Über Flutter',
+    ]);
+    final sorts = root.querySelectorAll('[data-esen-collection-sort]');
+    expect(
+      (sorts.item(2) as web.Element).getAttribute('aria-pressed'),
+      'true',
+    );
+  });
+
+  test('invalid application output leaves DOM and URL state unchanged', () {
+    final root = _collection(
+      _container(fixture),
+      'rejected-application-collection',
+    );
+    final before = web.window.location.href;
+
+    enhanceSeoDomFirstCollections(
+      transition: (
+        state,
+        action, {
+        required records,
+        required categoryCount,
+        required pageSize,
+      }) =>
+          const SeoCollectionState(categoryIndex: 999, page: 999),
+      enableUrlSynchronization: false,
+    );
+    final search = root.querySelector('input')! as web.HTMLInputElement;
+    search.value = 'flutter';
+    search.dispatchEvent(web.Event('input'));
+
+    expect(search.value, '');
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Über Flutter',
+      'CMS',
+    ]);
+    expect(web.window.location.href, before);
+  });
+
+  test('application mode rejects URL synchronization before mutation', () {
+    final root = _collection(
+      _container(fixture),
+      'application-url-collection',
+      synchronizeUrl: true,
+    );
+
+    enhanceSeoDomFirstCollections(
+      transition: _titleWhileSearching,
+      enableUrlSynchronization: false,
+    );
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(root.querySelectorAll('input,button').length, 0);
+    expect(_visibleItems(root), hasLength(4));
   });
 
   test('combined feature script enhances collection and theme together', () {
@@ -434,6 +504,30 @@ void main() {
     expect(_visibleItems(first).map((item) => item.textContent), ['CMS']);
     expect(_visibleItems(second).map((item) => item.textContent), ['Adapter']);
   });
+}
+
+SeoCollectionState _titleWhileSearching(
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+}) {
+  final next = transitionSeoCollection(
+    state,
+    action,
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
+  if (action is! SeoCollectionSetQuery || next.query.isEmpty) return next;
+  return transitionSeoCollection(
+    next,
+    const SeoCollectionSetSort(SeoCollectionSort.title),
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
 }
 
 web.HTMLElement _container(web.HTMLElement fixture) {

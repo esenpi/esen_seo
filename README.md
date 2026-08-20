@@ -863,9 +863,9 @@ created only after the complete collection structure has been validated.
 
 ### Application-owned state
 
-A DOM-first route can instead execute a tabs, carousel or stepper transition
-authored in the application. Write it as a state-free top-level Dart function
-under `lib/` and pass the same function to Flutter:
+A DOM-first route can instead execute a tabs, carousel, collection or stepper
+transition authored in the application. Write it as a state-free top-level
+Dart function under `lib/` and pass the same function to Flutter:
 
 ```dart
 // lib/product_tabs_transition.dart — pure Dart, no Flutter import
@@ -917,9 +917,71 @@ SeoStepper(
 );
 ```
 
+`SeoCollectionTransition` additionally receives the prepared, read-only
+records and its closed category/page configuration. The package validates the
+returned state before Flutter or the browser applies it. This example makes
+page navigation wrap while search, filtering and sorting keep their built-in
+semantics:
+
+```dart
+SeoCollectionState transitionArticles(
+  SeoCollectionState state,
+  SeoCollectionAction action, {
+  required List<SeoCollectionRecord> records,
+  required int categoryCount,
+  required int pageSize,
+}) {
+  final snapshot = selectSeoCollection(
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+    state: state,
+  );
+  final current = snapshot.state;
+  if (snapshot.pageCount > 1 &&
+      action is SeoCollectionPreviousPage &&
+      current.page == 0) {
+    return SeoCollectionState(
+      query: current.query,
+      categoryIndex: current.categoryIndex,
+      sort: current.sort,
+      page: snapshot.pageCount - 1,
+    );
+  }
+  if (snapshot.pageCount > 1 &&
+      action is SeoCollectionNextPage &&
+      current.page == snapshot.pageCount - 1) {
+    return SeoCollectionState(
+      query: current.query,
+      categoryIndex: current.categoryIndex,
+      sort: current.sort,
+    );
+  }
+  return transitionSeoCollection(
+    current,
+    action,
+    records: records,
+    categoryCount: categoryCount,
+    pageSize: pageSize,
+  );
+}
+
+SeoCollection(
+  transition: transitionArticles,
+  items: flutterArticles,
+);
+```
+
+The first application-owned collection slice is deliberately local: leave
+`synchronizeUrl` false. Its compiled adapter rejects a URL-synchronized
+collection before the first mutation, leaving all items as static HTML. Use
+the package-owned `SeoDomFirstFeature.collection` runtime when shareable
+History state is required; admitting application logic into restoration needs
+a separate state-hydration contract and performance gate.
+
 Compile only the selected transition and its package-owned adapter. Tabs is
-the default kind for backward compatibility; select carousel or stepper
-explicitly:
+the default kind for backward compatibility; select carousel, collection or
+stepper explicitly:
 
 ```shell
 dart run esen_seo:esen_seo_runtime \
@@ -932,6 +994,12 @@ dart run esen_seo:esen_seo_runtime \
   --id product-carousel \
   --library package:my_app/product_carousel_transition.dart \
   --symbol transitionProductCarousel
+
+dart run esen_seo:esen_seo_runtime \
+  --kind collection \
+  --id article-collection \
+  --library package:my_app/article_collection_transition.dart \
+  --symbol transitionArticles
 
 dart run esen_seo:esen_seo_runtime \
   --kind stepper \
@@ -986,11 +1054,13 @@ SeoRoute(
 
 For a carousel route use
 `SeoDomFirstApplicationRuntime.carousel('product-carousel')` together with
-`buildSeoCarouselNodes`. For a stepper route use
+`buildSeoCarouselNodes`. For a collection route use
+`SeoDomFirstApplicationRuntime.collection('article-collection')` with
+`buildSeoCollectionNodes`. For a stepper route use
 `SeoDomFirstApplicationRuntime.stepper('product-stepper')` together with
 `buildSeoStepperNodes`. Runtime kind is part of the artifact filename, so
-tabs, carousel and stepper transitions with the same logical id cannot
-overwrite each other.
+tabs, carousel, collection and stepper transitions with the same logical id
+cannot overwrite each other.
 
 Finally give the server or prerenderer the build-owned directory:
 

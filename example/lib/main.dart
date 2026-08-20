@@ -2,6 +2,7 @@ import 'package:esen_seo/esen_seo.dart';
 import 'package:flutter/material.dart';
 
 import 'application_carousel_transition.dart';
+import 'application_collection_transition.dart';
 import 'application_stepper_transition.dart';
 import 'application_tabs_transition.dart';
 import 'docs_page.dart';
@@ -22,6 +23,7 @@ final Map<String, WidgetBuilder> _pages = {
   '/demo': (_) => const DemoPage(),
   '/docs': (_) => const DocsPage(),
   '/dom-first-application-carousel': (_) => const ApplicationCarouselPage(),
+  '/dom-first-application-collection': (_) => const ApplicationCollectionPage(),
   '/dom-first-application-stepper': (_) => const ApplicationStepperPage(),
   '/dom-first-application-tabs': (_) => const ApplicationTabsPage(),
 };
@@ -350,6 +352,55 @@ class ApplicationCarouselPage extends StatelessWidget {
                       child: Text(slide.content),
                     ),
                     nodes: demoCarouselSlideNodes(slide),
+                  ),
+              ],
+            ),
+          ],
+        ).main,
+      );
+}
+
+class ApplicationCollectionPage extends StatelessWidget {
+  const ApplicationCollectionPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 20,
+          children: [
+            Text(
+              'Application-owned Collection',
+              style: Theme.of(context).textTheme.displaySmall,
+            ).h1,
+            const Para(
+              'The application transition starts category views with a clear '
+              'search and title order. Flutter and DOM-first call the same '
+              'function.',
+            ),
+            SeoCollection(
+              interactionId: 'application-demo-collection',
+              interactionLabel: 'Application article collection',
+              pageSize: 2,
+              transition: transitionExampleCollection,
+              items: [
+                for (final item in demoCollectionItems)
+                  SeoCollectionEntry(
+                    title: item.title,
+                    searchText: item.searchText,
+                    categories: item.categories,
+                    sortKey: item.sortKey,
+                    content: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.title),
+                        Text(item.content),
+                      ],
+                    ),
+                    nodes: [
+                      SeoNode(tag: 'h2', text: item.title),
+                      SeoNode(tag: 'p', text: item.content),
+                    ],
                   ),
               ],
             ),

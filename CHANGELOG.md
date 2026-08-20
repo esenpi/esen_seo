@@ -1,3 +1,14 @@
+## Unreleased
+
+* Added application-authored `SeoCollectionTransition` compilation and typed
+  `SeoDomFirstApplicationRuntime.collection` delivery. Flutter and the
+  validated DOM-first adapter can execute the same pure search, category,
+  sort and pagination policy; immutable records, canonical state validation
+  and fail-closed transition probes keep invalid output from reaching controls
+  or URL state. Application-owned collections remain local in this slice;
+  URL-synchronized markup stays complete static HTML, while the package-owned
+  collection runtime retains its existing History support.
+
 ## 0.11.0
 
 * Added application-authored `SeoStepperTransition` compilation and typed

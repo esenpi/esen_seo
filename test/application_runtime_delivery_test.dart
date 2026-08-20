@@ -7,6 +7,8 @@ import 'package:shelf/shelf.dart';
 const _reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
 const _carouselReference =
     SeoDomFirstApplicationRuntime.carousel('application-carousel');
+const _collectionReference =
+    SeoDomFirstApplicationRuntime.collection('application-collection');
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _javascript = '(function(){var applicationTabs=true;})();';
@@ -62,6 +64,26 @@ List<SeoNode> _carouselNodes() => buildSeoCarouselNodes(
       interactionId: 'application-carousel-control',
     );
 
+List<SeoNode> _collectionNodes() => buildSeoCollectionNodes(
+      items: [
+        (
+          title: 'First',
+          searchText: 'First article',
+          categories: const ['Docs'],
+          sortKey: 2,
+          nodes: [SeoNode(tag: 'p', text: 'First article')],
+        ),
+        (
+          title: 'Second',
+          searchText: 'Second article',
+          categories: const ['News'],
+          sortKey: 1,
+          nodes: [SeoNode(tag: 'p', text: 'Second article')],
+        ),
+      ],
+      interactionId: 'application-collection-control',
+    );
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -78,6 +100,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.collection},
+          applicationRuntime: _collectionReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -142,8 +174,13 @@ void main() {
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.carousel('same-id')),
       );
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(const SeoDomFirstApplicationRuntime.collection('same-id')),
+      );
       expect(_reference.kind, 'tabs');
       expect(_carouselReference.kind, 'carousel');
+      expect(_collectionReference.kind, 'collection');
       expect(_stepperReference.kind, 'stepper');
     });
 
@@ -206,6 +243,26 @@ void main() {
         contains(
           'data-esen-seo-dom-first-application-runtime='
           '"application-carousel"',
+        ),
+      );
+    });
+
+    test('collection runtime selects only its structural stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _collectionNodes(),
+        applicationRuntime: _artifact(_collectionReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="collection"'));
+      expect(html, contains(seoDomFirstCollectionStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-collection"',
         ),
       );
     });

@@ -181,6 +181,25 @@ jobs:
           --symbol transitionExampleCarousel
           --check
 
+      - name: Build the application-owned collection runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind collection
+          --id example-collection
+          --library package:example/application_collection_transition.dart
+          --symbol transitionExampleCollection
+
+      - name: Verify the application-owned collection runtime
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --kind collection
+          --id example-collection
+          --library package:example/application_collection_transition.dart
+          --symbol transitionExampleCollection
+          --check
+
       # Und dann durch den echten Prerenderer, damit ein Fehler in der
       # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.
       - name: Prerender
@@ -207,6 +226,13 @@ jobs:
           grep -q 'data-esen-seo-dom-first-application-runtime="example-carousel"' "$carousel"
           if grep -q 'flutter_bootstrap.js\|main.dart.js' "$carousel"; then
             echo "::error::DOM-first application carousel loads Flutter"
+            exit 1
+          fi
+          collection=build/web/dom-first-application-collection/index.html
+          test -s "$collection"
+          grep -q 'data-esen-seo-dom-first-application-runtime="example-collection"' "$collection"
+          if grep -q 'flutter_bootstrap.js\|main.dart.js' "$collection"; then
+            echo "::error::DOM-first application collection loads Flutter"
             exit 1
           fi
           test -s build/web/sitemap.xml

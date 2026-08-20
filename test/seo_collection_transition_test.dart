@@ -182,6 +182,98 @@ void main() {
       expect(record.categoryIndexes, [1]);
       expect(() => record.categoryIndexes.add(3), throwsUnsupportedError);
     });
+
+    test('application transitions run inside the canonical state boundary', () {
+      SeoCollectionState titleWhileSearching(
+        SeoCollectionState state,
+        SeoCollectionAction action, {
+        required List<SeoCollectionRecord> records,
+        required int categoryCount,
+        required int pageSize,
+      }) {
+        final next = transitionSeoCollection(
+          state,
+          action,
+          records: records,
+          categoryCount: categoryCount,
+          pageSize: pageSize,
+        );
+        if (action is! SeoCollectionSetQuery || next.query.isEmpty) {
+          return next;
+        }
+        return transitionSeoCollection(
+          next,
+          const SeoCollectionSetSort(SeoCollectionSort.title),
+          records: records,
+          categoryCount: categoryCount,
+          pageSize: pageSize,
+        );
+      }
+
+      final next = applySeoCollectionTransition(
+        titleWhileSearching,
+        const SeoCollectionState(),
+        const SeoCollectionSetQuery('flutter'),
+        records: _records,
+        categoryCount: 3,
+        pageSize: 10,
+      );
+
+      expect(next.query, 'flutter');
+      expect(next.categoryIndex, isNull);
+      expect(next.sort, SeoCollectionSort.title);
+      expect(next.page, 0);
+    });
+
+    test('application transitions cannot mutate records or escape bounds', () {
+      SeoCollectionState mutateRecords(
+        SeoCollectionState state,
+        SeoCollectionAction action, {
+        required List<SeoCollectionRecord> records,
+        required int categoryCount,
+        required int pageSize,
+      }) {
+        records.clear();
+        return state;
+      }
+
+      const current = SeoCollectionState(
+        query: 'flutter',
+        categoryIndex: 0,
+      );
+      final unchanged = applySeoCollectionTransition(
+        mutateRecords,
+        current,
+        const SeoCollectionNextPage(),
+        records: List<SeoCollectionRecord>.unmodifiable(_records),
+        categoryCount: 3,
+        pageSize: 1,
+      );
+      _expectSameCollectionState(unchanged, current);
+      expect(_records, hasLength(4));
+
+      for (final invalid in [
+        SeoCollectionState(
+          query: List.filled(seoCollectionMaxSearchLength + 1, 'x').join(),
+        ),
+        const SeoCollectionState(categoryIndex: 99),
+        const SeoCollectionState(page: 99),
+      ]) {
+        final result = applySeoCollectionTransition(
+          (_, __,
+                  {required records,
+                  required categoryCount,
+                  required pageSize}) =>
+              invalid,
+          current,
+          const SeoCollectionNextPage(),
+          records: _records,
+          categoryCount: 3,
+          pageSize: 1,
+        );
+        _expectSameCollectionState(result, current);
+      }
+    });
   });
 
   group('collection markup', () {
@@ -278,4 +370,14 @@ void main() {
       expect(html, isNot(contains('data-esen-component')));
     });
   });
+}
+
+void _expectSameCollectionState(
+  SeoCollectionState actual,
+  SeoCollectionState expected,
+) {
+  expect(actual.query, expected.query);
+  expect(actual.categoryIndex, expected.categoryIndex);
+  expect(actual.sort, expected.sort);
+  expect(actual.page, expected.page);
 }

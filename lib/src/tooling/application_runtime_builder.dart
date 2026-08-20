@@ -39,6 +39,21 @@ final class SeoCarouselRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one application-authored collection runtime build.
+final class SeoCollectionRuntimeBuildRequest {
+  const SeoCollectionRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.symbol,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String symbol;
+  final String outputDirectory;
+}
+
 /// Inputs for one application-authored stepper runtime build.
 final class SeoStepperRuntimeBuildRequest {
   const SeoStepperRuntimeBuildRequest({
@@ -80,6 +95,23 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoCarouselApplicationRuntime(
     _buildApplicationRuntime(
       _ApplicationRuntimeBuildRequest(
         reference: SeoDomFirstApplicationRuntime.carousel(request.id),
+        library: request.library,
+        symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked collection transition and writes its verified files.
+Future<SeoDomFirstRuntimeArtifact> buildSeoCollectionApplicationRuntime(
+  SeoCollectionRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.collection(request.id),
         library: request.library,
         symbol: request.symbol,
         outputDirectory: request.outputDirectory,
@@ -179,6 +211,10 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
           libraryUri,
           request.symbol,
         ),
+      SeoDomFirstCollectionApplicationRuntime() => _collectionEntrypointSource(
+          libraryUri,
+          request.symbol,
+        ),
       SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
           libraryUri,
           request.symbol,
@@ -252,6 +288,16 @@ SeoCarouselState _applicationTransition(
 
 void main() => enhanceSeoDomFirstCarousels(
   transition: _applicationTransition,
+);
+''';
+
+String _collectionEntrypointSource(Uri library, String symbol) => '''
+import 'package:esen_seo/src/renderer/dom_first_collection_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+void main() => enhanceSeoDomFirstCollections(
+  transition: application.$symbol,
+  enableUrlSynchronization: false,
 );
 ''';
 
@@ -449,6 +495,8 @@ final class _PackageGraph {
                   'package:esen_seo/src/components/seo_tabs_transition.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_carousel_transition.dart' ||
+              rawUri ==
+                  'package:esen_seo/src/components/seo_collection_transition.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_stepper_transition.dart')) {
         return File('');
