@@ -1,6 +1,6 @@
 name: esen_seo
 description: "Real semantic HTML for Flutter Web — SEO widget extensions, meta tags, OpenGraph, JSON-LD and a bot-aware SSR server. No Puppeteer, pure Dart."
-version: 0.11.0
+version: 0.12.0
 repository: https://github.com/esenpi/esen_seo
 executables:
   esen_seo_runtime: esen_seo_runtime

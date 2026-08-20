@@ -1,4 +1,4 @@
-## Unreleased
+## 0.12.0
 
 * Added an opt-in declarative Stepper effect slice. A pure application
   transition can atomically return its next state and one closed request to
