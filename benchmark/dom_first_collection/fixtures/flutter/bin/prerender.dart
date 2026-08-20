@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:esen_dom_first_collection_flutter_baseline/collection_data.dart';
 import 'package:esen_seo/server.dart';
+
+import '../lib/collection_data.dart';
 
 Future<void> main() async {
   final css = await File('../shared.css').readAsString();
