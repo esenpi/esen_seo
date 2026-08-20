@@ -1397,7 +1397,8 @@ Ballpark numbers from an Apple-silicon laptop (Dart VM):
 | `BotDetector.isBot` per request (precompiled matcher) | ~0.3 µs |
 | Route-table lookup across 21 routes | ~1.5 µs |
 
-Reproduce them yourself: `dart run benchmark/hot_paths.dart`.
+Reproduce them from a repository checkout:
+`dart run benchmark/hot_paths.dart`.
 
 ## An honest word on Core Web Vitals
 

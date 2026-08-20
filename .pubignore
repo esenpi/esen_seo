@@ -5,9 +5,7 @@ build/
 .dart_tool/
 node_modules/
 .next/
-benchmark/dom_first/fixtures/next/out/
-benchmark/dom_first_collection/fixtures/next/out/
-benchmark/dom_first_stepper_effects/fixtures/next/out/
+benchmark/
 .idea/
 portfolio/
 *.iml
