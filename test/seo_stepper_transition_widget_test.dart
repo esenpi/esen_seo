@@ -121,7 +121,7 @@ void main() {
 
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      isNot('SeoStepper active panel'),
+      isNot('SeoStepper panel 1'),
     );
     await tester.tap(find.text('Next'));
     await tester.pump();
@@ -129,7 +129,7 @@ void main() {
     expect(find.text('Body 1'), findsOneWidget);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      'SeoStepper active panel',
+      'SeoStepper panel 1',
     );
   });
 
@@ -155,7 +155,62 @@ void main() {
     expect(find.text('Body 1'), findsNothing);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      isNot('SeoStepper active panel'),
+      isNot('SeoStepper panel 1'),
+    );
+  });
+
+  testWidgets('Flutter focuses each concrete panel over repeated changes',
+      (tester) async {
+    SeoStepperEffectResult wrapAndFocus(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      final last = state.count - 1;
+      final index = switch (action) {
+        SeoStepperNext() => state.index == last ? 0 : state.index + 1,
+        SeoStepperPrevious() => state.index == 0 ? last : state.index - 1,
+        _ => transitionSeoStepper(state, action).index,
+      };
+      final next = SeoStepperState(index: index, count: state.count);
+      return SeoStepperEffectResult(
+        state: next,
+        effect: next == state ? null : const SeoStepperFocusActivePanel(),
+      );
+    }
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoStepper.withEffects(
+          effectTransition: wrapAndFocus,
+          steps: steps(),
+        ),
+      ),
+    );
+
+    for (final action in const [
+      (label: 'Next', expected: 1),
+      (label: 'Next', expected: 2),
+      (label: 'Next', expected: 0),
+      (label: 'Back', expected: 2),
+    ]) {
+      await tester.tap(find.text(action.label));
+      await tester.pump();
+      expect(find.text('Body ${action.expected}'), findsOneWidget);
+      expect(
+        tester.binding.focusManager.primaryFocus?.debugLabel,
+        'SeoStepper panel ${action.expected}',
+      );
+    }
+
+    await tester.tap(find.text('Back'));
+    await tester.tap(find.text('Back'));
+    await tester.pump();
+
+    expect(find.text('Body 0'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'SeoStepper panel 0',
     );
   });
 }

@@ -120,14 +120,13 @@ class _SeoStepperState extends State<SeoStepper>
     with SeoBlockState<SeoStepper> {
   late SeoStepperState _stepperState;
   late Set<int> _visited;
-  FocusNode? _effectPanelFocus;
+  final Map<int, FocusNode> _effectPanelFocusNodes = {};
 
   @override
   void initState() {
     super.initState();
     _stepperState = _initialState();
     _visited = {if (widget.steps.isNotEmpty) _index};
-    _syncEffectFocusNode();
   }
 
   int get _index => _stepperState.index;
@@ -140,11 +139,11 @@ class _SeoStepperState extends State<SeoStepper>
   @override
   void didUpdateWidget(SeoStepper oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncEffectFocusNode();
     var replaced = widget.steps.length != oldWidget.steps.length;
     for (var i = 0; !replaced && i < widget.steps.length; i++) {
       replaced = widget.steps[i].label != oldWidget.steps[i].label;
     }
+    _syncEffectFocusNodes(reset: replaced);
     if (widget.steps.isEmpty) {
       _stepperState = _initialState();
       _visited.clear();
@@ -165,18 +164,26 @@ class _SeoStepperState extends State<SeoStepper>
     }
   }
 
-  void _syncEffectFocusNode() {
-    if (widget.effectTransition != null) {
-      _effectPanelFocus ??= FocusNode(debugLabel: 'SeoStepper active panel');
-    } else {
-      _effectPanelFocus?.dispose();
-      _effectPanelFocus = null;
+  void _syncEffectFocusNodes({required bool reset}) {
+    if (widget.effectTransition == null || reset) {
+      for (final node in _effectPanelFocusNodes.values) {
+        node.dispose();
+      }
+      _effectPanelFocusNodes.clear();
     }
   }
 
+  FocusNode _effectPanelFocusNode(int index) =>
+      _effectPanelFocusNodes.putIfAbsent(
+        index,
+        () => FocusNode(debugLabel: 'SeoStepper panel $index'),
+      );
+
   @override
   void dispose() {
-    _effectPanelFocus?.dispose();
+    for (final node in _effectPanelFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -215,19 +222,26 @@ class _SeoStepperState extends State<SeoStepper>
                 enabled: index == _index,
                 child: ExcludeFocus(
                   excluding: index != _index,
-                  child: widget.steps[index].content,
+                  child: _buildEffectPanel(index),
                 ),
               ),
             ),
         ],
       ),
     );
-    final focusNode = _effectPanelFocus;
-    if (focusNode == null) return panels;
+    return panels;
+  }
+
+  Widget _buildEffectPanel(int index) {
+    final content = widget.steps[index].content;
+    if (widget.effectTransition == null) return content;
     return Semantics(
       container: true,
-      label: widget.steps[_index].label,
-      child: Focus(focusNode: focusNode, child: panels),
+      label: widget.steps[index].label,
+      child: Focus(
+        focusNode: _effectPanelFocusNode(index),
+        child: content,
+      ),
     );
   }
 
@@ -363,11 +377,20 @@ class _SeoStepperState extends State<SeoStepper>
         _visited.add(result.state.index);
       });
       widget.onStepChanged?.call(result.state.index);
-      for (final effect in result.effects) {
-        switch (effect) {
-          case SeoStepperFocusActivePanel():
-            _effectPanelFocus?.requestFocus();
-        }
+      if (result.effects.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              widget.effectTransition == null ||
+              _stepperState != result.state) {
+            return;
+          }
+          for (final effect in result.effects) {
+            switch (effect) {
+              case SeoStepperFocusActivePanel():
+                _effectPanelFocusNode(result.state.index).requestFocus();
+            }
+          }
+        });
       }
       return;
     }

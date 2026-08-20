@@ -62,7 +62,7 @@ void main() {
     expect(find.text(demoStepperSteps.first.content), findsNothing);
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      'SeoStepper active panel',
+      'SeoStepper panel 2',
     );
   });
 }
