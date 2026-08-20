@@ -95,4 +95,67 @@ void main() {
     expect(find.text('Body 2'), findsOneWidget);
     expect(find.text('Body 0'), findsNothing);
   });
+
+  testWidgets('Flutter applies a focus effect after the accepted state',
+      (tester) async {
+    SeoStepperEffectResult focusAfterChange(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      final next = transitionSeoStepper(state, action);
+      return SeoStepperEffectResult(
+        state: next,
+        effect: next == state ? null : const SeoStepperFocusActivePanel(),
+      );
+    }
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoStepper.withEffects(
+          effectTransition: focusAfterChange,
+          steps: steps(),
+        ),
+      ),
+    );
+
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot('SeoStepper active panel'),
+    );
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+
+    expect(find.text('Body 1'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'SeoStepper active panel',
+    );
+  });
+
+  testWidgets('Flutter rejects invalid effect output atomically',
+      (tester) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoStepper.withEffects(
+          effectTransition: (state, action) => SeoStepperEffectResult(
+            state: SeoStepperState(index: state.count, count: state.count),
+            effect: const SeoStepperFocusActivePanel(),
+          ),
+          steps: steps(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+
+    expect(find.text('Body 0'), findsOneWidget);
+    expect(find.text('Body 1'), findsNothing);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot('SeoStepper active panel'),
+    );
+  });
 }

@@ -219,6 +219,33 @@ void main() {
     );
   });
 
+  test('stepper effect builds use the same safety boundary', () async {
+    await write('lib/transition.dart', "import 'dart:io';");
+
+    await expectLater(
+      buildSeoStepperEffectsApplicationRuntime(
+        const SeoStepperEffectsRuntimeBuildRequest(
+          id: 'fixture-stepper-effects',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionStepperEffects',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      buildSeoStepperEffectsApplicationRuntime(
+        const SeoStepperEffectsRuntimeBuildRequest(
+          id: '../stepper-effects',
+          library: 'package:fixture_app/transition.dart',
+          symbol: 'transitionStepperEffects',
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('carousel builds use the same pre-compilation safety boundary',
       () async {
     await write('lib/transition.dart', "import 'dart:io';");

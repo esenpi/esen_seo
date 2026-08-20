@@ -8,6 +8,8 @@ void main() {
   const reference = SeoDomFirstApplicationRuntime.tabs('application-tabs');
   const stepperReference =
       SeoDomFirstApplicationRuntime.stepper('application-tabs');
+  const stepperEffectsReference =
+      SeoDomFirstApplicationRuntime.stepperEffects('application-tabs');
   const carouselReference =
       SeoDomFirstApplicationRuntime.carousel('application-tabs');
   const javascript = '(function(){var value=1;return value;})();';
@@ -97,12 +99,20 @@ void main() {
     test('keeps equal ids of different runtime kinds independent', () async {
       const stepperJavascript = '(function(){var step=2;return step;})();';
       const carouselJavascript = '(function(){var slide=3;return slide;})();';
+      const stepperEffectsJavascript =
+          '(function(){var effect=4;return effect;})();';
       final stepperArtifact = SeoDomFirstRuntimeArtifact.create(
         reference: stepperReference,
         javascript: stepperJavascript,
         dartVersion: dartVersion,
       );
       await _write(directory, stepperArtifact);
+      final stepperEffectsArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: stepperEffectsReference,
+        javascript: stepperEffectsJavascript,
+        dartVersion: dartVersion,
+      );
+      await _write(directory, stepperEffectsArtifact);
       final carouselArtifact = SeoDomFirstRuntimeArtifact.create(
         reference: carouselReference,
         javascript: carouselJavascript,
@@ -120,6 +130,10 @@ void main() {
         (await store.load(carouselReference)).javascript,
         carouselJavascript,
       );
+      expect(
+        (await store.load(stepperEffectsReference)).javascript,
+        stepperEffectsJavascript,
+      );
       expect(await _javascriptFile(directory, reference).exists(), isTrue);
       expect(
         await _javascriptFile(directory, stepperReference).exists(),
@@ -127,6 +141,10 @@ void main() {
       );
       expect(
         await _javascriptFile(directory, carouselReference).exists(),
+        isTrue,
+      );
+      expect(
+        await _javascriptFile(directory, stepperEffectsReference).exists(),
         isTrue,
       );
     });

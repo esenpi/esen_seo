@@ -391,8 +391,9 @@ final seoRoutes = [
   SeoRoute(
     path: '/dom-first-application-stepper',
     delivery: SeoRouteDelivery.domFirst,
-    applicationRuntime:
-        const SeoDomFirstApplicationRuntime.stepper('example-stepper'),
+    applicationRuntime: const SeoDomFirstApplicationRuntime.stepperEffects(
+      'example-stepper-effects',
+    ),
     meta: (_) => SeoMeta(
       title: 'Application Stepper — esen_seo',
       description: 'Application-authored pure Dart stepper logic compiled '
@@ -403,8 +404,8 @@ final seoRoutes = [
       SeoNode(
         tag: 'p',
         text: 'The application transition wraps previous and next at either '
-            'end. Flutter and this DOM-first route call the same pure Dart '
-            'function.',
+            'end, then focuses the active panel. Flutter and this DOM-first '
+            'route call the same pure Dart function.',
       ),
       ...demoStepperNodes(
         interactionId: 'application-demo-stepper',

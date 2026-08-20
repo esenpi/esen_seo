@@ -24,6 +24,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
 
+  /// Uses an application-authored stepper transition with closed effects.
+  const factory SeoDomFirstApplicationRuntime.stepperEffects(String id) =
+      SeoDomFirstStepperEffectsApplicationRuntime;
+
   /// The logical build-artifact identity.
   final String id;
 
@@ -74,6 +78,15 @@ final class SeoDomFirstStepperApplicationRuntime
 
   @override
   String get kind => 'stepper';
+}
+
+/// An application-authored state and effect transition for the stepper.
+final class SeoDomFirstStepperEffectsApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstStepperEffectsApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'stepper-effects';
 }
 
 /// Whether [id] is safe as a logical identity and artifact file component.

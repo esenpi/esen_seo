@@ -69,6 +69,21 @@ final class SeoStepperRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one application-authored stepper effects runtime build.
+final class SeoStepperEffectsRuntimeBuildRequest {
+  const SeoStepperEffectsRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.symbol,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String symbol;
+  final String outputDirectory;
+}
+
 /// Compiles one checked application transition and writes its verified files.
 Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
   SeoTabsRuntimeBuildRequest request, {
@@ -129,6 +144,23 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoStepperApplicationRuntime(
     _buildApplicationRuntime(
       _ApplicationRuntimeBuildRequest(
         reference: SeoDomFirstApplicationRuntime.stepper(request.id),
+        library: request.library,
+        symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked stepper effects transition and writes its files.
+Future<SeoDomFirstRuntimeArtifact> buildSeoStepperEffectsApplicationRuntime(
+  SeoStepperEffectsRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.stepperEffects(request.id),
         library: request.library,
         symbol: request.symbol,
         outputDirectory: request.outputDirectory,
@@ -216,6 +248,11 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
           request.symbol,
         ),
       SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
+          libraryUri,
+          request.symbol,
+        ),
+      SeoDomFirstStepperEffectsApplicationRuntime() =>
+        _stepperEffectsEntrypointSource(
           libraryUri,
           request.symbol,
         ),
@@ -311,6 +348,21 @@ SeoStepperState _applicationTransition(
 ) => application.$symbol(state, action);
 
 void main() => enhanceSeoDomFirstSteppers(
+  transition: _applicationTransition,
+);
+''';
+
+String _stepperEffectsEntrypointSource(Uri library, String symbol) => '''
+import 'package:esen_seo/src/components/seo_stepper_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+SeoStepperEffectResult _applicationTransition(
+  SeoStepperState state,
+  SeoStepperAction action,
+) => application.$symbol(state, action);
+
+void main() => enhanceSeoDomFirstStepperEffects(
   transition: _applicationTransition,
 );
 ''';

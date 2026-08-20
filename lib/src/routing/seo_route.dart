@@ -292,7 +292,8 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
       'cannot be combined with the package-owned collection runtime',
     );
   }
-  if (runtime is SeoDomFirstStepperApplicationRuntime &&
+  if ((runtime is SeoDomFirstStepperApplicationRuntime ||
+          runtime is SeoDomFirstStepperEffectsApplicationRuntime) &&
       features.contains(SeoDomFirstFeature.stepper)) {
     throw ArgumentError.value(
       runtime,

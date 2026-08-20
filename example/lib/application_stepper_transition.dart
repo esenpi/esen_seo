@@ -21,3 +21,15 @@ SeoStepperState transitionExampleStepper(
   };
   return SeoStepperState(index: next, count: normalized.count);
 }
+
+/// Adds one focus request after an accepted application step change.
+SeoStepperEffectResult transitionExampleStepperEffects(
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final next = transitionExampleStepper(state, action);
+  return SeoStepperEffectResult(
+    state: next,
+    effect: next == state ? null : const SeoStepperFocusActivePanel(),
+  );
+}

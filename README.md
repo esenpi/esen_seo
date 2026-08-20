@@ -864,8 +864,9 @@ created only after the complete collection structure has been validated.
 ### Application-owned state
 
 A DOM-first route can instead execute a tabs, carousel, collection or stepper
-transition authored in the application. Write it as a state-free top-level
-Dart function under `lib/` and pass the same function to Flutter:
+transition authored in the application. A separately selected stepper variant
+may also emit one closed focus effect. Write the logic as a state-free
+top-level Dart function under `lib/` and pass the same function to Flutter:
 
 ```dart
 // lib/product_tabs_transition.dart — pure Dart, no Flutter import
@@ -916,6 +917,32 @@ SeoStepper(
   steps: flutterProductSteps,
 );
 ```
+
+To focus the active panel after an accepted action, return the next state and
+the closed effect together. Invalid state or effect output rejects the complete
+result; initialization and availability probes never execute effects:
+
+```dart
+SeoStepperEffectResult transitionProductStepperEffects(
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final next = transitionProductStepper(state, action);
+  return SeoStepperEffectResult(
+    state: next,
+    effect: next == state ? null : const SeoStepperFocusActivePanel(),
+  );
+}
+
+SeoStepper.withEffects(
+  effectTransition: transitionProductStepperEffects,
+  steps: flutterProductSteps,
+);
+```
+
+The effect carries no selector, element id, callback or executable value.
+Flutter and the browser apply accepted state first and then focus only the
+package-owned active step panel.
 
 `SeoCollectionTransition` additionally receives the prepared, read-only
 records and its closed category/page configuration. The package validates the
@@ -982,8 +1009,8 @@ visible state or replace the canonical URL. Delegate unhandled restore actions t
 entry, while category, sort and page actions push only changed URLs.
 
 Compile only the selected transition and its package-owned adapter. Tabs is
-the default kind for backward compatibility; select carousel, collection or
-stepper explicitly:
+the default kind for backward compatibility; select carousel, collection,
+stepper or stepper-effects explicitly:
 
 ```shell
 dart run esen_seo:esen_seo_runtime \
@@ -1008,6 +1035,12 @@ dart run esen_seo:esen_seo_runtime \
   --id product-stepper \
   --library package:my_app/product_stepper_transition.dart \
   --symbol transitionProductStepper
+
+dart run esen_seo:esen_seo_runtime \
+  --kind stepper-effects \
+  --id product-stepper-effects \
+  --library package:my_app/product_stepper_transition.dart \
+  --symbol transitionProductStepperEffects
 ```
 
 The command parses the complete application import/export/part graph before
@@ -1060,9 +1093,11 @@ For a carousel route use
 `SeoDomFirstApplicationRuntime.collection('article-collection')` with
 `buildSeoCollectionNodes`. For a stepper route use
 `SeoDomFirstApplicationRuntime.stepper('product-stepper')` together with
-`buildSeoStepperNodes`. Runtime kind is part of the artifact filename, so
-tabs, carousel, collection and stepper transitions with the same logical id
-cannot overwrite each other.
+`buildSeoStepperNodes`. Select
+`SeoDomFirstApplicationRuntime.stepperEffects('product-stepper-effects')` for
+the closed effect variant. Runtime kind is part of the artifact filename, so
+tabs, carousel, collection, stepper and stepper-effects transitions with the
+same logical id cannot overwrite each other.
 
 Finally give the server or prerenderer the build-owned directory:
 

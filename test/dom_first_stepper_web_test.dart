@@ -229,6 +229,78 @@ void main() {
     );
   });
 
+  test('application effect focuses only the active panel after state', () {
+    final container = _container(fixture);
+    final root = _stepper(container, 'effect-stepper', initialIndex: 0);
+
+    SeoStepperEffectResult focusAfterChange(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      final next = transitionSeoStepper(state, action);
+      return SeoStepperEffectResult(
+        state: next,
+        effect: next == state ? null : const SeoStepperFocusActivePanel(),
+      );
+    }
+
+    enhanceSeoDomFirstStepperEffects(transition: focusAfterChange);
+    final firstPanel = root.querySelector('#effect-stepper-panel-0')!;
+    final secondPanel = root.querySelector('#effect-stepper-panel-1')!;
+    expect(firstPanel.hasAttribute('tabindex'), isFalse);
+    expect(secondPanel.hasAttribute('tabindex'), isFalse);
+    expect(web.document.activeElement, isNot(firstPanel));
+
+    final next = root.querySelectorAll('[data-esen-stepper-control]').item(1)!
+        as web.HTMLElement;
+    next.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    expect(secondPanel.getAttribute('tabindex'), '-1');
+    expect(secondPanel.hasAttribute('hidden'), isFalse);
+    expect(web.document.activeElement, secondPanel);
+    expect(firstPanel.hasAttribute('tabindex'), isFalse);
+
+    final previous = root
+        .querySelectorAll('[data-esen-stepper-control]')
+        .item(0)! as web.HTMLElement;
+    previous.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    expect(firstPanel.getAttribute('tabindex'), '-1');
+    expect(web.document.activeElement, firstPanel);
+    expect(secondPanel.hasAttribute('tabindex'), isFalse);
+  });
+
+  test('invalid effect result keeps DOM and focus unchanged', () {
+    final container = _container(fixture);
+    final root = _stepper(container, 'invalid-effect-stepper', initialIndex: 0);
+
+    enhanceSeoDomFirstStepperEffects(
+      transition: (state, action) => SeoStepperEffectResult(
+        state: SeoStepperState(index: state.count, count: state.count),
+        effect: const SeoStepperFocusActivePanel(),
+      ),
+    );
+    final firstButton =
+        root.querySelector('[data-esen-step-button]')! as web.HTMLElement;
+    firstButton.focus();
+    final next = root.querySelectorAll('[data-esen-stepper-control]').item(1)!
+        as web.HTMLElement;
+    next.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    expect(
+      root.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 1 / 3',
+    );
+    expect(root.querySelectorAll('[data-esen-step-panel][tabindex]').length, 0);
+    expect(web.document.activeElement, firstButton);
+  });
+
   test('RTL horizontal arrows follow visual direction', () {
     final container = _container(fixture);
     final root = _stepper(container, 'rtl-stepper', initialIndex: 1)

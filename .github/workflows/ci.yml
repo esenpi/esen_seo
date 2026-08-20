@@ -147,19 +147,19 @@ jobs:
         working-directory: example
         run: >-
           dart run esen_seo:esen_seo_runtime
-          --kind stepper
-          --id example-stepper
+          --kind stepper-effects
+          --id example-stepper-effects
           --library package:example/application_stepper_transition.dart
-          --symbol transitionExampleStepper
+          --symbol transitionExampleStepperEffects
 
       - name: Verify the application-owned stepper runtime
         working-directory: example
         run: >-
           dart run esen_seo:esen_seo_runtime
-          --kind stepper
-          --id example-stepper
+          --kind stepper-effects
+          --id example-stepper-effects
           --library package:example/application_stepper_transition.dart
-          --symbol transitionExampleStepper
+          --symbol transitionExampleStepperEffects
           --check
 
       - name: Build the application-owned carousel runtime
@@ -216,7 +216,7 @@ jobs:
           done
           stepper=build/web/dom-first-application-stepper/index.html
           test -s "$stepper"
-          grep -q 'data-esen-seo-dom-first-application-runtime="example-stepper"' "$stepper"
+          grep -q 'data-esen-seo-dom-first-application-runtime="example-stepper-effects"' "$stepper"
           if grep -q 'flutter_bootstrap.js\|main.dart.js' "$stepper"; then
             echo "::error::DOM-first application stepper loads Flutter"
             exit 1

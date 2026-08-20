@@ -58,9 +58,18 @@ Future<void> main(List<String> arguments) async {
           ),
           write: !check,
         ),
+      'stepper-effects' => await buildSeoStepperEffectsApplicationRuntime(
+          SeoStepperEffectsRuntimeBuildRequest(
+            id: id,
+            library: library,
+            symbol: symbol,
+            outputDirectory: output,
+          ),
+          write: !check,
+        ),
       _ => throw FormatException(
           'Unknown runtime kind "$kind"; expected "tabs", "carousel", '
-          '"collection" or "stepper".',
+          '"collection", "stepper" or "stepper-effects".',
         ),
     };
     stdout.writeln(
@@ -119,6 +128,6 @@ Usage: dart run esen_seo:esen_seo_runtime \\
   --id <runtime-id> \\
   --library package:<app>/<file.dart> \\
   --symbol <top-level-transition> \\
-  [--kind tabs|carousel|collection|stepper] \\
+  [--kind tabs|carousel|collection|stepper|stepper-effects] \\
   [--output build/esen_seo/runtimes] [--check]
 ''';

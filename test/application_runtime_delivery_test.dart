@@ -11,6 +11,8 @@ const _collectionReference =
     SeoDomFirstApplicationRuntime.collection('application-collection');
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
+const _stepperEffectsReference =
+    SeoDomFirstApplicationRuntime.stepperEffects('application-stepper');
 const _javascript = '(function(){var applicationTabs=true;})();';
 
 SeoDomFirstRuntimeArtifact _artifact([
@@ -107,6 +109,16 @@ void main() {
         () => SeoRoute(
           path: '/',
           delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.stepper},
+          applicationRuntime: _stepperEffectsReference,
+          meta: (_) => const SeoMeta(),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
           domFirstFeatures: const {SeoDomFirstFeature.collection},
           applicationRuntime: _collectionReference,
           meta: (_) => const SeoMeta(),
@@ -171,6 +183,12 @@ void main() {
         isNot(const SeoDomFirstApplicationRuntime.stepper('same-id')),
       );
       expect(
+        const SeoDomFirstApplicationRuntime.stepper('same-id'),
+        isNot(
+          const SeoDomFirstApplicationRuntime.stepperEffects('same-id'),
+        ),
+      );
+      expect(
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.carousel('same-id')),
       );
@@ -182,6 +200,7 @@ void main() {
       expect(_carouselReference.kind, 'carousel');
       expect(_collectionReference.kind, 'collection');
       expect(_stepperReference.kind, 'stepper');
+      expect(_stepperEffectsReference.kind, 'stepper-effects');
     });
 
     test('page embeds only the verified application script with CSP data', () {
@@ -216,6 +235,23 @@ void main() {
       ).toHtmlDocument();
 
       expect(html, contains('data-esen-component="stepper"'));
+      expect(html, contains(seoDomFirstStepperStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-stepper"',
+        ),
+      );
+    });
+
+    test('stepper effects runtime reuses only the stepper stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _stepperNodes(),
+        applicationRuntime: _artifact(_stepperEffectsReference),
+      ).toHtmlDocument();
+
       expect(html, contains(seoDomFirstStepperStylesheet));
       expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
       expect(

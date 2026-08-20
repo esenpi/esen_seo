@@ -7,6 +7,47 @@ typedef SeoStepperTransition = SeoStepperState Function(
   SeoStepperAction action,
 );
 
+/// A pure stepper transition that may request one closed platform effect.
+typedef SeoStepperEffectTransition = SeoStepperEffectResult Function(
+  SeoStepperState state,
+  SeoStepperAction action,
+);
+
+/// The atomically validated output of a [SeoStepperEffectTransition].
+final class SeoStepperEffectResult {
+  const SeoStepperEffectResult({
+    required this.state,
+    this.effect,
+  });
+
+  /// The requested next selection state.
+  final SeoStepperState state;
+
+  /// The optional closed effect applied after the state.
+  final SeoStepperEffect? effect;
+
+  /// The immutable zero-or-one effect sequence applied after the state.
+  List<SeoStepperEffect> get effects => effect == null
+      ? const <SeoStepperEffect>[]
+      : List<SeoStepperEffect>.unmodifiable([effect!]);
+}
+
+/// A closed imperative intent emitted by a pure stepper transition.
+sealed class SeoStepperEffect {
+  const SeoStepperEffect();
+}
+
+/// Requests focus for the package-owned active step panel.
+final class SeoStepperFocusActivePanel extends SeoStepperEffect {
+  const SeoStepperFocusActivePanel();
+
+  @override
+  bool operator ==(Object other) => other is SeoStepperFocusActivePanel;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
 /// Executes [transition] within the closed state contract of a stepper.
 ///
 /// Application logic cannot change the step count or select a missing step.
@@ -30,6 +71,51 @@ SeoStepperState applySeoStepperTransition(
     return current;
   }
   return result;
+}
+
+/// Executes [transition] and atomically validates its state and effect output.
+///
+/// A valid accepted action must change the normalized state and may request at
+/// most one [SeoStepperFocusActivePanel]. Invalid output, a no-op carrying an
+/// effect, or a thrown exception retains [state] and emits no effect.
+SeoStepperEffectResult applySeoStepperEffectTransition(
+  SeoStepperEffectTransition transition,
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final current = _normalizedSeoStepperState(state);
+  final SeoStepperEffectResult result;
+  try {
+    result = transition(current, action);
+  } catch (_) {
+    return _noSeoStepperEffect(current);
+  }
+  final next = result.state;
+  if (next.count != current.count ||
+      next.index < 0 ||
+      next.index >= current.count) {
+    return _noSeoStepperEffect(current);
+  }
+  if (next == current) return _noSeoStepperEffect(current);
+  final effect = switch (result.effect) {
+    null => null,
+    SeoStepperFocusActivePanel() => const SeoStepperFocusActivePanel(),
+  };
+  return SeoStepperEffectResult(state: next, effect: effect);
+}
+
+/// Whether [action] can change [state] through an effect-capable transition.
+///
+/// The effect sequence is validated but never exposed or executed by this
+/// availability probe.
+bool canApplySeoStepperEffectAction(
+  SeoStepperEffectTransition transition,
+  SeoStepperState state,
+  SeoStepperAction action,
+) {
+  final current = _normalizedSeoStepperState(state);
+  return applySeoStepperEffectTransition(transition, current, action).state !=
+      current;
 }
 
 /// Whether [action] can move the normalized [state] through [transition].
@@ -127,3 +213,6 @@ SeoStepperState _normalizedSeoStepperState(SeoStepperState state) {
   if (count == 0) return const SeoStepperState(index: 0, count: 0);
   return SeoStepperState(index: state.index.clamp(0, count - 1), count: count);
 }
+
+SeoStepperEffectResult _noSeoStepperEffect(SeoStepperState state) =>
+    SeoStepperEffectResult(state: state);

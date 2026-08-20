@@ -19,6 +19,15 @@ void enhanceSeoDomFirstSteppers({
   }
 }
 
+/// Enhances valid steppers with an application transition and closed effects.
+void enhanceSeoDomFirstStepperEffects({
+  required SeoStepperEffectTransition transition,
+}) {
+  for (final apply in _StepperApplyBoundary.discover(web.document)) {
+    _enhanceStepperEffects(apply, transition);
+  }
+}
+
 void _enhanceStepper(
   _StepperApplyBoundary apply,
   SeoStepperTransition transition,
@@ -48,6 +57,57 @@ void _enhanceStepper(
   void dispatch(SeoStepperAction action, {required bool moveFocus}) {
     state = applySeoStepperTransition(transition, state, action);
     render(moveFocus: moveFocus);
+  }
+
+  apply.mount((index, event, moveFocus) {
+    final action = switch (event) {
+      _StepperControlEvent.select => SeoStepperSelect(index),
+      _StepperControlEvent.next => const SeoStepperNext(),
+      _StepperControlEvent.previous => const SeoStepperPrevious(),
+      _StepperControlEvent.first => const SeoStepperFirst(),
+      _StepperControlEvent.last => const SeoStepperLast(),
+    };
+    dispatch(action, moveFocus: moveFocus);
+  });
+  render(moveFocus: false);
+}
+
+void _enhanceStepperEffects(
+  _StepperApplyBoundary apply,
+  SeoStepperEffectTransition transition,
+) {
+  var state = initialSeoStepperState(
+    count: apply.count,
+    index: apply.initialIndex,
+  );
+
+  void render({required bool moveFocus}) {
+    apply.state(
+      state,
+      previousEnabled: canApplySeoStepperEffectAction(
+        transition,
+        state,
+        const SeoStepperPrevious(),
+      ),
+      nextEnabled: canApplySeoStepperEffectAction(
+        transition,
+        state,
+        const SeoStepperNext(),
+      ),
+      moveFocus: moveFocus,
+    );
+  }
+
+  void dispatch(SeoStepperAction action, {required bool moveFocus}) {
+    final result = applySeoStepperEffectTransition(
+      transition,
+      state,
+      action,
+    );
+    if (result.state == state) return;
+    state = result.state;
+    render(moveFocus: moveFocus);
+    apply.effects(state, result.effects);
   }
 
   apply.mount((index, event, moveFocus) {
@@ -397,6 +457,20 @@ final class _StepperApplyBoundary {
     _status.textContent =
         '${plan.positionLabel} ${state.index + 1} / ${state.count}';
     if (moveFocus) _buttons[state.index].focus();
+  }
+
+  void effects(SeoStepperState state, List<SeoStepperEffect> effects) {
+    for (final effect in effects) {
+      switch (effect) {
+        case SeoStepperFocusActivePanel():
+          for (final entry in plan.entries) {
+            entry.panel.removeAttribute('tabindex');
+          }
+          final panel = plan.entries[state.index].panel;
+          panel.setAttribute('tabindex', '-1');
+          panel.focus();
+      }
+    }
   }
 }
 

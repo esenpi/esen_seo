@@ -30,7 +30,9 @@ void main() {
     expect(route.delivery, SeoRouteDelivery.domFirst);
     expect(
       route.applicationRuntime,
-      const SeoDomFirstApplicationRuntime.stepper('example-stepper'),
+      const SeoDomFirstApplicationRuntime.stepperEffects(
+        'example-stepper-effects',
+      ),
     );
     expect(route.domFirstFeatures, isEmpty);
   });
@@ -39,8 +41,8 @@ void main() {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
-        child: SeoStepper(
-          transition: transitionExampleStepper,
+        child: SeoStepper.withEffects(
+          effectTransition: transitionExampleStepperEffects,
           steps: [
             for (final step in demoStepperSteps)
               SeoStep(
@@ -58,5 +60,9 @@ void main() {
 
     expect(find.text(demoStepperSteps.last.content), findsOneWidget);
     expect(find.text(demoStepperSteps.first.content), findsNothing);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'SeoStepper active panel',
+    );
   });
 }

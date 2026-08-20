@@ -1,5 +1,11 @@
 ## Unreleased
 
+* Added an opt-in declarative Stepper effect slice. A pure application
+  transition can atomically return its next state and one closed request to
+  focus the package-owned active panel; Flutter and a separately compiled
+  `stepper-effects` DOM-first runtime validate and apply the same result in
+  state-then-effect order. Existing Stepper constructors, package runtimes and
+  generated JavaScript remain unchanged.
 * Added application-authored `SeoCollectionTransition` compilation and typed
   `SeoDomFirstApplicationRuntime.collection` delivery. Flutter and the
   validated DOM-first adapter can execute the same pure search, category,

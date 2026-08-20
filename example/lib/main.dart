@@ -301,12 +301,13 @@ class ApplicationStepperPage extends StatelessWidget {
             ).h1,
             const Para(
               'The application transition wraps previous and next at either '
-              'end. Flutter and DOM-first call the same function.',
+              'end, then focuses the active panel. Flutter and DOM-first '
+              'call the same function.',
             ),
-            SeoStepper(
+            SeoStepper.withEffects(
               interactionId: 'application-demo-stepper',
               interactionLabel: 'Application publishing flow',
-              transition: transitionExampleStepper,
+              effectTransition: transitionExampleStepperEffects,
               steps: [
                 for (final step in demoStepperSteps)
                   SeoStep(

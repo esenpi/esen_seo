@@ -153,6 +153,9 @@ class SeoPage {
         SeoDomFirstFeature.collection,
       if (applicationRuntime?.reference is SeoDomFirstStepperApplicationRuntime)
         SeoDomFirstFeature.stepper,
+      if (applicationRuntime?.reference
+          is SeoDomFirstStepperEffectsApplicationRuntime)
+        SeoDomFirstFeature.stepper,
     };
     final head = StringBuffer();
     head.write(
@@ -211,6 +214,8 @@ SeoDomFirstFeature _applicationRuntimeFeature(
       SeoDomFirstCollectionApplicationRuntime() =>
         SeoDomFirstFeature.collection,
       SeoDomFirstStepperApplicationRuntime() => SeoDomFirstFeature.stepper,
+      SeoDomFirstStepperEffectsApplicationRuntime() =>
+        SeoDomFirstFeature.stepper,
     };
 
 String _applicationRuntimeScriptHtml(

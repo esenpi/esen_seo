@@ -48,7 +48,28 @@ class SeoStepper extends StatefulWidget {
     this.stepLabelStyle,
     this.activeStepLabelStyle,
     this.onStepChanged,
-  });
+  }) : effectTransition = null;
+
+  /// Creates a stepper whose accepted actions may request a closed effect.
+  ///
+  /// Effects are validated together with the next state and applied only after
+  /// Flutter has accepted that state. The current vocabulary can focus only
+  /// the package-owned active panel.
+  const SeoStepper.withEffects({
+    super.key,
+    required this.steps,
+    required this.effectTransition,
+    this.initialIndex = 0,
+    this.headingLevel = 3,
+    this.interactionId,
+    this.interactionLabel = 'Steps',
+    this.previousLabel = 'Back',
+    this.nextLabel = 'Next',
+    this.positionLabel = 'Step',
+    this.stepLabelStyle,
+    this.activeStepLabelStyle,
+    this.onStepChanged,
+  }) : transition = transitionSeoStepper;
 
   /// Steps in flow order.
   final List<SeoStep> steps;
@@ -77,6 +98,11 @@ class SeoStepper extends StatefulWidget {
   /// Pure selection logic shared with an optional application web runtime.
   final SeoStepperTransition transition;
 
+  /// Pure state and effect logic shared with an application web runtime.
+  ///
+  /// This is non-null only for [SeoStepper.withEffects].
+  final SeoStepperEffectTransition? effectTransition;
+
   /// Flutter style of inactive step labels.
   final TextStyle? stepLabelStyle;
 
@@ -94,12 +120,14 @@ class _SeoStepperState extends State<SeoStepper>
     with SeoBlockState<SeoStepper> {
   late SeoStepperState _stepperState;
   late Set<int> _visited;
+  FocusNode? _effectPanelFocus;
 
   @override
   void initState() {
     super.initState();
     _stepperState = _initialState();
     _visited = {if (widget.steps.isNotEmpty) _index};
+    _syncEffectFocusNode();
   }
 
   int get _index => _stepperState.index;
@@ -112,6 +140,7 @@ class _SeoStepperState extends State<SeoStepper>
   @override
   void didUpdateWidget(SeoStepper oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncEffectFocusNode();
     var replaced = widget.steps.length != oldWidget.steps.length;
     for (var i = 0; !replaced && i < widget.steps.length; i++) {
       replaced = widget.steps[i].label != oldWidget.steps[i].label;
@@ -136,6 +165,21 @@ class _SeoStepperState extends State<SeoStepper>
     }
   }
 
+  void _syncEffectFocusNode() {
+    if (widget.effectTransition != null) {
+      _effectPanelFocus ??= FocusNode(debugLabel: 'SeoStepper active panel');
+    } else {
+      _effectPanelFocus?.dispose();
+      _effectPanelFocus = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _effectPanelFocus?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget buildFlutter(BuildContext context) {
     if (widget.steps.isEmpty) return const SizedBox.shrink();
@@ -152,27 +196,38 @@ class _SeoStepperState extends State<SeoStepper>
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(32, 8, 0, 12),
-          child: Stack(
-            children: [
-              for (final index in _visited)
-                Offstage(
-                  key: ValueKey(index),
-                  offstage: index != _index,
-                  child: TickerMode(
-                    enabled: index == _index,
-                    child: ExcludeFocus(
-                      excluding: index != _index,
-                      child: widget.steps[index].content,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        _buildPanels(),
         if (widget.steps.length > 1) _buildControls(),
       ],
+    );
+  }
+
+  Widget _buildPanels() {
+    final panels = Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(32, 8, 0, 12),
+      child: Stack(
+        children: [
+          for (final index in _visited)
+            Offstage(
+              key: ValueKey(index),
+              offstage: index != _index,
+              child: TickerMode(
+                enabled: index == _index,
+                child: ExcludeFocus(
+                  excluding: index != _index,
+                  child: widget.steps[index].content,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    final focusNode = _effectPanelFocus;
+    if (focusNode == null) return panels;
+    return Semantics(
+      container: true,
+      label: widget.steps[_index].label,
+      child: Focus(focusNode: focusNode, child: panels),
     );
   }
 
@@ -278,13 +333,44 @@ class _SeoStepperState extends State<SeoStepper>
         ),
       );
 
-  bool _canActivate(SeoStepperAction action) => canApplySeoStepperAction(
-        widget.transition,
+  bool _canActivate(SeoStepperAction action) {
+    final effectTransition = widget.effectTransition;
+    if (effectTransition != null) {
+      return canApplySeoStepperEffectAction(
+        effectTransition,
         _stepperState,
         action,
       );
+    }
+    return canApplySeoStepperAction(
+      widget.transition,
+      _stepperState,
+      action,
+    );
+  }
 
   void _activate(SeoStepperAction action) {
+    final effectTransition = widget.effectTransition;
+    if (effectTransition != null) {
+      final result = applySeoStepperEffectTransition(
+        effectTransition,
+        _stepperState,
+        action,
+      );
+      if (result.state == _stepperState) return;
+      setState(() {
+        _stepperState = result.state;
+        _visited.add(result.state.index);
+      });
+      widget.onStepChanged?.call(result.state.index);
+      for (final effect in result.effects) {
+        switch (effect) {
+          case SeoStepperFocusActivePanel():
+            _effectPanelFocus?.requestFocus();
+        }
+      }
+      return;
+    }
     final next = applySeoStepperTransition(
       widget.transition,
       _stepperState,
