@@ -30,12 +30,18 @@ void main() {
     final container = _container(fixture);
     final root = _collection(container, 'article-collection');
     final items = root.querySelector('[data-esen-collection-items]')!;
+    final placeholder =
+        root.querySelector('[data-esen-collection-placeholder]')!;
 
     expect(root.querySelectorAll('input').length, 0);
     expect(root.querySelectorAll('button').length, 0);
+    expect(placeholder.hasAttribute('hidden'), isTrue);
     expect(_visibleItems(root), hasLength(4));
     _runCompiledCandidate();
 
+    expect(placeholder.parentNode, isNull);
+    expect(root.firstElementChild?.className,
+        contains('esen-seo-collection-toolbar'));
     final search = root.querySelector('input')! as web.HTMLInputElement;
     final sorts = root.querySelectorAll('[data-esen-collection-sort]');
     final categories = root.querySelectorAll('[data-esen-collection-category]');
@@ -352,6 +358,11 @@ void main() {
         ?.setAttribute('data-esen-item-sort-key', '9007199254740992');
     final malformedUrlMarker = _collection(container, 'malformed-url-marker')
       ..setAttribute('data-esen-synchronize-url', 'yes');
+    final malformedPlaceholder = _collection(
+      container,
+      'malformed-placeholder',
+    );
+    malformedPlaceholder.firstElementChild?.removeAttribute('aria-hidden');
     final hiddenParent = web.document.createElement('div')
       ..setAttribute('hidden', '');
     container.appendChild(hiddenParent);
@@ -367,6 +378,7 @@ void main() {
       unexpectedChild,
       unsafeSort,
       malformedUrlMarker,
+      malformedPlaceholder,
     ]) {
       expect(root.querySelectorAll('input').length, 0);
       expect(root.querySelectorAll('button').length, 0);
@@ -689,6 +701,16 @@ web.HTMLElement _collection(
   if (synchronizeUrl) {
     root.setAttribute('data-esen-synchronize-url', 'true');
   }
+  root.appendChild(
+    web.document.createElement('div')
+      ..className = 'esen-seo-collection-placeholder'
+      ..setAttribute('data-esen-collection-placeholder', '')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true')
+      ..appendChild(
+        web.document.createElement('span')..textContent = 'Pending controls',
+      ),
+  );
   final categories = web.document.createElement('div')
     ..setAttribute('data-esen-collection-categories', '')
     ..setAttribute('hidden', '')

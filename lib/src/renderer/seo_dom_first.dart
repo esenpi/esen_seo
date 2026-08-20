@@ -52,13 +52,16 @@ const String seoDomFirstStepperStylesheet = '''
 
 /// Structural styles for the compiled DOM-first collection control.
 const String seoDomFirstCollectionStylesheet = '''
+#$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-placeholder{display:none}
+html[data-esen-collection-pending] #$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-placeholder[hidden]{display:block!important}
 #$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-toolbar{display:grid;gap:.75rem;margin-bottom:1rem}
-#$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-toolbar label{display:grid;gap:.375rem}
-#$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-toolbar input{min-height:2.75rem;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:6px;padding:.5rem .75rem}
+#$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-toolbar label,#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-search{display:grid;gap:.375rem}
+#$seoContainerId [data-esen-component="collection"]>.esen-seo-collection-toolbar input,#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-input-placeholder{display:block;box-sizing:border-box;min-height:2.75rem;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:6px;padding:.5rem .75rem}
 #$seoContainerId [data-esen-component="collection"] .esen-seo-collection-categories,#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-sort{display:grid;gap:.375rem}
 #$seoContainerId [data-esen-component="collection"] .esen-seo-collection-category-options,#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-sort-options{display:flex;flex-wrap:wrap;gap:.5rem}
-#$seoContainerId [data-esen-component="collection"] [data-esen-collection-category],#$seoContainerId [data-esen-component="collection"] [data-esen-collection-sort],#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-pagination>button{min-width:2.75rem;min-height:2.75rem;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:6px;padding:.5rem .75rem;cursor:pointer}
-#$seoContainerId [data-esen-component="collection"] [aria-pressed="true"]{font-weight:700;border-width:2px}
+#$seoContainerId [data-esen-component="collection"] [data-esen-collection-category],#$seoContainerId [data-esen-component="collection"] [data-esen-collection-sort],#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-pagination>button,#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:6px;padding:.5rem .75rem;cursor:pointer}
+#$seoContainerId [data-esen-component="collection"] .esen-seo-collection-control-placeholder{cursor:default}
+#$seoContainerId [data-esen-component="collection"] [aria-pressed="true"],#$seoContainerId [data-esen-component="collection"] [data-esen-placeholder-selected="true"]{font-weight:700;border-width:2px}
 #$seoContainerId [data-esen-component="collection"] .esen-seo-collection-results{margin:0 0 .75rem}
 #$seoContainerId [data-esen-component="collection"] .esen-seo-collection-empty{margin:1rem 0}
 #$seoContainerId [data-esen-component="collection"] .esen-seo-collection-pagination{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-top:1rem}
@@ -91,12 +94,28 @@ String seoDomFirstFeatureBootstrapScriptHtml(
   Set<SeoDomFirstFeature> features, {
   String? nonce,
 }) {
-  if (!features.contains(SeoDomFirstFeature.themeToggle)) return '';
+  final theme = features.contains(SeoDomFirstFeature.themeToggle);
+  final collection = features.contains(SeoDomFirstFeature.collection);
+  if (!theme && !collection) return '';
   final nonceAttribute = _nonceAttribute(nonce);
-  return '<script $seoDomFirstBootstrapScriptAttribute$nonceAttribute>'
+  final javascript = StringBuffer();
+  if (theme) {
+    javascript.write(
       '(()=>{try{let v=localStorage.getItem('
       '"$seoThemePreferenceStorageKey");if(v==="light"||v==="dark")'
-      'document.documentElement.dataset.esenTheme=v}catch(_){}})()</script>';
+      'document.documentElement.dataset.esenTheme=v}catch(_){}})()',
+    );
+  }
+  if (collection) {
+    if (javascript.isNotEmpty) javascript.write(';');
+    javascript.write(
+      'document.documentElement.dataset.esenCollectionPending=1;'
+      'addEventListener("DOMContentLoaded",'
+      '()=>delete document.documentElement.dataset.esenCollectionPending)',
+    );
+  }
+  return '<script $seoDomFirstBootstrapScriptAttribute$nonceAttribute>'
+      '$javascript</script>';
 }
 
 /// Returns the style tag needed by the selected DOM-first [features].
@@ -155,6 +174,11 @@ String seoDomFirstFeatureScriptHtml(
     addRuntime(seoDomFirstThemeToggleRuntime);
   }
   if (runtime.isEmpty) return '';
+  if (features.contains(SeoDomFirstFeature.collection)) {
+    runtime.write(
+      ';delete document.documentElement.dataset.esenCollectionPending',
+    );
+  }
   return '<script $seoDomFirstScriptAttribute$nonceAttribute>'
       '$runtime</script>';
 }

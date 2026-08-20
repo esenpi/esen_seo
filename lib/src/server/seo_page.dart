@@ -157,7 +157,7 @@ class SeoPage {
     final head = StringBuffer();
     head.write(
       seoDomFirstFeatureBootstrapScriptHtml(
-        domFirstFeatures,
+        effectiveFeatures,
         nonce: interactionNonce,
       ),
     );
@@ -225,5 +225,7 @@ String _applicationRuntimeScriptHtml(
       : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
   return '<script $seoDomFirstApplicationScriptAttribute="$id" '
       'data-esen-seo-runtime-sha256="$hash"$nonceAttribute>'
-      '${artifact.javascript}</script>';
+      '${artifact.javascript}'
+      '${artifact.reference is SeoDomFirstCollectionApplicationRuntime ? ';delete document.documentElement.dataset.esenCollectionPending' : ''}'
+      '</script>';
 }

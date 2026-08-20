@@ -13,6 +13,10 @@
   an exhaustive switch over its subtypes must add a
   `SeoCollectionRestoreState` case when upgrading; delegating that action to
   `transitionSeoCollection` preserves the package's canonical restore policy.
+* Prevented Collection enhancement from shifting the first viewport by
+  reserving its package-owned control geometry before paint. The placeholder
+  contains no interactive element, stays absent without the admitted runtime
+  and is replaced only after the complete Collection contract validates.
 
 ## 0.11.0
 

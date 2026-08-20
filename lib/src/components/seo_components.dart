@@ -379,6 +379,127 @@ List<SeoNode> buildSeoCollectionNodes({
           SeoNode(
             tag: 'div',
             attributes: const {
+              'class': 'esen-seo-collection-placeholder',
+              'data-esen-collection-placeholder': '',
+              'hidden': '',
+              'aria-hidden': 'true',
+            },
+            children: [
+              SeoNode(
+                tag: 'div',
+                attributes: const {
+                  'class': 'esen-seo-collection-toolbar',
+                },
+                children: [
+                  SeoNode(
+                    tag: 'div',
+                    attributes: const {
+                      'class': 'esen-seo-collection-search',
+                    },
+                    children: [
+                      SeoNode(tag: 'span', text: searchLabel),
+                      SeoNode(
+                        tag: 'span',
+                        attributes: const {
+                          'class': 'esen-seo-collection-input-placeholder',
+                        },
+                      ),
+                    ],
+                  ),
+                  SeoNode(
+                    tag: 'div',
+                    attributes: const {
+                      'class': 'esen-seo-collection-categories',
+                    },
+                    children: [
+                      SeoNode(
+                        tag: 'span',
+                        text: categoriesLabel,
+                        attributes: const {
+                          'class': 'esen-seo-collection-control-label',
+                        },
+                      ),
+                      SeoNode(
+                        tag: 'div',
+                        attributes: const {
+                          'class': 'esen-seo-collection-category-options',
+                        },
+                        children: [
+                          SeoNode(
+                            tag: 'span',
+                            text: allCategoriesLabel,
+                            attributes: const {
+                              'class':
+                                  'esen-seo-collection-control-placeholder',
+                              'data-esen-placeholder-selected': 'true',
+                            },
+                          ),
+                          for (final label in categoryLabels)
+                            SeoNode(
+                              tag: 'span',
+                              text: label,
+                              attributes: const {
+                                'class':
+                                    'esen-seo-collection-control-placeholder',
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  SeoNode(
+                    tag: 'div',
+                    attributes: const {
+                      'class': 'esen-seo-collection-sort',
+                    },
+                    children: [
+                      SeoNode(
+                        tag: 'span',
+                        text: sortLabel,
+                        attributes: const {
+                          'class': 'esen-seo-collection-control-label',
+                        },
+                      ),
+                      SeoNode(
+                        tag: 'div',
+                        attributes: const {
+                          'class': 'esen-seo-collection-sort-options',
+                        },
+                        children: [
+                          for (final (sort, label) in [
+                            (SeoCollectionSort.newest, newestLabel),
+                            (SeoCollectionSort.oldest, oldestLabel),
+                            (SeoCollectionSort.title, titleLabel),
+                          ])
+                            SeoNode(
+                              tag: 'span',
+                              text: label,
+                              attributes: {
+                                'class':
+                                    'esen-seo-collection-control-placeholder',
+                                if (sort == initialSort)
+                                  'data-esen-placeholder-selected': 'true',
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SeoNode(
+                tag: 'p',
+                text: '${items.length} $resultsLabel',
+                attributes: const {
+                  'class': 'esen-seo-collection-results',
+                },
+              ),
+            ],
+          ),
+        if (id != null)
+          SeoNode(
+            tag: 'div',
+            attributes: const {
               'data-esen-collection-categories': '',
               'hidden': '',
               'aria-hidden': 'true',

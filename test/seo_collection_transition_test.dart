@@ -374,6 +374,10 @@ void main() {
       expect(html, contains('data-esen-component="collection"'));
       expect(html, contains('data-esen-page-size="1"'));
       expect(html, isNot(contains('data-esen-synchronize-url')));
+      expect(html, contains('data-esen-collection-placeholder=""'));
+      expect(html, contains('class="esen-seo-collection-placeholder"'));
+      expect(html, contains('hidden=""'));
+      expect(html, contains('aria-hidden="true"'));
       expect('data-esen-collection-item=""'.allMatches(html), hasLength(2));
       expect(
         html.indexOf('data-esen-item-order="1"'),
@@ -418,6 +422,7 @@ void main() {
       expect(html, contains('<h2>Neuer</h2>'));
       expect(html, contains('<h2>Älter</h2>'));
       expect(html, isNot(contains('data-esen-component')));
+      expect(html, isNot(contains('data-esen-collection-placeholder')));
       expect(html, isNot(contains('data-esen-collection-item=""')));
     });
 

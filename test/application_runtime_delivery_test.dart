@@ -251,9 +251,20 @@ void main() {
       final html = SeoPage.domFirstFromNodes(
         body: _collectionNodes(),
         applicationRuntime: _artifact(_collectionReference),
+        interactionNonce: 'safe',
       ).toHtmlDocument();
+      final bootstrapIndex = html.indexOf('data-esen-seo-dom-first-bootstrap');
+      final bodyIndex = html.indexOf('<body>');
+      final runtimeIndex = html.indexOf(
+        'data-esen-seo-dom-first-application-runtime="application-collection"',
+      );
+      final cleanupIndex = html.indexOf(
+        'delete document.documentElement.dataset.esenCollectionPending',
+        runtimeIndex,
+      );
 
       expect(html, contains('data-esen-component="collection"'));
+      expect(html, contains('data-esen-collection-placeholder=""'));
       expect(html, contains(seoDomFirstCollectionStylesheet));
       expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
       expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
@@ -265,6 +276,11 @@ void main() {
           '"application-collection"',
         ),
       );
+      expect(bootstrapIndex, greaterThan(0));
+      expect(bootstrapIndex, lessThan(bodyIndex));
+      expect(runtimeIndex, greaterThan(bodyIndex));
+      expect(cleanupIndex, greaterThan(runtimeIndex));
+      expect('nonce="safe"'.allMatches(html).length, greaterThanOrEqualTo(3));
     });
   });
 

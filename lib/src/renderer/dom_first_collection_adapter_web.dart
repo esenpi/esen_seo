@@ -177,6 +177,7 @@ final class _CollectionPlan {
     required this.pageSize,
     required this.initialSort,
     required this.labels,
+    required this.placeholder,
     required this.categoryNode,
     required this.categories,
     required this.itemsNode,
@@ -190,6 +191,7 @@ final class _CollectionPlan {
   final int pageSize;
   final SeoCollectionSort initialSort;
   final _CollectionLabels labels;
+  final web.Element placeholder;
   final web.Element categoryNode;
   final List<String> categories;
   final web.Element itemsNode;
@@ -268,9 +270,17 @@ final class _CollectionApplyBoundary {
       return null;
     }
     final children = root.children;
-    if (children.length != 2) return null;
-    final categoryNode = children.item(0);
-    final itemsNode = children.item(1);
+    if (children.length != 3) return null;
+    final placeholder = children.item(0);
+    final categoryNode = children.item(1);
+    final itemsNode = children.item(2);
+    if (placeholder == null ||
+        placeholder.tagName != 'DIV' ||
+        !placeholder.hasAttribute('data-esen-collection-placeholder') ||
+        !placeholder.hasAttribute('hidden') ||
+        placeholder.getAttribute('aria-hidden') != 'true') {
+      return null;
+    }
     if (categoryNode == null ||
         categoryNode.tagName != 'DIV' ||
         !categoryNode.hasAttribute('data-esen-collection-categories') ||
@@ -462,6 +472,7 @@ final class _CollectionApplyBoundary {
         empty: emptyLabel!,
         page: pageLabel!,
       ),
+      placeholder: placeholder,
       categoryNode: categoryNode,
       categories: categories,
       itemsNode: itemsNode,
@@ -643,7 +654,7 @@ final class _CollectionApplyBoundary {
     _pagination.appendChild(_pageStatus);
     _pagination.appendChild(_next);
 
-    plan.root.insertBefore(toolbar, plan.categoryNode);
+    plan.root.replaceChild(toolbar, plan.placeholder);
     plan.root.insertBefore(_resultStatus, plan.categoryNode);
     plan.root.insertBefore(_emptyStatus, plan.categoryNode);
     plan.root.appendChild(_pagination);

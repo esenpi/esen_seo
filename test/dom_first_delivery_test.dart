@@ -125,6 +125,21 @@ void main() {
       expect(html, contains('data-esen-seo-dom-first-runtime'));
       expect(html, contains('nonce="safe"'));
       expect(style, contains('data-esen-component="collection"'));
+      expect(
+        seoDomFirstFeatureBootstrapScriptHtml(
+          const {SeoDomFirstFeature.collection},
+          nonce: 'safe',
+        ),
+        allOf(
+          contains('data-esen-seo-dom-first-bootstrap'),
+          contains('esenCollectionPending'),
+          contains('nonce="safe"'),
+        ),
+      );
+      expect(
+          html,
+          contains('delete document.documentElement.dataset.'
+              'esenCollectionPending'));
       expect(seoDomFirstCollectionRuntime.toLowerCase(),
           isNot(contains('</script')));
       expect(seoDomFirstCollectionRuntime, isNot(contains('innerHTML')));
@@ -200,6 +215,7 @@ void main() {
       expect(styleIndex, greaterThan(bootstrapIndex));
       expect(bodyIndex, greaterThan(styleIndex));
       expect(page, contains('localStorage.getItem("esen.theme")'));
+      expect(page, isNot(contains('esenCollectionPending')));
       expect(page, contains('nonce="safe"'));
       expect(page, contains('data-esen-component="theme-toggle"'));
       expect(page, contains(seoDomFirstThemeToggleRuntime));
