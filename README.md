@@ -926,7 +926,11 @@ result; initialization and availability probes never execute effects:
 SeoStepperEffectResult transitionProductStepperEffects(
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 ) {
+  if (context.interactionId != 'product-stepper') {
+    return SeoStepperEffectResult(state: state);
+  }
   final next = transitionProductStepper(state, action);
   return SeoStepperEffectResult(
     state: next,
@@ -935,6 +939,7 @@ SeoStepperEffectResult transitionProductStepperEffects(
 }
 
 SeoStepper.withEffects(
+  interactionId: 'product-stepper',
   effectTransition: transitionProductStepperEffects,
   steps: flutterProductSteps,
 );
@@ -942,7 +947,8 @@ SeoStepper.withEffects(
 
 The effect carries no selector, element id, callback or executable value.
 Flutter and the browser apply accepted state first and then focus only the
-package-owned active step panel.
+package-owned active step panel. Browser arrow-key navigation keeps focus on
+the active step control so repeated arrows remain usable.
 
 `SeoCollectionTransition` additionally receives the prepared, read-only
 records and its closed category/page configuration. The package validates the
@@ -1040,8 +1046,15 @@ dart run esen_seo:esen_seo_runtime \
   --kind stepper-effects \
   --id product-stepper-effects \
   --library package:my_app/product_stepper_transition.dart \
-  --symbol transitionProductStepperEffects
+  --symbol transitionProductStepperEffects \
+  --interaction-ids product-stepper
 ```
+
+The `stepper-effects` symbol is one stateless dispatcher. Its package-owned
+context identifies the Stepper, so a `switch` can serve several admitted ids
+without returning closures or retaining state. The build-time validated
+`--interaction-ids` list limits enhancement before the first DOM mutation;
+unlisted steppers remain complete static HTML.
 
 The command parses the complete application import/export/part graph before
 compilation. It rejects Flutter, IO, browser libraries, third-party packages,

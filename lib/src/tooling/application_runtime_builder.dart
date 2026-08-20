@@ -5,6 +5,7 @@ import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
+import '../components/seo_component_format.dart';
 import '../routing/seo_application_runtime.dart';
 import '../routing/seo_application_runtime_artifact.dart';
 import '../server/seo_runtime_store.dart';
@@ -75,12 +76,16 @@ final class SeoStepperEffectsRuntimeBuildRequest {
     required this.id,
     required this.library,
     required this.symbol,
+    required this.interactionIds,
     this.outputDirectory = 'build/esen_seo/runtimes',
   });
 
   final String id;
   final String library;
   final String symbol;
+
+  /// Stable Stepper ids this runtime may enhance.
+  final Set<String> interactionIds;
   final String outputDirectory;
 }
 
@@ -163,6 +168,7 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoStepperEffectsApplicationRuntime(
         reference: SeoDomFirstApplicationRuntime.stepperEffects(request.id),
         library: request.library,
         symbol: request.symbol,
+        interactionIds: request.interactionIds,
         outputDirectory: request.outputDirectory,
       ),
       packageRoot: packageRoot,
@@ -175,12 +181,14 @@ final class _ApplicationRuntimeBuildRequest {
     required this.library,
     required this.symbol,
     required this.outputDirectory,
+    this.interactionIds = const {},
   });
 
   final SeoDomFirstApplicationRuntime reference;
   final String library;
   final String symbol;
   final String outputDirectory;
+  final Set<String> interactionIds;
 }
 
 Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
@@ -206,6 +214,10 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
       'must be a valid non-reserved Dart identifier',
     );
   }
+  final interactionIds =
+      reference is SeoDomFirstStepperEffectsApplicationRuntime
+          ? _validatedStepperEffectInteractionIds(request.interactionIds)
+          : const <String>[];
   final output = _checkedOutputDirectory(root, request.outputDirectory);
 
   final packageConfig = File('${root.path}/.dart_tool/package_config.json');
@@ -255,6 +267,7 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
         _stepperEffectsEntrypointSource(
           libraryUri,
           request.symbol,
+          interactionIds,
         ),
     });
 
@@ -352,20 +365,44 @@ void main() => enhanceSeoDomFirstSteppers(
 );
 ''';
 
-String _stepperEffectsEntrypointSource(Uri library, String symbol) => '''
+String _stepperEffectsEntrypointSource(
+  Uri library,
+  String symbol,
+  List<String> interactionIds,
+) {
+  final encodedIds = interactionIds.map(jsonEncode).join(', ');
+  return '''
 import 'package:esen_seo/src/components/seo_stepper_transition.dart';
 import 'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart';
 import ${jsonEncode(library.toString())} as application;
 
+const _interactionIds = <String>{$encodedIds};
+
 SeoStepperEffectResult _applicationTransition(
   SeoStepperState state,
   SeoStepperAction action,
-) => application.$symbol(state, action);
+  SeoStepperEffectContext context,
+) => application.$symbol(state, action, context);
 
 void main() => enhanceSeoDomFirstStepperEffects(
+  interactionIds: _interactionIds,
   transition: _applicationTransition,
 );
 ''';
+}
+
+List<String> _validatedStepperEffectInteractionIds(Set<String> interactionIds) {
+  if (interactionIds.isEmpty ||
+      interactionIds.any((id) => !isValidSeoInteractionId(id))) {
+    throw ArgumentError.value(
+      interactionIds,
+      'interactionIds',
+      'must contain at least one valid, stable interaction id',
+    );
+  }
+  final sorted = interactionIds.toList()..sort();
+  return List<String>.unmodifiable(sorted);
+}
 
 Directory _checkedOutputDirectory(Directory root, String relative) {
   final uri = Uri.tryParse(relative);

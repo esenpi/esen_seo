@@ -19,12 +19,22 @@ void enhanceSeoDomFirstSteppers({
   }
 }
 
-/// Enhances valid steppers with an application transition and closed effects.
+/// Enhances admitted steppers with one application dispatcher and effects.
+///
+/// [interactionIds] is validated before discovery and scopes the runtime before
+/// the first mutation. Other steppers remain complete static HTML.
 void enhanceSeoDomFirstStepperEffects({
+  required Set<String> interactionIds,
   required SeoStepperEffectTransition transition,
 }) {
+  if (interactionIds.isEmpty ||
+      interactionIds.any((id) => !isValidSeoInteractionId(id))) {
+    return;
+  }
   for (final apply in _StepperApplyBoundary.discover(web.document)) {
-    _enhanceStepperEffects(apply, transition);
+    if (interactionIds.contains(apply.id)) {
+      _enhanceStepperEffects(apply, transition);
+    }
   }
 }
 
@@ -76,6 +86,7 @@ void _enhanceStepperEffects(
   _StepperApplyBoundary apply,
   SeoStepperEffectTransition transition,
 ) {
+  final context = SeoStepperEffectContext(interactionId: apply.id);
   var state = initialSeoStepperState(
     count: apply.count,
     index: apply.initialIndex,
@@ -88,11 +99,13 @@ void _enhanceStepperEffects(
         transition,
         state,
         const SeoStepperPrevious(),
+        context,
       ),
       nextEnabled: canApplySeoStepperEffectAction(
         transition,
         state,
         const SeoStepperNext(),
+        context,
       ),
       moveFocus: moveFocus,
     );
@@ -103,11 +116,16 @@ void _enhanceStepperEffects(
       transition,
       state,
       action,
+      context,
     );
     if (result.state == state) return;
     state = result.state;
     render(moveFocus: moveFocus);
-    apply.effects(state, result.effects);
+    apply.effects(
+      state,
+      result.effects,
+      preserveControlFocus: moveFocus,
+    );
   }
 
   apply.mount((index, event, moveFocus) {
@@ -181,6 +199,7 @@ final class _StepperApplyBoundary {
 
   int get count => plan.entries.length;
   int get initialIndex => plan.initialIndex;
+  String get id => plan.id;
 
   static List<_StepperApplyBoundary> discover(web.Document document) {
     final container = document.getElementById(seoContainerId);
@@ -459,13 +478,18 @@ final class _StepperApplyBoundary {
     if (moveFocus) _buttons[state.index].focus();
   }
 
-  void effects(SeoStepperState state, List<SeoStepperEffect> effects) {
+  void effects(
+    SeoStepperState state,
+    List<SeoStepperEffect> effects, {
+    required bool preserveControlFocus,
+  }) {
+    for (final entry in plan.entries) {
+      entry.panel.removeAttribute('tabindex');
+    }
     for (final effect in effects) {
       switch (effect) {
         case SeoStepperFocusActivePanel():
-          for (final entry in plan.entries) {
-            entry.panel.removeAttribute('tabindex');
-          }
+          if (preserveControlFocus) continue;
           final panel = plan.entries[state.index].panel;
           panel.setAttribute('tabindex', '-1');
           panel.focus();

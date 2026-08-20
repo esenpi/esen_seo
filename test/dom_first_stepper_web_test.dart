@@ -236,7 +236,9 @@ void main() {
     SeoStepperEffectResult focusAfterChange(
       SeoStepperState state,
       SeoStepperAction action,
+      SeoStepperEffectContext context,
     ) {
+      expect(context.interactionId, 'effect-stepper');
       final next = transitionSeoStepper(state, action);
       return SeoStepperEffectResult(
         state: next,
@@ -244,7 +246,10 @@ void main() {
       );
     }
 
-    enhanceSeoDomFirstStepperEffects(transition: focusAfterChange);
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {'effect-stepper'},
+      transition: focusAfterChange,
+    );
     final firstPanel = root.querySelector('#effect-stepper-panel-0')!;
     final secondPanel = root.querySelector('#effect-stepper-panel-1')!;
     expect(firstPanel.hasAttribute('tabindex'), isFalse);
@@ -279,8 +284,12 @@ void main() {
     final root = _stepper(container, 'invalid-effect-stepper', initialIndex: 0);
 
     enhanceSeoDomFirstStepperEffects(
-      transition: (state, action) => SeoStepperEffectResult(
-        state: SeoStepperState(index: state.count, count: state.count),
+      interactionIds: const {'invalid-effect-stepper'},
+      transition: (state, action, context) => SeoStepperEffectResult(
+        state: SeoStepperState(
+          index: state.count,
+          count: state.count,
+        ),
         effect: const SeoStepperFocusActivePanel(),
       ),
     );
@@ -299,6 +308,194 @@ void main() {
     );
     expect(root.querySelectorAll('[data-esen-step-panel][tabindex]').length, 0);
     expect(web.document.activeElement, firstButton);
+  });
+
+  test('an effectless change clears earlier package focus state', () {
+    final container = _container(fixture);
+    final root = _stepper(
+      container,
+      'conditional-effect-stepper',
+      initialIndex: 0,
+    );
+
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {'conditional-effect-stepper'},
+      transition: (state, action, context) {
+        final next = transitionSeoStepper(state, action);
+        return SeoStepperEffectResult(
+          state: next,
+          effect: next.index == 1 ? const SeoStepperFocusActivePanel() : null,
+        );
+      },
+    );
+    final controls = root.querySelectorAll('[data-esen-stepper-control]');
+
+    (controls.item(1)! as web.HTMLElement).click();
+    expect(
+      root.querySelectorAll('[data-esen-step-panel][tabindex]').length,
+      1,
+    );
+
+    (controls.item(1)! as web.HTMLElement).click();
+    expect(
+      root.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 3 / 3',
+    );
+    expect(root.querySelectorAll('[data-esen-step-panel][tabindex]').length, 0);
+  });
+
+  test('effect dispatcher isolates multiple steppers by interaction id', () {
+    final container = _container(fixture);
+    final bounded = _stepper(
+      container,
+      'bounded-effect-stepper',
+      initialIndex: 0,
+    );
+    final wrapping = _stepper(
+      container,
+      'wrapping-effect-stepper',
+      initialIndex: 0,
+    );
+
+    SeoStepperEffectResult boundedTransition(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) =>
+        SeoStepperEffectResult(
+          state: transitionSeoStepper(state, action),
+        );
+
+    SeoStepperEffectResult wrappingTransition(
+      SeoStepperState state,
+      SeoStepperAction action,
+    ) {
+      final next = action is SeoStepperPrevious && state.index == 0
+          ? SeoStepperState(index: state.count - 1, count: state.count)
+          : transitionSeoStepper(state, action);
+      return SeoStepperEffectResult(state: next);
+    }
+
+    SeoStepperEffectResult dispatch(
+      SeoStepperState state,
+      SeoStepperAction action,
+      SeoStepperEffectContext context,
+    ) =>
+        switch (context.interactionId) {
+          'bounded-effect-stepper' => boundedTransition(state, action),
+          'wrapping-effect-stepper' => wrappingTransition(state, action),
+          _ => SeoStepperEffectResult(state: state),
+        };
+
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {
+        'bounded-effect-stepper',
+        'wrapping-effect-stepper',
+      },
+      transition: dispatch,
+    );
+
+    final boundedPrevious = bounded
+        .querySelectorAll('[data-esen-stepper-control]')
+        .item(0)! as web.HTMLElement;
+    final wrappingPrevious = wrapping
+        .querySelectorAll('[data-esen-stepper-control]')
+        .item(0)! as web.HTMLElement;
+    expect(boundedPrevious.hasAttribute('disabled'), isTrue);
+    expect(wrappingPrevious.hasAttribute('disabled'), isFalse);
+
+    wrappingPrevious.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+
+    expect(
+      wrapping.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 3 / 3',
+    );
+    expect(
+      bounded.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 1 / 3',
+    );
+  });
+
+  test('unadmitted effect steppers remain complete static HTML', () {
+    final container = _container(fixture);
+    final admitted = _stepper(
+      container,
+      'admitted-effect-stepper',
+      initialIndex: 0,
+    );
+    final unadmitted = _stepper(container, 'unadmitted-effect-stepper');
+
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {'admitted-effect-stepper'},
+      transition: (state, action, context) => SeoStepperEffectResult(
+        state: transitionSeoStepper(state, action),
+      ),
+    );
+
+    expect(admitted.getAttribute('data-esen-enhanced'), 'true');
+    expect(admitted.querySelectorAll('button').length, greaterThan(0));
+    expect(unadmitted.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(unadmitted.querySelectorAll('button').length, 0);
+    expect(unadmitted.querySelectorAll('[hidden]').length, 0);
+  });
+
+  test('invalid effect admission fails closed before discovery', () {
+    final container = _container(fixture);
+    final root = _stepper(container, 'valid-effect-stepper');
+
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {'valid-effect-stepper', 'Invalid ID'},
+      transition: (state, action, context) => SeoStepperEffectResult(
+        state: transitionSeoStepper(state, action),
+      ),
+    );
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(root.querySelectorAll('button').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 0);
+  });
+
+  test('arrow navigation keeps roving focus when an effect is requested', () {
+    final container = _container(fixture);
+    final root = _stepper(
+      container,
+      'keyboard-effect-stepper',
+      initialIndex: 0,
+    );
+
+    SeoStepperEffectResult focusAfterChange(
+      SeoStepperState state,
+      SeoStepperAction action,
+      SeoStepperEffectContext context,
+    ) {
+      final next = transitionSeoStepper(state, action);
+      return SeoStepperEffectResult(
+        state: next,
+        effect: next == state ? null : const SeoStepperFocusActivePanel(),
+      );
+    }
+
+    enhanceSeoDomFirstStepperEffects(
+      interactionIds: const {'keyboard-effect-stepper'},
+      transition: focusAfterChange,
+    );
+    final buttons = root.querySelectorAll('[data-esen-step-button]');
+    final second = buttons.item(1)! as web.HTMLElement;
+    final third = buttons.item(2)! as web.HTMLElement;
+
+    second.dispatchEvent(
+      web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
+    );
+    expect(
+      root.querySelectorAll('[data-esen-step-panel][tabindex]').length,
+      1,
+    );
+    _keydown(second, 'ArrowRight');
+    expect(web.document.activeElement, third);
+    _keydown(third, 'ArrowLeft');
+    expect(web.document.activeElement, second);
+    expect(root.querySelectorAll('[data-esen-step-panel][tabindex]').length, 0);
   });
 
   test('RTL horizontal arrows follow visual direction', () {

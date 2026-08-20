@@ -3,7 +3,11 @@ import 'package:esen_seo/core.dart';
 SeoStepperEffectResult transitionBenchmarkStepperEffects(
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 ) {
+  if (context.interactionId != 'benchmark-stepper') {
+    return SeoStepperEffectResult(state: state);
+  }
   final current = initialSeoStepperState(
     count: state.count,
     index: state.index,

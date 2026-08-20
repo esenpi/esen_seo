@@ -5,6 +5,28 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('effect dispatcher owns only the declared Stepper id', () {
+    const state = SeoStepperState(index: 0, count: 3);
+    expect(
+      transitionExampleStepperEffects(
+        state,
+        const SeoStepperNext(),
+        const SeoStepperEffectContext(
+          interactionId: exampleStepperInteractionId,
+        ),
+      ).state,
+      const SeoStepperState(index: 1, count: 3),
+    );
+    expect(
+      transitionExampleStepperEffects(
+        state,
+        const SeoStepperNext(),
+        const SeoStepperEffectContext(interactionId: 'another-stepper'),
+      ).state,
+      state,
+    );
+  });
+
   test('application stepper wraps at both ends', () {
     expect(
       transitionExampleStepper(
@@ -42,6 +64,7 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: SeoStepper.withEffects(
+          interactionId: exampleStepperInteractionId,
           effectTransition: transitionExampleStepperEffects,
           steps: [
             for (final step in demoStepperSteps)

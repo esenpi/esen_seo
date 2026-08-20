@@ -54,14 +54,16 @@ class SeoStepper extends StatefulWidget {
   ///
   /// Effects are validated together with the next state and applied only after
   /// Flutter has accepted that state. The current vocabulary can focus only
-  /// the package-owned active panel.
+  /// the package-owned active panel. [interactionId] is required so the
+  /// DOM-first runtime can admit the matching application transition before
+  /// enhancing this stepper.
   const SeoStepper.withEffects({
     super.key,
     required this.steps,
-    required this.effectTransition,
+    required String this.interactionId,
+    required SeoStepperEffectTransition this.effectTransition,
     this.initialIndex = 0,
     this.headingLevel = 3,
-    this.interactionId,
     this.interactionLabel = 'Steps',
     this.previousLabel = 'Back',
     this.nextLabel = 'Next',
@@ -178,6 +180,9 @@ class _SeoStepperState extends State<SeoStepper>
         index,
         () => FocusNode(debugLabel: 'SeoStepper panel $index'),
       );
+
+  SeoStepperEffectContext get _effectContext =>
+      SeoStepperEffectContext(interactionId: widget.interactionId!);
 
   @override
   void dispose() {
@@ -354,6 +359,7 @@ class _SeoStepperState extends State<SeoStepper>
         effectTransition,
         _stepperState,
         action,
+        _effectContext,
       );
     }
     return canApplySeoStepperAction(
@@ -366,10 +372,12 @@ class _SeoStepperState extends State<SeoStepper>
   void _activate(SeoStepperAction action) {
     final effectTransition = widget.effectTransition;
     if (effectTransition != null) {
+      final effectContext = _effectContext;
       final result = applySeoStepperEffectTransition(
         effectTransition,
         _stepperState,
         action,
+        effectContext,
       );
       if (result.state == _stepperState) return;
       setState(() {
@@ -380,7 +388,8 @@ class _SeoStepperState extends State<SeoStepper>
       if (result.effects.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted ||
-              widget.effectTransition == null ||
+              widget.effectTransition != effectTransition ||
+              widget.interactionId != effectContext.interactionId ||
               _stepperState != result.state) {
             return;
           }

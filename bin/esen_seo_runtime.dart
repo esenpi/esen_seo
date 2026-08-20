@@ -21,6 +21,17 @@ Future<void> main(List<String> arguments) async {
     final symbol = _required(values, 'symbol');
     final output = values['output'] ?? 'build/esen_seo/runtimes';
     final kind = values['kind'] ?? 'tabs';
+    final Set<String> interactionIds;
+    if (kind == 'stepper-effects') {
+      interactionIds = _interactionIds(_required(values, 'interaction-ids'));
+    } else {
+      if (values.containsKey('interaction-ids')) {
+        throw FormatException(
+          'Option "--interaction-ids" is only valid for "stepper-effects".',
+        );
+      }
+      interactionIds = const {};
+    }
     final artifact = switch (kind) {
       'tabs' => await buildSeoTabsApplicationRuntime(
           SeoTabsRuntimeBuildRequest(
@@ -63,6 +74,7 @@ Future<void> main(List<String> arguments) async {
             id: id,
             library: library,
             symbol: symbol,
+            interactionIds: interactionIds,
             outputDirectory: output,
           ),
           write: !check,
@@ -93,7 +105,14 @@ Future<void> main(List<String> arguments) async {
 }
 
 Map<String, String> _arguments(List<String> arguments) {
-  const allowed = {'id', 'library', 'symbol', 'output', 'kind'};
+  const allowed = {
+    'id',
+    'library',
+    'symbol',
+    'output',
+    'kind',
+    'interaction-ids',
+  };
   final values = <String, String>{};
   for (var index = 0; index < arguments.length; index++) {
     final argument = arguments[index];
@@ -123,11 +142,25 @@ String _required(Map<String, String> values, String name) {
   return value;
 }
 
+Set<String> _interactionIds(String value) {
+  final ids = value.split(',');
+  final unique = ids.toSet();
+  if (ids.any((id) => id.isEmpty) || unique.length != ids.length) {
+    throw const FormatException(
+      'Option "--interaction-ids" requires unique comma-separated ids.',
+    );
+  }
+  return Set<String>.unmodifiable(unique);
+}
+
 const String _usage = '''
 Usage: dart run esen_seo:esen_seo_runtime \\
   --id <runtime-id> \\
   --library package:<app>/<file.dart> \\
   --symbol <top-level-transition> \\
   [--kind tabs|carousel|collection|stepper|stepper-effects] \\
+  [--interaction-ids <id[,id...]>] \\
   [--output build/esen_seo/runtimes] [--check]
+
+--interaction-ids is required for stepper-effects and rejected for other kinds.
 ''';

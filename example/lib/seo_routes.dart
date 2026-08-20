@@ -5,6 +5,8 @@
 // (SSR-Server) lesen BEIDE diese Datei — nichts driftet auseinander.
 import 'package:esen_seo/core.dart';
 
+import 'application_stepper_transition.dart';
+
 const siteBase = 'https://esen.software';
 
 typedef DemoTabData = ({String content, String label});
@@ -408,7 +410,7 @@ final seoRoutes = [
             'route call the same pure Dart function.',
       ),
       ...demoStepperNodes(
-        interactionId: 'application-demo-stepper',
+        interactionId: exampleStepperInteractionId,
         interactionLabel: 'Application publishing flow',
       ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),

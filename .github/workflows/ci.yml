@@ -151,6 +151,7 @@ jobs:
           --id example-stepper-effects
           --library package:example/application_stepper_transition.dart
           --symbol transitionExampleStepperEffects
+          --interaction-ids application-demo-stepper
 
       - name: Verify the application-owned stepper runtime
         working-directory: example
@@ -160,6 +161,7 @@ jobs:
           --id example-stepper-effects
           --library package:example/application_stepper_transition.dart
           --symbol transitionExampleStepperEffects
+          --interaction-ids application-demo-stepper
           --check
 
       - name: Build the application-owned carousel runtime

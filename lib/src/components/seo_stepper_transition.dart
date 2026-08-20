@@ -11,7 +11,16 @@ typedef SeoStepperTransition = SeoStepperState Function(
 typedef SeoStepperEffectTransition = SeoStepperEffectResult Function(
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 );
+
+/// Stable package-owned context for one effect-capable Stepper dispatch.
+final class SeoStepperEffectContext {
+  const SeoStepperEffectContext({required this.interactionId});
+
+  /// The application-provided id that identifies the Stepper on each platform.
+  final String interactionId;
+}
 
 /// The atomically validated output of a [SeoStepperEffectTransition].
 final class SeoStepperEffectResult {
@@ -82,11 +91,12 @@ SeoStepperEffectResult applySeoStepperEffectTransition(
   SeoStepperEffectTransition transition,
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 ) {
   final current = _normalizedSeoStepperState(state);
   final SeoStepperEffectResult result;
   try {
-    result = transition(current, action);
+    result = transition(current, action, context);
   } catch (_) {
     return _noSeoStepperEffect(current);
   }
@@ -112,9 +122,15 @@ bool canApplySeoStepperEffectAction(
   SeoStepperEffectTransition transition,
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 ) {
   final current = _normalizedSeoStepperState(state);
-  return applySeoStepperEffectTransition(transition, current, action).state !=
+  return applySeoStepperEffectTransition(
+        transition,
+        current,
+        action,
+        context,
+      ).state !=
       current;
 }
 

@@ -1,5 +1,7 @@
 import 'package:esen_seo/core.dart';
 
+const exampleStepperInteractionId = 'application-demo-stepper';
+
 /// Example-owned stepper logic: previous and next wrap at either end.
 SeoStepperState transitionExampleStepper(
   SeoStepperState state,
@@ -26,7 +28,11 @@ SeoStepperState transitionExampleStepper(
 SeoStepperEffectResult transitionExampleStepperEffects(
   SeoStepperState state,
   SeoStepperAction action,
+  SeoStepperEffectContext context,
 ) {
+  if (context.interactionId != exampleStepperInteractionId) {
+    return SeoStepperEffectResult(state: state);
+  }
   final next = transitionExampleStepper(state, action);
   return SeoStepperEffectResult(
     state: next,

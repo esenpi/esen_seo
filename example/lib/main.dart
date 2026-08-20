@@ -305,7 +305,7 @@ class ApplicationStepperPage extends StatelessWidget {
               'call the same function.',
             ),
             SeoStepper.withEffects(
-              interactionId: 'application-demo-stepper',
+              interactionId: exampleStepperInteractionId,
               interactionLabel: 'Application publishing flow',
               effectTransition: transitionExampleStepperEffects,
               steps: [

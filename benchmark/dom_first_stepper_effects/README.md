@@ -18,12 +18,14 @@ dart run esen_seo:esen_seo_runtime \
   --kind stepper-effects \
   --id benchmark-stepper-effects \
   --library package:esen_seo_stepper_effects_benchmark_app/stepper_effect_transition.dart \
-  --symbol transitionBenchmarkStepperEffects
+  --symbol transitionBenchmarkStepperEffects \
+  --interaction-ids benchmark-stepper
 dart run esen_seo:esen_seo_runtime \
   --kind stepper-effects \
   --id benchmark-stepper-effects \
   --library package:esen_seo_stepper_effects_benchmark_app/stepper_effect_transition.dart \
   --symbol transitionBenchmarkStepperEffects \
+  --interaction-ids benchmark-stepper \
   --check
 cd ../../../..
 dart run benchmark/dom_first_stepper_effects/generate_esen.dart \

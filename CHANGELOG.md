@@ -4,8 +4,12 @@
   transition can atomically return its next state and one closed request to
   focus the package-owned active panel; Flutter and a separately compiled
   `stepper-effects` DOM-first runtime validate and apply the same result in
-  state-then-effect order. Existing Stepper constructors, package runtimes and
-  generated JavaScript remain unchanged.
+  state-then-effect order. The stateless transition receives a stable Stepper
+  context, while a build-time validated interaction-id list limits which
+  matching DOM components may be enhanced. This keeps different Stepper
+  policies isolated, leaves unadmitted Stepper HTML static and preserves
+  roving control focus during keyboard navigation. Existing non-effect
+  Stepper usage and other package runtimes remain unchanged.
 * Added application-authored `SeoCollectionTransition` compilation and typed
   `SeoDomFirstApplicationRuntime.collection` delivery. Flutter and the
   validated DOM-first adapter can execute the same pure search, category,

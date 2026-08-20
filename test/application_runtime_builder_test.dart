@@ -228,6 +228,7 @@ void main() {
           id: 'fixture-stepper-effects',
           library: 'package:fixture_app/transition.dart',
           symbol: 'transitionStepperEffects',
+          interactionIds: {'fixture-stepper'},
         ),
         packageRoot: root.path,
       ),
@@ -239,11 +240,36 @@ void main() {
           id: '../stepper-effects',
           library: 'package:fixture_app/transition.dart',
           symbol: 'transitionStepperEffects',
+          interactionIds: {'fixture-stepper'},
         ),
         packageRoot: root.path,
       ),
       throwsArgumentError,
     );
+  });
+
+  test('stepper effect builds require valid admitted interaction ids',
+      () async {
+    await write('lib/transition.dart', 'const value = 1;');
+
+    for (final interactionIds in const <Set<String>>[
+      {},
+      {'Invalid ID'},
+      {'valid-stepper', 'also invalid'},
+    ]) {
+      await expectLater(
+        buildSeoStepperEffectsApplicationRuntime(
+          SeoStepperEffectsRuntimeBuildRequest(
+            id: 'fixture-stepper-effects',
+            library: 'package:fixture_app/transition.dart',
+            symbol: 'transitionStepperEffects',
+            interactionIds: interactionIds,
+          ),
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
   });
 
   test('carousel builds use the same pre-compilation safety boundary',

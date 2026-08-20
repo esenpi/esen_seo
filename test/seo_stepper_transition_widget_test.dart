@@ -101,7 +101,9 @@ void main() {
     SeoStepperEffectResult focusAfterChange(
       SeoStepperState state,
       SeoStepperAction action,
+      SeoStepperEffectContext context,
     ) {
+      expect(context.interactionId, 'focus-stepper');
       final next = transitionSeoStepper(state, action);
       return SeoStepperEffectResult(
         state: next,
@@ -113,6 +115,7 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: SeoStepper.withEffects(
+          interactionId: 'focus-stepper',
           effectTransition: focusAfterChange,
           steps: steps(),
         ),
@@ -139,7 +142,8 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: SeoStepper.withEffects(
-          effectTransition: (state, action) => SeoStepperEffectResult(
+          interactionId: 'invalid-effect-stepper',
+          effectTransition: (state, action, context) => SeoStepperEffectResult(
             state: SeoStepperState(index: state.count, count: state.count),
             effect: const SeoStepperFocusActivePanel(),
           ),
@@ -159,12 +163,91 @@ void main() {
     );
   });
 
+  testWidgets('Flutter clears focus from a hidden panel without a new effect',
+      (tester) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoStepper.withEffects(
+          interactionId: 'conditional-effect-stepper',
+          effectTransition: (state, action, context) {
+            final next = transitionSeoStepper(state, action);
+            return SeoStepperEffectResult(
+              state: next,
+              effect:
+                  next.index == 1 ? const SeoStepperFocusActivePanel() : null,
+            );
+          },
+          steps: steps(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      'SeoStepper panel 1',
+    );
+
+    await tester.tap(find.text('Next'));
+    await tester.pump();
+    expect(find.text('Body 2'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot('SeoStepper panel 1'),
+    );
+  });
+
+  testWidgets('Flutter drops an effect queued by a replaced policy',
+      (tester) async {
+    late StateSetter rebuild;
+    SeoStepperEffectTransition transition = (state, action, context) {
+      final next = transitionSeoStepper(state, action);
+      return SeoStepperEffectResult(
+        state: next,
+        effect: const SeoStepperFocusActivePanel(),
+      );
+    };
+
+    Widget app() => Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return SeoStepper.withEffects(
+                interactionId: 'replaceable-effect-stepper',
+                effectTransition: transition,
+                steps: steps(),
+              );
+            },
+          ),
+        );
+
+    await tester.pumpWidget(app());
+    await tester.tap(find.text('Next'));
+    rebuild(() {
+      transition = (state, action, context) => SeoStepperEffectResult(
+            state: transitionSeoStepper(state, action),
+          );
+    });
+    await tester.pump();
+
+    expect(find.text('Body 1'), findsOneWidget);
+    expect(
+      tester.binding.focusManager.primaryFocus?.debugLabel,
+      isNot('SeoStepper panel 1'),
+    );
+  });
+
   testWidgets('Flutter focuses each concrete panel over repeated changes',
       (tester) async {
     SeoStepperEffectResult wrapAndFocus(
       SeoStepperState state,
       SeoStepperAction action,
+      SeoStepperEffectContext context,
     ) {
+      expect(context.interactionId, 'wrapping-effect-stepper');
       final last = state.count - 1;
       final index = switch (action) {
         SeoStepperNext() => state.index == last ? 0 : state.index + 1,
@@ -182,6 +265,7 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: SeoStepper.withEffects(
+          interactionId: 'wrapping-effect-stepper',
           effectTransition: wrapAndFocus,
           steps: steps(),
         ),
