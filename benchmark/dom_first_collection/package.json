@@ -1,0 +1,15 @@
+{
+  "name": "esen-seo-dom-first-collection-benchmark",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "next": "16.2.11",
+    "playwright": "1.62.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "scripts": {
+    "build:next": "next build fixtures/next",
+    "measure": "node run.mjs"
+  }
+}

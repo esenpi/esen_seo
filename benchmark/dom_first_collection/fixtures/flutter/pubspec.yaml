@@ -1,0 +1,14 @@
+name: esen_dom_first_collection_flutter_baseline
+publish_to: none
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  esen_seo:
+    path: ../../../..
+
+flutter:
+  uses-material-design: true

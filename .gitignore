@@ -32,6 +32,7 @@ coverage/
 node_modules/
 .next/
 benchmark/dom_first/fixtures/next/out/
+benchmark/dom_first_collection/fixtures/next/out/
 
 # Local-only files (not part of the repository)
 *.local.md

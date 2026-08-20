@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collection history benchmark</title>
+  <link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+  <main id="catalog">
+    <h1>Publishing library</h1>
+    <p>Twelve complete resources with searchable, shareable state.</p>
+    <section class="esen-seo-collection" id="benchmark-collection" aria-label="Publishing library">
+      <div class="esen-seo-collection-toolbar">
+        <label class="esen-seo-collection-search" for="benchmark-collection-search"><span>Search</span><input id="benchmark-collection-search" type="search" maxlength="4096"></label>
+        <div class="esen-seo-collection-categories" role="group" aria-label="Categories"><span class="esen-seo-collection-control-label">Categories</span><div class="esen-seo-collection-category-options"><button type="button" aria-label="All" data-category="">All</button><button type="button" aria-label="Guides" data-category="guides">Guides</button><button type="button" aria-label="Releases" data-category="releases">Releases</button><button type="button" aria-label="Notes" data-category="notes">Notes</button></div></div>
+        <div class="esen-seo-collection-sort" role="group" aria-label="Sort"><span class="esen-seo-collection-control-label">Sort</span><div class="esen-seo-collection-sort-options"><button type="button" aria-label="Newest" data-sort="newest">Newest</button><button type="button" aria-label="Oldest" data-sort="oldest">Oldest</button><button type="button" aria-label="Title" data-sort="title">Title</button></div></div>
+      </div>
+      <p class="esen-seo-collection-results" aria-live="polite" aria-atomic="true"></p>
+      <p class="esen-seo-collection-empty" hidden>No results</p>
+      <div data-esen-collection-items>
+        <article class="esen-seo-collection-item" data-title="Dart Rendering Guide" data-search="dart flutter rendering semantic" data-category="guides" data-key="120"><h2>Dart Rendering Guide</h2><p>Render one Dart model into native widgets and semantic HTML.</p></article>
+        <article class="esen-seo-collection-item" data-title="CSS Token Guide" data-search="css design tokens styling" data-category="guides" data-key="110"><h2>CSS Token Guide</h2><p>Keep visual tokens aligned across permanent web documents.</p></article>
+        <article class="esen-seo-collection-item" data-title="JavaScript State Guide" data-search="javascript state transition progressive" data-category="guides" data-key="100"><h2>JavaScript State Guide</h2><p>Compile bounded transitions for progressive interaction.</p></article>
+        <article class="esen-seo-collection-item" data-title="Browser History Guide" data-search="browser history url back forward" data-category="guides" data-key="90"><h2>Browser History Guide</h2><p>Restore canonical collection state from browser History.</p></article>
+        <article class="esen-seo-collection-item" data-title="Accessible Tabs Guide" data-search="accessible keyboard aria tabs" data-category="guides" data-key="80"><h2>Accessible Tabs Guide</h2><p>Preserve semantic controls and predictable keyboard input.</p></article>
+        <article class="esen-seo-collection-item" data-title="Collection Search Guide" data-search="collection search filter pagination" data-category="guides" data-key="70"><h2>Collection Search Guide</h2><p>Search complete static content without hiding it from bots.</p></article>
+        <article class="esen-seo-collection-item" data-title="Static HTML Guide" data-search="static html prerender seo" data-category="guides" data-key="60"><h2>Static HTML Guide</h2><p>Deliver readable content before any script executes.</p></article>
+        <article class="esen-seo-collection-item" data-title="Deployment Guide" data-search="deployment server static hosting" data-category="guides" data-key="50"><h2>Deployment Guide</h2><p>Choose static output or a pure server delivery path.</p></article>
+        <article class="esen-seo-collection-item" data-title="Release 0.11" data-search="release application runtime carousel stepper" data-category="releases" data-key="40"><h2>Release 0.11</h2><p>Application-owned transitions reach more components.</p></article>
+        <article class="esen-seo-collection-item" data-title="Runtime Notes" data-search="runtime size csp hash validation" data-category="notes" data-key="30"><h2>Runtime Notes</h2><p>Runtime manifests bind identity, bytes and policy.</p></article>
+        <article class="esen-seo-collection-item" data-title="Security Policy" data-search="security policy validation allow list" data-category="notes" data-key="20"><h2>Security Policy</h2><p>All mutations pass the package-owned apply boundary.</p></article>
+        <article class="esen-seo-collection-item" data-title="Roadmap" data-search="roadmap effects routing forms" data-category="notes" data-key="10"><h2>Roadmap</h2><p>Future slices remain behind explicit admission gates.</p></article>
+      </div>
+      <div class="esen-seo-collection-pagination" role="navigation" aria-label="Page"><button type="button" aria-label="Previous" data-previous>‹</button><span class="esen-seo-collection-page"></span><button type="button" aria-label="Next" data-next>›</button></div>
+    </section>
+  </main>
+  <script src="/collection.js"></script>
+</body>
+</html>
