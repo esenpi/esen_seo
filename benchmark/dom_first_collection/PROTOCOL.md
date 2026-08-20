@@ -14,13 +14,29 @@ Thresholds must not be fitted to observed results.
 ## Cells
 
 Every cell carries equivalent content, CSS, fonts and collection behaviour,
-including namespaced URL state and Back/Forward restoration:
+with the permanent DOM cells also carrying namespaced URL state and
+Back/Forward restoration:
 
 1. hand-written DOM as the practical floor;
 2. statically rendered Next.js as the competitive reference;
 3. esen_seo DOM-first with the application-authored compiled collection
    transition;
 4. the existing visible shell followed by a Flutter release build.
+
+## Pre-measurement correction
+
+The first fixture smoke run exposed an invalid assumption in the original cell
+description: native Flutter collections deliberately keep local state and do
+not implement the permanent DOM route's browser URL and History contract. The
+visible shell also has no Collection interaction runtime after Flutter takes
+ownership. Consequently the Flutter cell records transfer, LCP, TBT and CLS,
+but reports first interaction and the scripted interaction proxy as not
+applicable. Relative gates for those two metrics are omitted; their frozen
+absolute ceilings still apply to DOM-first.
+
+The three permanent DOM cells execute the complete sequence below. No complete
+matrix was accepted before this correction. Thresholds, run count and rotating
+order remain unchanged.
 
 ## Scripted sequence
 
@@ -34,10 +50,10 @@ Every run starts at `/?campaign=bench#catalog` and performs the same sequence:
 6. restore page one with Back;
 7. restore page two with Forward.
 
-The unrelated `campaign` query parameter and `catalog` fragment must survive
-the complete sequence. Search uses replacement history; category, sort and page
-changes use pushed entries. Initial state and history restoration must not add
-entries.
+In the three permanent DOM cells, the unrelated `campaign` query parameter and
+`catalog` fragment must survive the complete sequence. Search uses replacement
+history; category, sort and page changes use pushed entries. Initial state and
+history restoration must not add entries.
 
 ## Profile
 
