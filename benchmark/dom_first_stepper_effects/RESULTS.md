@@ -1,33 +1,33 @@
 # DOM-first Stepper Effects Benchmark Results
 
-Measured: 2026-08-20T22:07:08.495Z
+Measured: 2026-08-20T23:37:21.827Z
 
-Dart 3.6.2; Flutter 3.27.4; Browser: 151.0.7922.140; Node: v23.4.0; Next.js 16.2.11; React 19.2.0.
+Dart 3.6.2; Flutter 3.27.4; Browser: 151.0.7922.170; Node: v23.4.0; Next.js 16.2.11; React 19.2.0.
 7 cold runs per cell; 390x844 @2x; 1.6 Mbit/s down, 750 Kbit/s up, 150 ms RTT; 4x slowdown.
 
 | Metric (median / p75) | Hand DOM | Next.js | DOM-first | Flutter |
 | --- | ---: | ---: | ---: | ---: |
-| Critical JS gzip (KiB) | 0.8 / 0.8 | 144.3 / 144.3 | 19.7 / 19.7 | 445.2 / 445.2 |
-| Total transfer (KiB) | 1.9 / 1.9 | 145.3 / 145.3 | 21.1 / 21.1 | 450.1 / 450.1 |
-| LCP (ms) | 388 / 396 | 396 / 400 | 228 / 236 | 248 / 252 |
-| TBT (ms) | 0 / 0 | 22 / 24 | 0 / 0 | 549 / 557 |
-| First interaction (ms) | 461.6 / 471.6 | 1754.2 / 1762.7 | 381.1 / 389.1 | 13061.6 / 13191.6 |
-| Scripted INP proxy (ms) | 33.2 / 33.6 | 50.2 / 50.9 | 32.5 / 32.6 | 151.5 / 156.4 |
+| Critical JS gzip (KiB) | 0.8 / 0.8 | 144.3 / 144.3 | 20.1 / 20.1 | 445.3 / 445.3 |
+| Total transfer (KiB) | 1.9 / 1.9 | 145.3 / 145.3 | 21.5 / 21.5 | 450.2 / 450.2 |
+| LCP (ms) | 380 / 388 | 384 / 396 | 228 / 228 | 244 / 248 |
+| TBT (ms) | 0 / 0 | 23 / 24 | 0 / 0 | 556 / 568 |
+| First interaction (ms) | 442 / 454.4 | 1742 / 1743.9 | 372.1 / 381.7 | 12019.8 / 12031.3 |
+| Scripted INP proxy (ms) | 32.5 / 32.9 | 49.5 / 50.3 | 32.3 / 32.6 | 151.9 / 157.8 |
 | CLS | 0.0487 / 0.0487 | 0.0932 / 0.0932 | 0.0487 / 0.0487 | 0 / 0 |
 
 ## Acceptance
 
-- PASS: criticalJsGzipKiB absolute ceiling (19.7/19.7 <= 25/25)
-- PASS: criticalJsGzipKiB relative bound (DOM 19.7, Next 144.3, Flutter 445.2)
-- PASS: totalTransferKiB absolute ceiling (21.1/21.1 <= 100/100)
-- PASS: totalTransferKiB relative bound (DOM 21.1, Next 145.3, Flutter 450.1)
-- PASS: lcpMs absolute ceiling (228/236 <= 2000/2500)
+- PASS: criticalJsGzipKiB absolute ceiling (20.1/20.1 <= 25/25)
+- PASS: criticalJsGzipKiB relative bound (DOM 20.1, Next 144.3, Flutter 445.3)
+- PASS: totalTransferKiB absolute ceiling (21.5/21.5 <= 100/100)
+- PASS: totalTransferKiB relative bound (DOM 21.5, Next 145.3, Flutter 450.2)
+- PASS: lcpMs absolute ceiling (228/228 <= 2000/2500)
 - PASS: tbtMs absolute ceiling (0/0 <= 150/200)
-- PASS: tbtMs relative bound (DOM 0, Next 22, Flutter 549)
-- PASS: firstInteractionMs absolute ceiling (381.1/389.1 <= 2200/2700)
-- PASS: firstInteractionMs relative bound (DOM 381.1, Next 1754.2, Flutter 13061.6)
-- PASS: scriptedInpMs absolute ceiling (32.5/32.6 <= 200/200)
-- PASS: scriptedInpMs relative bound (DOM 32.5, Next 50.2, Flutter 151.5)
+- PASS: tbtMs relative bound (DOM 0, Next 23, Flutter 556)
+- PASS: firstInteractionMs absolute ceiling (372.1/381.7 <= 2200/2700)
+- PASS: firstInteractionMs relative bound (DOM 372.1, Next 1742, Flutter 12019.8)
+- PASS: scriptedInpMs absolute ceiling (32.3/32.6 <= 200/200)
+- PASS: scriptedInpMs relative bound (DOM 32.3, Next 49.5, Flutter 151.9)
 - PASS: cls absolute ceiling (0.0487/0.0487 <= 0.05/0.05)
 
 **Decision: keep the compiled candidate. Every applicable gate passed.**
