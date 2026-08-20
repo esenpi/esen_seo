@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stepper effects benchmark</title>
+  <link rel="stylesheet" href="/shared.css">
+</head>
+<body>
+  <main>
+    <h1>Publishing flow</h1>
+    <p>One pure transition selects a complete step and then focuses its panel.</p>
+    <div class="esen-seo-stepper" id="benchmark-stepper" data-esen-component="stepper">
+      <ol data-esen-step-list>
+        <li data-esen-step><h2>Draft</h2><div id="benchmark-stepper-panel-0" data-esen-step-panel><p>Write the complete article before review.</p></div></li>
+        <li data-esen-step><h2>Review</h2><div id="benchmark-stepper-panel-1" data-esen-step-panel><p>Check facts, links and the semantic outline.</p></div></li>
+        <li data-esen-step><h2>Publish</h2><div id="benchmark-stepper-panel-2" data-esen-step-panel><p>Release the approved document to every reader.</p></div></li>
+      </ol>
+    </div>
+  </main>
+  <script src="/stepper.js"></script>
+</body>
+</html>
