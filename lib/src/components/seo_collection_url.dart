@@ -44,14 +44,29 @@ final class SeoCollectionUrlCodec {
     List<String> categoryValues = const [],
     List<String> sortValues = const [],
     List<String> pageValues = const [],
+  }) =>
+      decodeUniqueValues(
+        queryValue: _single(queryValues),
+        categoryValue: _single(categoryValues),
+        sortValue: _single(sortValues),
+        pageValue: _single(pageValues),
+      );
+
+  /// Decodes query values after the caller has rejected duplicate parameters.
+  ///
+  /// The browser adapter uses this allocation-free boundary after requiring
+  /// exactly one value per parameter. A missing or ambiguous value is `null`.
+  SeoCollectionState decodeUniqueValues({
+    String? queryValue,
+    String? categoryValue,
+    String? sortValue,
+    String? pageValue,
   }) {
-    final queryValue = _single(queryValues);
     final query =
         queryValue != null && queryValue.length <= seoCollectionMaxSearchLength
             ? queryValue
             : '';
 
-    final categoryValue = _single(categoryValues);
     final normalizedCategory =
         categoryValue != null && categoryValue.length <= _maxCategoryUrlLength
             ? normalizeSeoCollectionText(categoryValue)
@@ -62,12 +77,10 @@ final class SeoCollectionUrlCodec {
             (label) => normalizeSeoCollectionText(label) == normalizedCategory,
           );
 
-    final sortValue = _single(sortValues);
     final sort = sortValue == null
         ? initialSort
         : parseSeoCollectionSort(sortValue) ?? initialSort;
 
-    final pageValue = _single(pageValues);
     final page = pageValue != null && _urlPage.hasMatch(pageValue)
         ? (int.tryParse(pageValue) ?? 1) - 1
         : 0;
@@ -81,21 +94,34 @@ final class SeoCollectionUrlCodec {
   }
 
   /// Encodes canonical non-default values for one collection state.
-  SeoCollectionUrlValues encode(SeoCollectionState state) {
+  SeoCollectionUrlValues encode(SeoCollectionState state) => (
+        query: encodeQueryValue(state),
+        category: encodeCategoryValue(state),
+        sort: encodeSortValue(state),
+        page: encodePageValue(state),
+      );
+
+  /// Encodes the non-default query value for browser persistence.
+  String? encodeQueryValue(SeoCollectionState state) {
     final query = boundSeoCollectionQuery(state.query);
-    final category = state.categoryIndex;
-    return (
-      query: normalizeSeoCollectionText(query).isEmpty ? null : query,
-      category:
-          category != null && category >= 0 && category < categoryLabels.length
-              ? normalizeSeoCollectionText(categoryLabels[category])
-              : null,
-      sort: state.sort == initialSort
-          ? null
-          : seoCollectionSortMarker(state.sort),
-      page: state.page > 0 ? '${state.page + 1}' : null,
-    );
+    return normalizeSeoCollectionText(query).isEmpty ? null : query;
   }
+
+  /// Encodes the stable category label for browser persistence.
+  String? encodeCategoryValue(SeoCollectionState state) {
+    final category = state.categoryIndex;
+    return category != null && category >= 0 && category < categoryLabels.length
+        ? normalizeSeoCollectionText(categoryLabels[category])
+        : null;
+  }
+
+  /// Encodes the non-default sort marker for browser persistence.
+  String? encodeSortValue(SeoCollectionState state) =>
+      state.sort == initialSort ? null : seoCollectionSortMarker(state.sort);
+
+  /// Encodes the one-based non-default page for browser persistence.
+  String? encodePageValue(SeoCollectionState state) =>
+      state.page > 0 ? '${state.page + 1}' : null;
 }
 
 String? _single(List<String> values) =>

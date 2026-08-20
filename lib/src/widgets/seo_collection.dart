@@ -112,9 +112,8 @@ class SeoCollection extends StatefulWidget {
   /// Whether the DOM-first presentation stores collection state in the URL.
   ///
   /// Native Flutter presentations keep local state; browser history exists
-  /// only on the permanent HTML presentation. The application-owned
-  /// collection runtime currently requires this to remain false; package-owned
-  /// collection enhancement supports it.
+  /// only on the permanent HTML presentation. Package-owned and compiled
+  /// application transitions both validate restored state before applying it.
   final bool synchronizeUrl;
   final TextStyle? controlTextStyle;
   final Color selectedColor;

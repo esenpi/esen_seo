@@ -154,12 +154,14 @@ List<SeoCollectionComponentEntry> demoCollectionEntries() => [
 List<SeoNode> demoCollectionNodes({
   String interactionId = 'demo-collection',
   String interactionLabel = 'Article collection',
+  bool synchronizeUrl = false,
 }) =>
     buildSeoCollectionNodes(
       items: demoCollectionEntries(),
       interactionId: interactionId,
       interactionLabel: interactionLabel,
       pageSize: 2,
+      synchronizeUrl: synchronizeUrl,
     );
 
 List<SeoNode> demoStepperBodyNodes(DemoStepperData step) => [
@@ -451,12 +453,13 @@ final seoRoutes = [
       SeoNode(
         tag: 'p',
         text: 'The application transition starts category views with a clear '
-            'search and title order. Flutter and this DOM-first route call '
-            'the same pure Dart function.',
+            'search and title order. The DOM-first route also restores its '
+            'validated state from shareable URLs and browser History.',
       ),
       ...demoCollectionNodes(
         interactionId: 'application-demo-collection',
         interactionLabel: 'Application article collection',
+        synchronizeUrl: true,
       ),
       SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
     ],

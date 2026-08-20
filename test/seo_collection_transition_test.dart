@@ -130,6 +130,90 @@ void main() {
       expect(previous.page, 0);
     });
 
+    test('restores a complete state atomically through application policy', () {
+      var restoreCalls = 0;
+      SeoCollectionState applicationTransition(
+        SeoCollectionState state,
+        SeoCollectionAction action, {
+        required List<SeoCollectionRecord> records,
+        required int categoryCount,
+        required int pageSize,
+      }) {
+        if (action case SeoCollectionRestoreState(:final state)) {
+          restoreCalls++;
+          return selectSeoCollection(
+            records: records,
+            categoryCount: categoryCount,
+            pageSize: pageSize,
+            state: SeoCollectionState(
+              query: state.query,
+              categoryIndex: state.categoryIndex,
+              sort: SeoCollectionSort.title,
+              page: state.page,
+            ),
+          ).state;
+        }
+        return transitionSeoCollection(
+          state,
+          action,
+          records: records,
+          categoryCount: categoryCount,
+          pageSize: pageSize,
+        );
+      }
+
+      final restored = applySeoCollectionTransition(
+        applicationTransition,
+        const SeoCollectionState(),
+        const SeoCollectionRestoreState(
+          SeoCollectionState(
+            query: 'flutter',
+            categoryIndex: 0,
+            sort: SeoCollectionSort.oldest,
+            page: 1,
+          ),
+        ),
+        records: _records,
+        categoryCount: 3,
+        pageSize: 1,
+      );
+
+      expect(restoreCalls, 1);
+      expect(restored.query, 'flutter');
+      expect(restored.categoryIndex, 0);
+      expect(restored.sort, SeoCollectionSort.title);
+      expect(restored.page, 1);
+    });
+
+    test('throwing application restoration retains the last valid state', () {
+      const current = SeoCollectionState(
+        query: 'cms',
+        categoryIndex: 1,
+      );
+      final restored = applySeoCollectionTransition(
+        (state, action,
+            {required records, required categoryCount, required pageSize}) {
+          if (action is SeoCollectionRestoreState) throw StateError('restore');
+          return transitionSeoCollection(
+            state,
+            action,
+            records: records,
+            categoryCount: categoryCount,
+            pageSize: pageSize,
+          );
+        },
+        current,
+        const SeoCollectionRestoreState(
+          SeoCollectionState(query: 'flutter'),
+        ),
+        records: _records,
+        categoryCount: 3,
+        pageSize: 1,
+      );
+
+      _expectSameCollectionState(restored, current);
+    });
+
     test('empty results have a canonical zero page', () {
       final snapshot = selectSeoCollection(
         records: _records,

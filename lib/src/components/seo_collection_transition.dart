@@ -111,6 +111,17 @@ final class SeoCollectionPreviousPage extends SeoCollectionAction {
   const SeoCollectionPreviousPage();
 }
 
+/// Restores one complete state snapshot from presentation-owned persistence.
+///
+/// URL and History adapters use this closed action so application transitions
+/// can validate restoration atomically instead of replaying field actions in
+/// an order that may change application policy.
+final class SeoCollectionRestoreState extends SeoCollectionAction {
+  const SeoCollectionRestoreState(this.state);
+
+  final SeoCollectionState state;
+}
+
 /// Keeps page sizes useful and bounds the amount shown in one DOM mutation.
 int normalizeSeoCollectionPageSize(int pageSize) => pageSize.clamp(1, 100);
 
@@ -316,6 +327,7 @@ SeoCollectionState transitionSeoCollection(
         sort: state.sort,
         page: state.page - 1,
       ),
+    SeoCollectionRestoreState(:final state) => state,
   };
   return selectSeoCollection(
     records: records,

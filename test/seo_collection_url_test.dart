@@ -48,6 +48,18 @@ void main() {
       )),
       (query: null, category: null, sort: null, page: null),
     );
+
+    const state = SeoCollectionState(
+      query: 'Flutter SEO',
+      categoryIndex: 2,
+      sort: SeoCollectionSort.oldest,
+      page: 3,
+    );
+    final combined = codec.encode(state);
+    expect(codec.encodeQueryValue(state), combined.query);
+    expect(codec.encodeCategoryValue(state), combined.category);
+    expect(codec.encodeSortValue(state), combined.sort);
+    expect(codec.encodePageValue(state), combined.page);
   });
 
   test('decodes category identity independently of display order', () {
@@ -66,6 +78,26 @@ void main() {
     expect(state.categoryIndex, 1);
     expect(state.sort, SeoCollectionSort.title);
     expect(state.page, 1);
+  });
+
+  test('unique-value decoding matches the existing list boundary', () {
+    final listed = codec.decode(
+      queryValues: const ['Flutter SEO'],
+      categoryValues: const ['ÜBERBLICK'],
+      sortValues: const ['oldest'],
+      pageValues: const ['3'],
+    );
+    final unique = codec.decodeUniqueValues(
+      queryValue: 'Flutter SEO',
+      categoryValue: 'ÜBERBLICK',
+      sortValue: 'oldest',
+      pageValue: '3',
+    );
+
+    expect(unique.query, listed.query);
+    expect(unique.categoryIndex, listed.categoryIndex);
+    expect(unique.sort, listed.sort);
+    expect(unique.page, listed.page);
   });
 
   test('duplicate, malformed and oversized values fall back safely', () {

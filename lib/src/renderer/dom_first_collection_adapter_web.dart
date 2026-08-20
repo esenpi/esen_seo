@@ -81,7 +81,18 @@ void _enhanceSynchronizedCollection(
   _CollectionApplyBoundary apply,
   SeoCollectionTransition transition,
 ) {
-  var state = apply.stateFromUrl();
+  var state = SeoCollectionState(sort: apply.initialSort);
+
+  void applyAction(SeoCollectionAction action) {
+    state = applySeoCollectionTransition(
+      transition,
+      state,
+      action,
+      records: apply.records,
+      categoryCount: apply.categoryCount,
+      pageSize: apply.pageSize,
+    );
+  }
 
   void render() {
     apply.state(
@@ -106,14 +117,7 @@ void _enhanceSynchronizedCollection(
   }
 
   void dispatch(SeoCollectionAction action) {
-    state = applySeoCollectionTransition(
-      transition,
-      state,
-      action,
-      records: apply.records,
-      categoryCount: apply.categoryCount,
-      pageSize: apply.pageSize,
-    );
+    applyAction(action);
     render();
     apply.synchronizeUrl(
       state,
@@ -122,21 +126,11 @@ void _enhanceSynchronizedCollection(
   }
 
   apply.mount(dispatch);
-  state = selectSeoCollection(
-    records: apply.records,
-    categoryCount: apply.categoryCount,
-    pageSize: apply.pageSize,
-    state: state,
-  ).state;
+  applyAction(SeoCollectionRestoreState(apply.stateFromUrl()));
   render();
   apply.synchronizeUrl(state, push: false);
   apply.listenToHistory((restored) {
-    state = selectSeoCollection(
-      records: apply.records,
-      categoryCount: apply.categoryCount,
-      pageSize: apply.pageSize,
-      state: restored,
-    ).state;
+    applyAction(SeoCollectionRestoreState(restored));
     render();
     apply.synchronizeUrl(state, push: false);
   });
@@ -667,16 +661,16 @@ final class _CollectionApplyBoundary {
     if (codec == null) return SeoCollectionState(sort: plan.initialSort);
     try {
       final url = web.URL(web.window.location.href);
-      List<String> values(String name) {
+      String? value(String name) {
         final matches = url.searchParams.getAll(name);
-        return matches.length == 1 ? [matches[0].toDart] : const <String>[];
+        return matches.length == 1 ? matches[0].toDart : null;
       }
 
-      return codec.decode(
-        queryValues: values(codec.queryParameter),
-        categoryValues: values(codec.categoryParameter),
-        sortValues: values(codec.sortParameter),
-        pageValues: values(codec.pageParameter),
+      return codec.decodeUniqueValues(
+        queryValue: value(codec.queryParameter),
+        categoryValue: value(codec.categoryParameter),
+        sortValue: value(codec.sortParameter),
+        pageValue: value(codec.pageParameter),
       );
     } catch (_) {
       return SeoCollectionState(sort: plan.initialSort);
@@ -694,18 +688,21 @@ final class _CollectionApplyBoundary {
         ..delete(codec.categoryParameter)
         ..delete(codec.sortParameter)
         ..delete(codec.pageParameter);
-      final values = codec.encode(state);
-      if (values.query != null) {
-        url.searchParams.set(codec.queryParameter, values.query!);
+      final query = codec.encodeQueryValue(state);
+      if (query != null) {
+        url.searchParams.set(codec.queryParameter, query);
       }
-      if (values.category != null) {
-        url.searchParams.set(codec.categoryParameter, values.category!);
+      final category = codec.encodeCategoryValue(state);
+      if (category != null) {
+        url.searchParams.set(codec.categoryParameter, category);
       }
-      if (values.sort != null) {
-        url.searchParams.set(codec.sortParameter, values.sort!);
+      final sort = codec.encodeSortValue(state);
+      if (sort != null) {
+        url.searchParams.set(codec.sortParameter, sort);
       }
-      if (values.page != null) {
-        url.searchParams.set(codec.pageParameter, values.page!);
+      final page = codec.encodePageValue(state);
+      if (page != null) {
+        url.searchParams.set(codec.pageParameter, page);
       }
       if (url.href == current) return;
       if (push) {

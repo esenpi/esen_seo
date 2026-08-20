@@ -375,13 +375,14 @@ class ApplicationCollectionPage extends StatelessWidget {
             ).h1,
             const Para(
               'The application transition starts category views with a clear '
-              'search and title order. Flutter and DOM-first call the same '
-              'function.',
+              'search and title order. DOM-first also restores the validated '
+              'state from shareable URLs and browser History.',
             ),
             SeoCollection(
               interactionId: 'application-demo-collection',
               interactionLabel: 'Application article collection',
               pageSize: 2,
+              synchronizeUrl: true,
               transition: transitionExampleCollection,
               items: [
                 for (final item in demoCollectionItems)

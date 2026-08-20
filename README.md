@@ -968,16 +968,18 @@ SeoCollectionState transitionArticles(
 
 SeoCollection(
   transition: transitionArticles,
+  synchronizeUrl: true,
   items: flutterArticles,
 );
 ```
 
-The first application-owned collection slice is deliberately local: leave
-`synchronizeUrl` false. Its compiled adapter rejects a URL-synchronized
-collection before the first mutation, leaving all items as static HTML. Use
-the package-owned `SeoDomFirstFeature.collection` runtime when shareable
-History state is required; admitting application logic into restoration needs
-a separate state-hydration contract and performance gate.
+With `synchronizeUrl: true`, the compiled application runtime restores initial,
+Back and Forward state through one atomic `SeoCollectionRestoreState` action.
+The URL codec bounds the candidate first; the same application transition can
+then accept or normalize the complete snapshot before that candidate can alter
+visible state or replace the canonical URL. Delegate unhandled restore actions to
+`transitionSeoCollection` as above. Search still replaces the current History
+entry, while category, sort and page actions push only changed URLs.
 
 Compile only the selected transition and its package-owned adapter. Tabs is
 the default kind for backward compatibility; select carousel, collection or

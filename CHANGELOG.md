@@ -5,9 +5,11 @@
   validated DOM-first adapter can execute the same pure search, category,
   sort and pagination policy; immutable records, canonical state validation
   and fail-closed transition probes keep invalid output from reaching controls
-  or URL state. Application-owned collections remain local in this slice;
-  URL-synchronized markup stays complete static HTML, while the package-owned
-  collection runtime retains its existing History support.
+  or URL state. URL-synchronized application collections restore initial,
+  Back and Forward snapshots atomically through `SeoCollectionRestoreState`;
+  malformed or rejected values are replaced with accepted canonical state
+  without changing unrelated URL data. Static HTML remains complete without
+  JavaScript.
 
 ## 0.11.0
 

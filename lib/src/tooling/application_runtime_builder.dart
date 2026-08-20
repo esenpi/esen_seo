@@ -297,7 +297,6 @@ import ${jsonEncode(library.toString())} as application;
 
 void main() => enhanceSeoDomFirstCollections(
   transition: application.$symbol,
-  enableUrlSynchronization: false,
 );
 ''';
 

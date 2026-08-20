@@ -191,6 +191,122 @@ void main() {
     expect(_visibleItems(root), hasLength(4));
   });
 
+  test('application policy owns initial URL and History restoration', () async {
+    final codec = SeoCollectionUrlCodec(
+      interactionId: 'application-history-collection',
+      categoryLabels: const ['Flutter', 'CMS', 'JavaScript'],
+    );
+    final initialUrl = web.URL(web.window.location.href);
+    for (final name in _parameterNames(codec)) {
+      initialUrl.searchParams.delete(name);
+    }
+    initialUrl.searchParams
+      ..set('esen-test-keep', 'yes')
+      ..set(codec.queryParameter, 'flutter')
+      ..set(codec.sortParameter, 'oldest');
+    initialUrl.hash = 'application-results';
+    web.window.history.replaceState(null, '', initialUrl.href);
+    final historyBeforeMount = web.window.history.length;
+    final root = _collection(
+      _container(fixture),
+      'application-history-collection',
+      synchronizeUrl: true,
+    );
+
+    enhanceSeoDomFirstCollections(transition: _titleWhileSearching);
+
+    final search = root.querySelector('input')! as web.HTMLInputElement;
+    final sorts = root.querySelectorAll('[data-esen-collection-sort]');
+    expect(web.window.history.length, historyBeforeMount);
+    expect(search.value, 'flutter');
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Alpha',
+      'Über Flutter',
+    ]);
+    expect(
+      (sorts.item(2) as web.Element).getAttribute('aria-pressed'),
+      'true',
+    );
+    var current = web.URL(web.window.location.href);
+    expect(current.searchParams.get(codec.sortParameter), 'title');
+    expect(current.searchParams.get('esen-test-keep'), 'yes');
+    expect(current.hash, '#application-results');
+
+    search.value = '';
+    search.dispatchEvent(web.Event('input'));
+    (sorts.item(1) as web.HTMLElement).dispatchEvent(web.MouseEvent('click'));
+    final historyAfterPush = web.window.history.length;
+    expect(historyAfterPush, historyBeforeMount + 1);
+    search.value = 'flutter';
+    search.dispatchEvent(web.Event('input'));
+
+    final nonCanonicalForward = web.URL(web.window.location.href)
+      ..searchParams.set(codec.sortParameter, 'oldest');
+    web.window.history.replaceState(null, '', nonCanonicalForward.href);
+    await _navigateHistory(() => web.window.history.back());
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Adapter',
+      'Alpha',
+    ]);
+
+    await _navigateHistory(() => web.window.history.forward());
+    current = web.URL(web.window.location.href);
+    expect(current.searchParams.get(codec.queryParameter), 'flutter');
+    expect(current.searchParams.get(codec.sortParameter), 'title');
+    expect(current.searchParams.get('esen-test-keep'), 'yes');
+    expect(current.hash, '#application-results');
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Alpha',
+      'Über Flutter',
+    ]);
+  });
+
+  test('throwing application restore keeps default state and canonical URL',
+      () {
+    final codec = SeoCollectionUrlCodec(
+      interactionId: 'throwing-restore-collection',
+      categoryLabels: const ['Flutter', 'CMS', 'JavaScript'],
+    );
+    final initialUrl = web.URL(web.window.location.href);
+    for (final name in _parameterNames(codec)) {
+      initialUrl.searchParams.delete(name);
+    }
+    initialUrl.searchParams
+      ..set('esen-test-keep', 'yes')
+      ..set(codec.queryParameter, 'flutter');
+    web.window.history.replaceState(null, '', initialUrl.href);
+    final historyBeforeMount = web.window.history.length;
+    final root = _collection(
+      _container(fixture),
+      'throwing-restore-collection',
+      synchronizeUrl: true,
+    );
+
+    enhanceSeoDomFirstCollections(
+      transition: (state, action,
+          {required records, required categoryCount, required pageSize}) {
+        if (action is SeoCollectionRestoreState) throw StateError('restore');
+        return transitionSeoCollection(
+          state,
+          action,
+          records: records,
+          categoryCount: categoryCount,
+          pageSize: pageSize,
+        );
+      },
+    );
+
+    final current = web.URL(web.window.location.href);
+    expect(web.window.history.length, historyBeforeMount);
+    expect(current.searchParams.get(codec.queryParameter), isNull);
+    expect(current.searchParams.get('esen-test-keep'), 'yes');
+    expect((root.querySelector('input') as web.HTMLInputElement).value, '');
+    expect(_visibleItems(root).map((item) => item.textContent), [
+      'Über Flutter',
+      'CMS',
+    ]);
+  });
+
   test('combined feature script enhances collection and theme together', () {
     final container = _container(fixture);
     final collection = _collection(container, 'combined-collection');
@@ -520,7 +636,11 @@ SeoCollectionState _titleWhileSearching(
     categoryCount: categoryCount,
     pageSize: pageSize,
   );
-  if (action is! SeoCollectionSetQuery || next.query.isEmpty) return next;
+  if (action is! SeoCollectionSetQuery &&
+          action is! SeoCollectionRestoreState ||
+      next.query.isEmpty) {
+    return next;
+  }
   return transitionSeoCollection(
     next,
     const SeoCollectionSetSort(SeoCollectionSort.title),

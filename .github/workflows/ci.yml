@@ -230,6 +230,7 @@ jobs:
           fi
           collection=build/web/dom-first-application-collection/index.html
           test -s "$collection"
+          grep -q 'data-esen-synchronize-url="true"' "$collection"
           grep -q 'data-esen-seo-dom-first-application-runtime="example-collection"' "$collection"
           if grep -q 'flutter_bootstrap.js\|main.dart.js' "$collection"; then
             echo "::error::DOM-first application collection loads Flutter"
