@@ -9,7 +9,10 @@
   Back and Forward snapshots atomically through `SeoCollectionRestoreState`;
   malformed or rejected values are replaced with accepted canonical state
   without changing unrelated URL data. Static HTML remains complete without
-  JavaScript.
+  JavaScript. Because `SeoCollectionAction` is sealed, application code with
+  an exhaustive switch over its subtypes must add a
+  `SeoCollectionRestoreState` case when upgrading; delegating that action to
+  `transitionSeoCollection` preserves the package's canonical restore policy.
 
 ## 0.11.0
 
