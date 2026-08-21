@@ -35,6 +35,14 @@ jobs:
           flutter pub get
           flutter pub upgrade analyzer
 
+      - name: Install collection benchmark dependencies
+        working-directory: benchmark/dom_first_collection/fixtures/flutter
+        run: flutter pub get
+
+      - name: Install stepper effects benchmark dependencies
+        working-directory: benchmark/dom_first_stepper_effects/fixtures/flutter
+        run: flutter pub get
+
       # pana bewertet die Formatierung — ein Verstoß kostet Punkte auf
       # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
       - name: Verify formatting
@@ -72,6 +80,14 @@ jobs:
 
       - name: Install the minimum supported analyzer
         run: flutter pub add 'override:analyzer:6.11.0'
+
+      - name: Install collection benchmark dependencies
+        working-directory: benchmark/dom_first_collection/fixtures/flutter
+        run: flutter pub get
+
+      - name: Install stepper effects benchmark dependencies
+        working-directory: benchmark/dom_first_stepper_effects/fixtures/flutter
+        run: flutter pub get
 
       - name: Analyze package
         run: flutter analyze
