@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 
 import '../components/seo_component_format.dart';
@@ -509,14 +510,7 @@ Future<File> _checkedBundleConfigFile(Directory root, String relative) async {
       uri.path.startsWith('/') ||
       uri.pathSegments.isEmpty ||
       !uri.path.endsWith('.json') ||
-      uri.pathSegments.any(
-        (segment) =>
-            segment.isEmpty ||
-            segment == '.' ||
-            segment == '..' ||
-            segment.contains('\\') ||
-            segment.runes.any(_isControlCodePoint),
-      )) {
+      uri.pathSegments.any(_isUnsafePathSegment)) {
     throw ArgumentError.value(
       relative,
       'configPath',
@@ -691,7 +685,7 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
 
 void _validateSymbol(String symbol) {
   if (!_dartIdentifier.hasMatch(symbol) ||
-      _dartReservedWords.contains(symbol)) {
+      Keyword.keywords.containsKey(symbol)) {
     throw ArgumentError.value(
       symbol,
       'symbol',
@@ -984,14 +978,7 @@ Directory _checkedOutputDirectory(Directory root, String relative) {
       uri.hasFragment ||
       uri.pathSegments.isEmpty ||
       uri.pathSegments.first != 'build' ||
-      uri.pathSegments.any(
-        (segment) =>
-            segment.isEmpty ||
-            segment == '.' ||
-            segment == '..' ||
-            segment.contains('\\') ||
-            segment.runes.any(_isControlCodePoint),
-      )) {
+      uri.pathSegments.any(_isUnsafePathSegment)) {
     throw ArgumentError.value(
       relative,
       'outputDirectory',
@@ -1291,74 +1278,13 @@ const Set<String> _allowedDartLibraries = {'dart:core', 'dart:collection'};
 
 final RegExp _dartIdentifier = RegExp(r'^[a-zA-Z][a-zA-Z0-9_]*$');
 
-const Set<String> _dartReservedWords = {
-  'abstract',
-  'as',
-  'assert',
-  'async',
-  'await',
-  'base',
-  'break',
-  'case',
-  'catch',
-  'class',
-  'const',
-  'continue',
-  'covariant',
-  'default',
-  'deferred',
-  'do',
-  'dynamic',
-  'else',
-  'enum',
-  'export',
-  'extends',
-  'extension',
-  'external',
-  'factory',
-  'false',
-  'final',
-  'finally',
-  'for',
-  'Function',
-  'get',
-  'hide',
-  'if',
-  'implements',
-  'import',
-  'in',
-  'interface',
-  'is',
-  'late',
-  'library',
-  'mixin',
-  'new',
-  'null',
-  'of',
-  'on',
-  'operator',
-  'part',
-  'required',
-  'rethrow',
-  'return',
-  'sealed',
-  'set',
-  'show',
-  'static',
-  'super',
-  'switch',
-  'sync',
-  'this',
-  'throw',
-  'true',
-  'try',
-  'var',
-  'void',
-  'when',
-  'while',
-  'with',
-  'yield',
-};
+bool _isUnsafePathSegment(String segment) =>
+    segment.isEmpty ||
+    segment == '.' ||
+    segment == '..' ||
+    segment.contains('/') ||
+    segment.contains('\\') ||
+    segment.runes.any(_isControlCodePoint);
 
 bool _isControlCodePoint(int codePoint) =>
     codePoint < 0x20 || codePoint == 0x7f;

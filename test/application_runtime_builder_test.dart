@@ -146,18 +146,25 @@ void main() {
   test('rejects path traversal in the output before compilation', () async {
     await write('lib/transition.dart', 'const value = 1;');
 
-    await expectLater(
-      buildSeoTabsApplicationRuntime(
-        const SeoTabsRuntimeBuildRequest(
-          id: 'fixture-tabs',
-          library: 'package:fixture_app/transition.dart',
-          symbol: 'transitionTabs',
-          outputDirectory: 'build/../lib',
+    for (final outputDirectory in const [
+      'build/../lib',
+      'build/%2Foutside',
+      'build/nested%2Foutside',
+    ]) {
+      await expectLater(
+        buildSeoTabsApplicationRuntime(
+          SeoTabsRuntimeBuildRequest(
+            id: 'fixture-tabs',
+            library: 'package:fixture_app/transition.dart',
+            symbol: 'transitionTabs',
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: root.path,
         ),
-        packageRoot: root.path,
-      ),
-      throwsArgumentError,
-    );
+        throwsArgumentError,
+        reason: 'accepted: $outputDirectory',
+      );
+    }
   });
 
   test('rejects an output directory that escapes through a symlink', () async {
@@ -191,6 +198,21 @@ void main() {
       ),
       throwsArgumentError,
     );
+
+    for (final symbol in const ['break', 'typedef', 'augment']) {
+      await expectLater(
+        buildSeoTabsApplicationRuntime(
+          SeoTabsRuntimeBuildRequest(
+            id: 'fixture-tabs',
+            library: 'package:fixture_app/transition.dart',
+            symbol: symbol,
+          ),
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+        reason: 'accepted Dart keyword: $symbol',
+      );
+    }
   });
 
   test('stepper builds use the same pre-compilation safety boundary', () async {
@@ -554,6 +576,8 @@ void main() {
     for (final path in const [
       '../outside.json',
       '%2e%2e/outside.json',
+      '%2Foutside.json',
+      'nested%2Foutside.json',
       'nested/%5coutside.json',
       '/absolute.json',
       'config.json?alternate=true',
