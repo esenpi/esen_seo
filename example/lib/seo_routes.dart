@@ -468,6 +468,46 @@ final seoRoutes = [
     ],
   ),
   SeoRoute(
+    path: '/dom-first-application-bundle',
+    delivery: SeoRouteDelivery.domFirst,
+    applicationRuntime: SeoDomFirstApplicationRuntime.bundle(
+      'example-page',
+      members: const {
+        SeoDomFirstApplicationRuntimeKind.tabs,
+        SeoDomFirstApplicationRuntimeKind.carousel,
+        SeoDomFirstApplicationRuntimeKind.stepperEffects,
+      },
+    ),
+    meta: (_) => SeoMeta(
+      title: 'Application Runtime Bundle — esen_seo',
+      description: 'Three independent application-owned state slices in one '
+          'verified route-scoped JavaScript artifact.',
+    ),
+    body: (_) => [
+      SeoNode(tag: 'h1', text: 'Application runtime bundle'),
+      SeoNode(
+        tag: 'p',
+        text: 'Tabs, Carousel and Stepper use independent application '
+            'transitions. The DOM-first route compiles their adapters into '
+            'one verified JavaScript artifact.',
+      ),
+      ...buildSeoTabsNodes(
+        tabs: demoTabEntries(),
+        interactionId: 'application-bundle-tabs',
+        interactionLabel: 'Bundled rendering targets',
+      ),
+      ...demoCarouselNodes(
+        interactionId: 'application-bundle-carousel',
+        interactionLabel: 'Bundled rendering carousel',
+      ),
+      ...demoStepperNodes(
+        interactionId: exampleStepperInteractionId,
+        interactionLabel: 'Bundled publishing flow',
+      ),
+      SeoNode(tag: 'a', text: 'Back to Home', attributes: {'href': '/'}),
+    ],
+  ),
+  SeoRoute(
     path: '/docs',
     // Erscheint als <lastmod> in der sitemap.xml.
     lastModified: DateTime.utc(2026, 7, 31),

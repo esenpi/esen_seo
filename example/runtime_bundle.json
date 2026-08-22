@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "example-page",
+  "entries": [
+    {
+      "kind": "tabs",
+      "library": "package:example/application_tabs_transition.dart",
+      "symbol": "transitionExampleTabs"
+    },
+    {
+      "kind": "carousel",
+      "library": "package:example/application_carousel_transition.dart",
+      "symbol": "transitionExampleCarousel"
+    },
+    {
+      "kind": "stepper-effects",
+      "library": "package:example/application_stepper_transition.dart",
+      "symbol": "transitionExampleStepperEffects",
+      "interactionIds": [
+        "application-demo-stepper"
+      ]
+    }
+  ]
+}

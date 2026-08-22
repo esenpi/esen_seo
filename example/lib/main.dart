@@ -23,6 +23,7 @@ final Map<String, WidgetBuilder> _pages = {
   '/demo': (_) => const DemoPage(),
   '/docs': (_) => const DocsPage(),
   '/dom-first-application-carousel': (_) => const ApplicationCarouselPage(),
+  '/dom-first-application-bundle': (_) => const ApplicationBundlePage(),
   '/dom-first-application-collection': (_) => const ApplicationCollectionPage(),
   '/dom-first-application-stepper': (_) => const ApplicationStepperPage(),
   '/dom-first-application-tabs': (_) => const ApplicationTabsPage(),
@@ -403,6 +404,72 @@ class ApplicationCollectionPage extends StatelessWidget {
                       SeoNode(tag: 'h2', text: item.title),
                       SeoNode(tag: 'p', text: item.content),
                     ],
+                  ),
+              ],
+            ),
+          ],
+        ).main,
+      );
+}
+
+class ApplicationBundlePage extends StatelessWidget {
+  const ApplicationBundlePage({super.key});
+
+  @override
+  Widget build(BuildContext context) => PageScaffold(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 24,
+          children: [
+            Text(
+              'Application runtime bundle',
+              style: Theme.of(context).textTheme.displaySmall,
+            ).h1,
+            const Para(
+              'Tabs, Carousel and Stepper use independent application '
+              'transitions. The DOM-first route compiles their adapters into '
+              'one verified JavaScript artifact.',
+            ),
+            SeoTabs(
+              interactionId: 'application-bundle-tabs',
+              interactionLabel: 'Bundled rendering targets',
+              transition: transitionExampleTabs,
+              tabs: [
+                for (final tab in demoTabs)
+                  SeoTab(
+                    label: tab.label,
+                    content: Text(tab.content),
+                    nodes: demoTabPanelNodes(tab),
+                  ),
+              ],
+            ),
+            SeoCarousel(
+              height: 180,
+              interactionId: 'application-bundle-carousel',
+              interactionLabel: 'Bundled rendering carousel',
+              transition: transitionExampleCarousel,
+              slides: [
+                for (final slide in demoCarouselSlides)
+                  SeoCarouselSlide(
+                    label: slide.label,
+                    content: Align(
+                      alignment: Alignment.topLeft,
+                      child: Text(slide.content),
+                    ),
+                    nodes: demoCarouselSlideNodes(slide),
+                  ),
+              ],
+            ),
+            SeoStepper.withEffects(
+              interactionId: exampleStepperInteractionId,
+              interactionLabel: 'Bundled publishing flow',
+              effectTransition: transitionExampleStepperEffects,
+              steps: [
+                for (final step in demoStepperSteps)
+                  SeoStep(
+                    label: step.label,
+                    content: Text(step.content),
+                    nodes: demoStepperBodyNodes(step),
                   ),
               ],
             ),

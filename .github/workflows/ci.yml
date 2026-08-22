@@ -218,6 +218,19 @@ jobs:
           --symbol transitionExampleCollection
           --check
 
+      - name: Build the application runtime bundle
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --bundle runtime_bundle.json
+
+      - name: Verify the application runtime bundle
+        working-directory: example
+        run: >-
+          dart run esen_seo:esen_seo_runtime
+          --bundle runtime_bundle.json
+          --check
+
       # Und dann durch den echten Prerenderer, damit ein Fehler in der
       # Ausgabe auffällt, bevor er auf einer Nutzerseite landet.
       - name: Prerender
@@ -254,6 +267,23 @@ jobs:
             echo "::error::DOM-first application collection loads Flutter"
             exit 1
           fi
+          bundle=build/web/dom-first-application-bundle/index.html
+          test -s "$bundle"
+          test "$(grep -o 'data-esen-seo-dom-first-application-runtime=' "$bundle" | wc -l | tr -d ' ')" = 1
+          grep -q 'data-esen-seo-dom-first-application-runtime="example-page"' "$bundle"
+          grep -q 'data-esen-component="tabs"' "$bundle"
+          grep -q 'data-esen-component="carousel"' "$bundle"
+          grep -q 'data-esen-component="stepper"' "$bundle"
+          if grep -q 'flutter_bootstrap.js\|main.dart.js' "$bundle"; then
+            echo "::error::DOM-first application bundle loads Flutter"
+            exit 1
+          fi
+          manifest=build/esen_seo/runtimes/bundle-example-page.json
+          test -s "$manifest"
+          grep -q '"members"' "$manifest"
+          grep -q '"tabs"' "$manifest"
+          grep -q '"carousel"' "$manifest"
+          grep -q '"stepper-effects"' "$manifest"
           test -s build/web/sitemap.xml
           test -s build/web/robots.txt
           echo "prerendered output looks sane"
