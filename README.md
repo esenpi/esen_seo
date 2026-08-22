@@ -71,7 +71,8 @@ The HTML only exists on the web.
 - **DOM-first routes (opt-in)**: let a pure route body remain the permanent
   page without loading Flutter Web. `SeoTabs` and bounded `SeoCollection`
   interactions run through transitions compiled from the same pure Dart
-  source used by Flutter.
+  source used by Flutter. A route may combine different application-owned
+  adapter families in one verified runtime bundle.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -1056,6 +1057,43 @@ without returning closures or retaining state. The build-time validated
 `--interaction-ids` list limits enhancement before the first DOM mutation;
 unlisted steppers remain complete static HTML.
 
+For a route that uses several application transitions, describe two to four
+different adapter families in one bounded JSON file. Member order in the file
+does not affect the generated entrypoint or manifest:
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "product-page",
+  "entries": [
+    {
+      "kind": "tabs",
+      "library": "package:my_app/product_tabs_transition.dart",
+      "symbol": "transitionProductTabs"
+    },
+    {
+      "kind": "carousel",
+      "library": "package:my_app/product_carousel_transition.dart",
+      "symbol": "transitionProductCarousel"
+    }
+  ]
+}
+```
+
+```shell
+dart run esen_seo:esen_seo_runtime \
+  --bundle runtime_bundle.json
+```
+
+`stepper` and `stepper-effects` are the same ownership family and cannot both
+appear in one bundle. Unknown fields and kinds, duplicate families, invalid
+symbols, files outside the application root and configurations above 32 KiB
+are rejected before compilation. Every member independently passes the same
+complete pure-Dart graph and held-state checks as a single runtime. The
+artifact is accepted only when the complete combined output remains inside the
+unchanged 25 KiB gzip and 512 KiB raw limits; a large combination may therefore
+fail even when each transition compiles separately.
+
 The command parses the complete application import/export/part graph before
 compilation. It rejects Flutter, IO, browser libraries, third-party packages,
 conditional and deferred imports, path escapes and invalid identifiers. It
@@ -1100,6 +1138,34 @@ SeoRoute(
 );
 ```
 
+Select all bundle members explicitly on the route. The member set is checked
+against the schema-2 manifest before the script can be delivered:
+
+```dart
+SeoRoute(
+  path: '/product',
+  delivery: SeoRouteDelivery.domFirst,
+  applicationRuntime: SeoDomFirstApplicationRuntime.bundle(
+    'product-page',
+    members: const {
+      SeoDomFirstApplicationRuntimeKind.tabs,
+      SeoDomFirstApplicationRuntimeKind.carousel,
+    },
+  ),
+  meta: (_) => const SeoMeta(title: 'Product'),
+  body: (_) => [
+    ...buildSeoTabsNodes(
+      tabs: productTabNodes,
+      interactionId: 'product-tabs-control',
+    ),
+    ...buildSeoCarouselNodes(
+      slides: productCarouselNodes,
+      interactionId: 'product-carousel-control',
+    ),
+  ],
+);
+```
+
 For a carousel route use
 `SeoDomFirstApplicationRuntime.carousel('product-carousel')` together with
 `buildSeoCarouselNodes`. For a collection route use
@@ -1131,15 +1197,16 @@ await prerenderSite(
 ```
 
 On first load through a `SeoDirectoryRuntimeStore`, the store checks kind,
-logical id, SHA-256, byte sizes and the expected Dart compiler version, then
-caches the verified artifact for that store's lifetime. Missing, stale, foreign
-or inconsistent artifacts fail by name instead of falling back to package logic
-or Flutter. Treat the build directory as trusted deployment input: the hash
-detects a mismatched script and manifest, but cannot authenticate them against
-an actor who can replace both. A route may select either the corresponding
-package feature or one matching application runtime, never both. Cubit or
-another Flutter state manager may dispatch the same pure transition on the
-Flutter side, but it is not compiled and is not a dependency of `esen_seo`.
+logical id, bundle members where applicable, SHA-256, byte sizes and the
+expected Dart compiler version, then caches the verified artifact for that
+store's lifetime. Missing, stale, foreign or inconsistent artifacts fail by
+name instead of falling back to package logic or Flutter. Treat the build
+directory as trusted deployment input: the hash detects a mismatched script and
+manifest, but cannot authenticate them against an actor who can replace both. A
+route may select either the corresponding package feature or one matching
+application runtime member, never both. Cubit or another Flutter state manager
+may dispatch the same pure transition on the Flutter side, but it is not
+compiled and is not a dependency of `esen_seo`.
 
 For a hybrid site that serves Flutter and DOM-first routes from the same
 origin, disable Flutter's root-scoped application-shell cache:

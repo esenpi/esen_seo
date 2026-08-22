@@ -17,7 +17,8 @@ the injected meta tags and the JSON-LD schema.
 ## Run the SSR server
 
 ```sh
-flutter build web
+dart run esen_seo:esen_seo_runtime --bundle runtime_bundle.json
+flutter build web --release --pwa-strategy=none
 dart run bin/server.dart
 ```
 
@@ -27,12 +28,14 @@ Then compare what bots and users receive:
 curl -A "Googlebot/2.1" http://localhost:8080   # semantic HTML document
 curl -A "Mozilla/5.0"   http://localhost:8080   # Flutter web app
 curl http://localhost:8080/sitemap.xml          # generated from seo_routes.dart
+curl http://localhost:8080/dom-first-application-bundle # one DOM-first bundle
 ```
 
 ## Or: prerender for static hosting (no server)
 
 ```sh
-flutter build web
+dart run esen_seo:esen_seo_runtime --bundle runtime_bundle.json
+flutter build web --release --pwa-strategy=none
 dart run bin/prerender.dart
 ```
 
