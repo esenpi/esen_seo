@@ -278,7 +278,7 @@ jobs:
             echo "::error::DOM-first application bundle loads Flutter"
             exit 1
           fi
-          manifest=build/esen_seo/runtimes/bundle-example-page.json
+          manifest=build/esen_seo/runtimes/bundle+tabs+carousel+stepper-effects+example-page.json
           test -s "$manifest"
           grep -q '"members"' "$manifest"
           grep -q '"tabs"' "$manifest"

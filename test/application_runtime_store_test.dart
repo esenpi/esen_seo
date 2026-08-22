@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/src/routing/seo_application_runtime_artifact.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -24,6 +25,61 @@ void main() {
   final dartVersion = Platform.version.split(' ').first;
 
   group('application runtime artifact', () {
+    test('artifact stems are injective without renaming safe singles', () {
+      expect(
+        seoApplicationRuntimeArtifactStem(reference),
+        'tabs-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(stepperEffectsReference),
+        'stepper-effects-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(carouselReference),
+        'carousel-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(
+          const SeoDomFirstApplicationRuntime.collection('application-tabs'),
+        ),
+        'collection-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(
+          const SeoDomFirstApplicationRuntime.stepper('application-tabs'),
+        ),
+        'stepper-application-tabs',
+      );
+
+      const ambiguousPlain =
+          SeoDomFirstApplicationRuntime.stepper('effects-page');
+      const effects = SeoDomFirstApplicationRuntime.stepperEffects('page');
+      expect(
+        seoApplicationRuntimeArtifactStem(ambiguousPlain),
+        'stepper+effects-page',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(ambiguousPlain),
+        isNot(seoApplicationRuntimeArtifactStem(effects)),
+      );
+
+      final otherMembers = SeoDomFirstApplicationRuntime.bundle(
+        'application-page',
+        members: const {
+          SeoDomFirstApplicationRuntimeKind.tabs,
+          SeoDomFirstApplicationRuntimeKind.carousel,
+        },
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(bundleReference),
+        'bundle+tabs+collection+stepper-effects+application-page',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(bundleReference),
+        isNot(seoApplicationRuntimeArtifactStem(otherMembers)),
+      );
+    });
+
     test('records and verifies its complete compiler identity', () {
       final artifact = SeoDomFirstRuntimeArtifact.create(
         reference: reference,
@@ -254,6 +310,47 @@ void main() {
           await _javascriptFile(directory, bundleReference).exists(), isTrue);
     });
 
+    test('keeps equal bundle ids with different members independent', () async {
+      final firstReference = SeoDomFirstApplicationRuntime.bundle(
+        'shared-bundle',
+        members: const {
+          SeoDomFirstApplicationRuntimeKind.tabs,
+          SeoDomFirstApplicationRuntimeKind.carousel,
+        },
+      );
+      final secondReference = SeoDomFirstApplicationRuntime.bundle(
+        'shared-bundle',
+        members: const {
+          SeoDomFirstApplicationRuntimeKind.tabs,
+          SeoDomFirstApplicationRuntimeKind.collection,
+        },
+      );
+      final firstArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: firstReference,
+        javascript: '(function(){return "first";})();',
+        dartVersion: dartVersion,
+      );
+      final secondArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: secondReference,
+        javascript: '(function(){return "second";})();',
+        dartVersion: dartVersion,
+      );
+      await _write(directory, firstArtifact);
+      await _write(directory, secondArtifact);
+
+      final store = SeoDirectoryRuntimeStore(directory.path);
+      expect((await store.load(firstReference)).javascript, contains('first'));
+      expect(
+        (await store.load(secondReference)).javascript,
+        contains('second'),
+      );
+      expect(await _javascriptFile(directory, firstReference).exists(), isTrue);
+      expect(
+        await _javascriptFile(directory, secondReference).exists(),
+        isTrue,
+      );
+    });
+
     test('bounds runtime files before reading or compressing them', () async {
       await _javascriptFile(directory, reference).writeAsString(
         List.filled(seoDomFirstRuntimeMaxBytes + 1, ' ').join(),
@@ -380,7 +477,7 @@ File _javascriptFile(
 ) =>
     File(
       '${directory.path}/'
-      '${_artifactStem(reference)}.js',
+      '${seoApplicationRuntimeArtifactStem(reference)}.js',
     );
 
 File _manifestFile(
@@ -389,8 +486,5 @@ File _manifestFile(
 ) =>
     File(
       '${directory.path}/'
-      '${_artifactStem(reference)}.json',
+      '${seoApplicationRuntimeArtifactStem(reference)}.json',
     );
-
-String _artifactStem(SeoDomFirstApplicationRuntime reference) =>
-    '${reference.kind}-${reference.id}';
