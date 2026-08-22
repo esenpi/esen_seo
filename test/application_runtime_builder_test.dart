@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -327,8 +328,303 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('bundle rejects invalid ownership before compilation', () async {
+    const tabs = SeoRuntimeBundleEntry.tabs(
+      library: 'package:fixture_app/tabs.dart',
+      symbol: 'transitionTabs',
+    );
+    const stepper = SeoRuntimeBundleEntry.stepper(
+      library: 'package:fixture_app/stepper.dart',
+      symbol: 'transitionStepper',
+    );
+    const stepperEffects = SeoRuntimeBundleEntry.stepperEffects(
+      library: 'package:fixture_app/stepper_effects.dart',
+      symbol: 'transitionStepperEffects',
+      interactionIds: {'fixture-stepper'},
+    );
+
+    for (final entries in const <List<SeoRuntimeBundleEntry>>[
+      [tabs],
+      [tabs, tabs],
+      [stepper, stepperEffects],
+    ]) {
+      await expectLater(
+        buildSeoApplicationRuntimeBundle(
+          SeoRuntimeBundleBuildRequest(
+            id: 'fixture-bundle',
+            entries: entries,
+          ),
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
+  });
+
+  test('bundle checks every library and symbol before compilation', () async {
+    await write('lib/tabs.dart', 'const tabs = 1;');
+    await write('lib/collection.dart', "import 'dart:io';");
+
+    await expectLater(
+      buildSeoApplicationRuntimeBundle(
+        const SeoRuntimeBundleBuildRequest(
+          id: 'fixture-bundle',
+          entries: [
+            SeoRuntimeBundleEntry.tabs(
+              library: 'package:fixture_app/tabs.dart',
+              symbol: 'transitionTabs',
+            ),
+            SeoRuntimeBundleEntry.collection(
+              library: 'package:fixture_app/collection.dart',
+              symbol: 'transitionCollection',
+            ),
+          ],
+        ),
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+
+    await expectLater(
+      buildSeoApplicationRuntimeBundle(
+        const SeoRuntimeBundleBuildRequest(
+          id: 'fixture-bundle',
+          entries: [
+            SeoRuntimeBundleEntry.tabs(
+              library: 'package:fixture_app/tabs.dart',
+              symbol: 'transitionTabs',
+            ),
+            SeoRuntimeBundleEntry.collection(
+              library: 'package:fixture_app/tabs.dart',
+              symbol: 'await',
+            ),
+          ],
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('bundle validates Stepper effect admission ids', () async {
+    await write('lib/tabs.dart', 'const tabs = 1;');
+    await write('lib/stepper.dart', 'const stepper = 1;');
+
+    await expectLater(
+      buildSeoApplicationRuntimeBundle(
+        const SeoRuntimeBundleBuildRequest(
+          id: 'fixture-bundle',
+          entries: [
+            SeoRuntimeBundleEntry.tabs(
+              library: 'package:fixture_app/tabs.dart',
+              symbol: 'transitionTabs',
+            ),
+            SeoRuntimeBundleEntry.stepperEffects(
+              library: 'package:fixture_app/stepper.dart',
+              symbol: 'transitionStepperEffects',
+              interactionIds: {'invalid id'},
+            ),
+          ],
+        ),
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('bundle snapshots Stepper effect ids before its first await', () async {
+    await write('lib/tabs.dart', 'const tabs = 1;');
+    await write('lib/stepper.dart', 'const stepper = 1;');
+    final interactionIds = _TrackingSet<String>({'fixture-stepper'});
+
+    final build = buildSeoApplicationRuntimeBundle(
+      SeoRuntimeBundleBuildRequest(
+        id: 'fixture-bundle',
+        entries: [
+          const SeoRuntimeBundleEntry.tabs(
+            library: 'package:fixture_app/tabs.dart',
+            symbol: 'transitionTabs',
+          ),
+          SeoRuntimeBundleEntry.stepperEffects(
+            library: 'package:fixture_app/stepper.dart',
+            symbol: 'transitionStepperEffects',
+            interactionIds: interactionIds,
+          ),
+        ],
+      ),
+      packageRoot: root.path,
+    );
+    final readBeforeFirstAwait = interactionIds.wasIterated;
+    interactionIds
+      ..clear()
+      ..add('invalid id');
+    await File('${root.path}/.dart_tool/package_config.json')
+        .writeAsString('{}');
+
+    await expectLater(build, throwsStateError);
+    expect(readBeforeFirstAwait, isTrue);
+  });
+
+  test('bundle config parser accepts only its exact structured schema',
+      () async {
+    await write(
+        'runtime_bundle.json',
+        jsonEncode({
+          'schemaVersion': 1,
+          'id': 'fixture-bundle',
+          'entries': [
+            {
+              'kind': 'collection',
+              'library': 'package:fixture_app/collection.dart',
+              'symbol': 'transitionCollection',
+            },
+            {
+              'kind': 'stepper-effects',
+              'library': 'package:fixture_app/stepper.dart',
+              'symbol': 'transitionStepperEffects',
+              'interactionIds': ['stepper-b', 'stepper-a'],
+            },
+          ],
+        }));
+
+    final request = await loadSeoRuntimeBundleBuildRequest(
+      'runtime_bundle.json',
+      packageRoot: root.path,
+      outputDirectory: 'build/custom',
+    );
+
+    expect(request.id, 'fixture-bundle');
+    expect(request.outputDirectory, 'build/custom');
+    expect(request.entries, hasLength(2));
+    expect(request.entries.first, isA<SeoCollectionRuntimeBundleEntry>());
+    expect(
+      request.entries.last.interactionIds,
+      {'stepper-a', 'stepper-b'},
+    );
+
+    for (final invalid in [
+      {
+        'schemaVersion': 1.0,
+        'id': 'fixture-bundle',
+        'entries': const [],
+      },
+      {
+        'schemaVersion': 1,
+        'id': 'fixture-bundle',
+        'entries': const [],
+        'unknown': true,
+      },
+      {
+        'schemaVersion': 1,
+        'id': 'fixture-bundle',
+        'entries': [
+          {
+            'kind': 'unknown',
+            'library': 'package:fixture_app/a.dart',
+            'symbol': 'transition',
+          }
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'id': 'fixture-bundle',
+        'entries': [
+          {
+            'kind': 'stepper-effects',
+            'library': 'package:fixture_app/a.dart',
+            'symbol': 'transition',
+            'interactionIds': ['same', 'same'],
+          }
+        ],
+      },
+    ]) {
+      await write('invalid_bundle.json', jsonEncode(invalid));
+      await expectLater(
+        loadSeoRuntimeBundleBuildRequest(
+          'invalid_bundle.json',
+          packageRoot: root.path,
+        ),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('bundle config path and input size fail closed', () async {
+    for (final path in const [
+      '../outside.json',
+      '%2e%2e/outside.json',
+      'nested/%5coutside.json',
+      '/absolute.json',
+      'config.json?alternate=true',
+    ]) {
+      await expectLater(
+        loadSeoRuntimeBundleBuildRequest(
+          path,
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
+
+    await write('oversized.json', List.filled(32 * 1024 + 1, ' ').join());
+    await expectLater(
+      loadSeoRuntimeBundleBuildRequest(
+        'oversized.json',
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+
+    final outside = await Directory.systemTemp.createTemp('esen_bundle_config');
+    addTearDown(() => outside.delete(recursive: true));
+    await File('${outside.path}/bundle.json').writeAsString('{}');
+    await Link('${root.path}/linked.json')
+        .create('${outside.path}/bundle.json');
+    await expectLater(
+      loadSeoRuntimeBundleBuildRequest(
+        'linked.json',
+        packageRoot: root.path,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 final class _UnexpectedSuccess {
   const _UnexpectedSuccess();
+}
+
+final class _TrackingSet<E> extends SetBase<E> {
+  _TrackingSet(Set<E> values) : _values = values;
+
+  final Set<E> _values;
+  bool wasIterated = false;
+
+  @override
+  Iterator<E> get iterator {
+    wasIterated = true;
+    return _values.iterator;
+  }
+
+  @override
+  int get length => _values.length;
+
+  @override
+  bool add(E value) => _values.add(value);
+
+  @override
+  bool contains(Object? element) => _values.contains(element);
+
+  @override
+  E? lookup(Object? element) => _values.lookup(element);
+
+  @override
+  bool remove(Object? value) => _values.remove(value);
+
+  @override
+  Set<E> toSet() {
+    wasIterated = true;
+    return _values.toSet();
+  }
 }

@@ -1,6 +1,35 @@
 /// Typed references to application-authored DOM-first browser logic.
 library;
 
+/// Closed adapter kinds accepted by application runtime builds.
+enum SeoDomFirstApplicationRuntimeKind {
+  tabs('tabs'),
+  carousel('carousel'),
+  collection('collection'),
+  stepper('stepper'),
+  stepperEffects('stepper-effects');
+
+  const SeoDomFirstApplicationRuntimeKind(this.value);
+
+  /// Stable value written to bundle manifests.
+  final String value;
+
+  /// Parses a manifest or configuration value without guessing aliases.
+  static SeoDomFirstApplicationRuntimeKind? tryParse(String value) {
+    for (final kind in values) {
+      if (kind.value == value) return kind;
+    }
+    return null;
+  }
+
+  String get _ownershipFamily => switch (this) {
+        SeoDomFirstApplicationRuntimeKind.stepper ||
+        SeoDomFirstApplicationRuntimeKind.stepperEffects =>
+          'stepper',
+        _ => value,
+      };
+}
+
 /// One application runtime selected by a DOM-first route.
 ///
 /// The route stores only this validated logical identity. JavaScript remains
@@ -28,20 +57,67 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.stepperEffects(String id) =
       SeoDomFirstStepperEffectsApplicationRuntime;
 
+  /// Uses one artifact containing two to four different adapter families.
+  factory SeoDomFirstApplicationRuntime.bundle(
+    String id, {
+    required Iterable<SeoDomFirstApplicationRuntimeKind> members,
+  }) {
+    if (!isValidSeoApplicationRuntimeId(id)) {
+      throw ArgumentError.value(
+        id,
+        'id',
+        'must start with a lowercase letter and contain at most 64 lowercase '
+            'letters, digits, underscores or dashes',
+      );
+    }
+    final ordered = members.toList();
+    if (ordered.length < 2 || ordered.length > 4) {
+      throw ArgumentError.value(
+        ordered,
+        'members',
+        'must contain between two and four adapter families',
+      );
+    }
+    final exactKinds = <SeoDomFirstApplicationRuntimeKind>{};
+    final families = <String>{};
+    for (final member in ordered) {
+      if (!exactKinds.add(member) || !families.add(member._ownershipFamily)) {
+        throw ArgumentError.value(
+          ordered,
+          'members',
+          'must contain each adapter family exactly once',
+        );
+      }
+    }
+    ordered.sort((left, right) => left.index.compareTo(right.index));
+    return SeoDomFirstApplicationRuntimeBundle._(
+      id,
+      List<SeoDomFirstApplicationRuntimeKind>.unmodifiable(ordered),
+    );
+  }
+
   /// The logical build-artifact identity.
   final String id;
 
   /// The closed runtime kind written to the verified manifest.
   String get kind;
 
+  /// Adapter kinds initialized by this artifact in canonical order.
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds;
+
   @override
   bool operator ==(Object other) =>
       other is SeoDomFirstApplicationRuntime &&
       other.runtimeType == runtimeType &&
-      other.id == id;
+      other.id == id &&
+      _sameKinds(other.memberKinds, memberKinds);
 
   @override
-  int get hashCode => Object.hash(runtimeType, id);
+  int get hashCode => Object.hash(
+        runtimeType,
+        id,
+        Object.hashAll(memberKinds),
+      );
 }
 
 /// An application-authored transition executed by the tabs adapter.
@@ -51,6 +127,10 @@ final class SeoDomFirstTabsApplicationRuntime
 
   @override
   String get kind => 'tabs';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.tabs];
 }
 
 /// An application-authored transition executed by the carousel adapter.
@@ -60,6 +140,10 @@ final class SeoDomFirstCarouselApplicationRuntime
 
   @override
   String get kind => 'carousel';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.carousel];
 }
 
 /// An application-authored transition executed by the collection adapter.
@@ -69,6 +153,10 @@ final class SeoDomFirstCollectionApplicationRuntime
 
   @override
   String get kind => 'collection';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.collection];
 }
 
 /// An application-authored transition executed by the stepper adapter.
@@ -78,6 +166,10 @@ final class SeoDomFirstStepperApplicationRuntime
 
   @override
   String get kind => 'stepper';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.stepper];
 }
 
 /// An application-authored state and effect transition for the stepper.
@@ -87,6 +179,22 @@ final class SeoDomFirstStepperEffectsApplicationRuntime
 
   @override
   String get kind => 'stepper-effects';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.stepperEffects];
+}
+
+/// A route-scoped artifact containing different application adapter families.
+final class SeoDomFirstApplicationRuntimeBundle
+    extends SeoDomFirstApplicationRuntime {
+  SeoDomFirstApplicationRuntimeBundle._(super.id, this.memberKinds) : super._();
+
+  @override
+  String get kind => 'bundle';
+
+  @override
+  final List<SeoDomFirstApplicationRuntimeKind> memberKinds;
 }
 
 /// Whether [id] is safe as a logical identity and artifact file component.
@@ -94,3 +202,14 @@ bool isValidSeoApplicationRuntimeId(String id) =>
     _applicationRuntimeId.hasMatch(id);
 
 final RegExp _applicationRuntimeId = RegExp(r'^[a-z][a-z0-9_-]{0,63}$');
+
+bool _sameKinds(
+  List<SeoDomFirstApplicationRuntimeKind> left,
+  List<SeoDomFirstApplicationRuntimeKind> right,
+) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
+}

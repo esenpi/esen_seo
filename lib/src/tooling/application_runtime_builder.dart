@@ -89,6 +89,242 @@ final class SeoStepperEffectsRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// One checked transition included in an application runtime bundle.
+sealed class SeoRuntimeBundleEntry {
+  const SeoRuntimeBundleEntry._({
+    required this.library,
+    required this.symbol,
+  });
+
+  const factory SeoRuntimeBundleEntry.tabs({
+    required String library,
+    required String symbol,
+  }) = SeoTabsRuntimeBundleEntry;
+
+  const factory SeoRuntimeBundleEntry.carousel({
+    required String library,
+    required String symbol,
+  }) = SeoCarouselRuntimeBundleEntry;
+
+  const factory SeoRuntimeBundleEntry.collection({
+    required String library,
+    required String symbol,
+  }) = SeoCollectionRuntimeBundleEntry;
+
+  const factory SeoRuntimeBundleEntry.stepper({
+    required String library,
+    required String symbol,
+  }) = SeoStepperRuntimeBundleEntry;
+
+  const factory SeoRuntimeBundleEntry.stepperEffects({
+    required String library,
+    required String symbol,
+    required Set<String> interactionIds,
+  }) = SeoStepperEffectsRuntimeBundleEntry;
+
+  final String library;
+  final String symbol;
+  SeoDomFirstApplicationRuntimeKind get kind;
+  Set<String> get interactionIds => const {};
+}
+
+final class SeoTabsRuntimeBundleEntry extends SeoRuntimeBundleEntry {
+  const SeoTabsRuntimeBundleEntry({
+    required super.library,
+    required super.symbol,
+  }) : super._();
+
+  @override
+  SeoDomFirstApplicationRuntimeKind get kind =>
+      SeoDomFirstApplicationRuntimeKind.tabs;
+}
+
+final class SeoCarouselRuntimeBundleEntry extends SeoRuntimeBundleEntry {
+  const SeoCarouselRuntimeBundleEntry({
+    required super.library,
+    required super.symbol,
+  }) : super._();
+
+  @override
+  SeoDomFirstApplicationRuntimeKind get kind =>
+      SeoDomFirstApplicationRuntimeKind.carousel;
+}
+
+final class SeoCollectionRuntimeBundleEntry extends SeoRuntimeBundleEntry {
+  const SeoCollectionRuntimeBundleEntry({
+    required super.library,
+    required super.symbol,
+  }) : super._();
+
+  @override
+  SeoDomFirstApplicationRuntimeKind get kind =>
+      SeoDomFirstApplicationRuntimeKind.collection;
+}
+
+final class SeoStepperRuntimeBundleEntry extends SeoRuntimeBundleEntry {
+  const SeoStepperRuntimeBundleEntry({
+    required super.library,
+    required super.symbol,
+  }) : super._();
+
+  @override
+  SeoDomFirstApplicationRuntimeKind get kind =>
+      SeoDomFirstApplicationRuntimeKind.stepper;
+}
+
+final class SeoStepperEffectsRuntimeBundleEntry extends SeoRuntimeBundleEntry {
+  const SeoStepperEffectsRuntimeBundleEntry({
+    required super.library,
+    required super.symbol,
+    required this.interactionIds,
+  }) : super._();
+
+  @override
+  SeoDomFirstApplicationRuntimeKind get kind =>
+      SeoDomFirstApplicationRuntimeKind.stepperEffects;
+
+  @override
+  final Set<String> interactionIds;
+}
+
+/// Inputs for one route-scoped bundle of checked application transitions.
+final class SeoRuntimeBundleBuildRequest {
+  const SeoRuntimeBundleBuildRequest({
+    required this.id,
+    required this.entries,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final List<SeoRuntimeBundleEntry> entries;
+  final String outputDirectory;
+}
+
+/// Reads one bounded, strictly shaped bundle build configuration.
+Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
+  String configPath, {
+  String? packageRoot,
+  String outputDirectory = 'build/esen_seo/runtimes',
+}) async {
+  final root = Directory(packageRoot ?? Directory.current.path).absolute;
+  final file = await _checkedBundleConfigFile(root, configPath);
+  final String source;
+  try {
+    final handle = await file.open();
+    try {
+      if (await handle.length() > _runtimeBundleConfigMaxBytes) {
+        throw StateError(
+          'Runtime bundle config "$configPath" exceeds '
+          '$_runtimeBundleConfigMaxBytes bytes.',
+        );
+      }
+      final bytes = await handle.read(_runtimeBundleConfigMaxBytes + 1);
+      if (bytes.length > _runtimeBundleConfigMaxBytes) {
+        throw StateError(
+          'Runtime bundle config "$configPath" exceeds '
+          '$_runtimeBundleConfigMaxBytes bytes.',
+        );
+      }
+      source = utf8.decode(bytes);
+    } finally {
+      await handle.close();
+    }
+  } on FileSystemException catch (error) {
+    throw StateError('Cannot read runtime bundle config "$configPath": $error');
+  } on FormatException catch (error) {
+    throw FormatException(
+      'Runtime bundle config "$configPath" is not valid UTF-8: '
+      '${error.message}',
+    );
+  }
+
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(source);
+  } on FormatException catch (error) {
+    throw FormatException(
+      'Runtime bundle config "$configPath" is not valid JSON: '
+      '${error.message}',
+    );
+  }
+  if (decoded is! Map<String, Object?>) {
+    throw const FormatException('Runtime bundle config must be a JSON object.');
+  }
+  _requireExactFields(
+    decoded,
+    const {'schemaVersion', 'id', 'entries'},
+    'Runtime bundle config',
+  );
+  if (decoded['schemaVersion'] is! int ||
+      decoded['schemaVersion'] != 1 ||
+      decoded['id'] is! String ||
+      decoded['entries'] is! List) {
+    throw const FormatException(
+        'Runtime bundle config has invalid field types.');
+  }
+
+  final entries = <SeoRuntimeBundleEntry>[];
+  for (final (index, raw) in (decoded['entries']! as List).indexed) {
+    if (raw is! Map<String, Object?>) {
+      throw FormatException('Runtime bundle entry $index must be an object.');
+    }
+    final rawKind = raw['kind'];
+    final kind = rawKind is String
+        ? SeoDomFirstApplicationRuntimeKind.tryParse(rawKind)
+        : null;
+    if (kind == null) {
+      throw FormatException('Runtime bundle entry $index has an unknown kind.');
+    }
+    final expectedFields =
+        kind == SeoDomFirstApplicationRuntimeKind.stepperEffects
+            ? const {'kind', 'library', 'symbol', 'interactionIds'}
+            : const {'kind', 'library', 'symbol'};
+    _requireExactFields(raw, expectedFields, 'Runtime bundle entry $index');
+    final library = raw['library'];
+    final symbol = raw['symbol'];
+    if (library is! String || symbol is! String) {
+      throw FormatException(
+        'Runtime bundle entry $index has invalid field types.',
+      );
+    }
+    entries.add(switch (kind) {
+      SeoDomFirstApplicationRuntimeKind.tabs => SeoRuntimeBundleEntry.tabs(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.carousel =>
+        SeoRuntimeBundleEntry.carousel(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.collection =>
+        SeoRuntimeBundleEntry.collection(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.stepper =>
+        SeoRuntimeBundleEntry.stepper(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.stepperEffects =>
+        SeoRuntimeBundleEntry.stepperEffects(
+          library: library,
+          symbol: symbol,
+          interactionIds: _configInteractionIds(
+            raw['interactionIds'],
+            index,
+          ),
+        ),
+    });
+  }
+  return SeoRuntimeBundleBuildRequest(
+    id: decoded['id']! as String,
+    entries: List<SeoRuntimeBundleEntry>.unmodifiable(entries),
+    outputDirectory: outputDirectory,
+  );
+}
+
 /// Compiles one checked application transition and writes its verified files.
 Future<SeoDomFirstRuntimeArtifact> buildSeoTabsApplicationRuntime(
   SeoTabsRuntimeBuildRequest request, {
@@ -175,6 +411,164 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoStepperEffectsApplicationRuntime(
       write: write,
     );
 
+/// Compiles different checked adapter families into one verified artifact.
+Future<SeoDomFirstRuntimeArtifact> buildSeoApplicationRuntimeBundle(
+  SeoRuntimeBundleBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) async {
+  final root = Directory(packageRoot ?? Directory.current.path).absolute;
+  final entries = request.entries.toList(growable: false)
+    ..sort((left, right) => left.kind.index.compareTo(right.kind.index));
+  final reference = SeoDomFirstApplicationRuntime.bundle(
+    request.id,
+    members: entries.map((entry) => entry.kind),
+  );
+  final output = _checkedOutputDirectory(root, request.outputDirectory);
+  final prepared = <_PreparedRuntimeBundleEntry>[];
+  for (final entry in entries) {
+    _validateSymbol(entry.symbol);
+    prepared.add(_PreparedRuntimeBundleEntry(
+      kind: entry.kind,
+      library: entry.library,
+      symbol: entry.symbol,
+      interactionIds:
+          entry.kind == SeoDomFirstApplicationRuntimeKind.stepperEffects
+              ? _validatedStepperEffectInteractionIds(entry.interactionIds)
+              : const <String>[],
+    ));
+  }
+
+  final packageConfig = File('${root.path}/.dart_tool/package_config.json');
+  if (!await packageConfig.exists()) {
+    throw StateError(
+      'Missing ${packageConfig.path}. Run dart pub get in ${root.path}.',
+    );
+  }
+  final graph = await _PackageGraph.load(packageConfig, root);
+  final checked = <_CheckedRuntimeBundleEntry>[];
+  for (final entry in prepared) {
+    final libraryUri = _checkedApplicationLibraryUri(
+      graph,
+      entry.library,
+    );
+    checked.add(_CheckedRuntimeBundleEntry(
+      kind: entry.kind,
+      library: libraryUri,
+      symbol: entry.symbol,
+      interactionIds: entry.interactionIds,
+    ));
+  }
+
+  return _compileApplicationRuntime(
+    root: root,
+    output: output,
+    reference: reference,
+    entrypointSource: _bundleEntrypointSource(checked),
+    write: write,
+  );
+}
+
+final class _PreparedRuntimeBundleEntry {
+  const _PreparedRuntimeBundleEntry({
+    required this.kind,
+    required this.library,
+    required this.symbol,
+    required this.interactionIds,
+  });
+
+  final SeoDomFirstApplicationRuntimeKind kind;
+  final String library;
+  final String symbol;
+  final List<String> interactionIds;
+}
+
+final class _CheckedRuntimeBundleEntry {
+  const _CheckedRuntimeBundleEntry({
+    required this.kind,
+    required this.library,
+    required this.symbol,
+    required this.interactionIds,
+  });
+
+  final SeoDomFirstApplicationRuntimeKind kind;
+  final Uri library;
+  final String symbol;
+  final List<String> interactionIds;
+}
+
+const int _runtimeBundleConfigMaxBytes = 32 * 1024;
+
+Future<File> _checkedBundleConfigFile(Directory root, String relative) async {
+  final uri = Uri.tryParse(relative);
+  if (uri == null ||
+      uri.hasScheme ||
+      uri.hasAuthority ||
+      uri.hasQuery ||
+      uri.hasFragment ||
+      uri.path.startsWith('/') ||
+      uri.pathSegments.isEmpty ||
+      !uri.path.endsWith('.json') ||
+      uri.pathSegments.any(
+        (segment) =>
+            segment.isEmpty ||
+            segment == '.' ||
+            segment == '..' ||
+            segment.contains('\\') ||
+            segment.runes.any(_isControlCodePoint),
+      )) {
+    throw ArgumentError.value(
+      relative,
+      'configPath',
+      'must be a relative JSON file below the application root',
+    );
+  }
+  final file = File.fromUri(root.uri.resolveUri(uri));
+  try {
+    final rootPath = await root.resolveSymbolicLinks();
+    final filePath = await file.resolveSymbolicLinks();
+    if (!_isWithinDirectory(rootPath, filePath)) {
+      throw ArgumentError.value(
+        relative,
+        'configPath',
+        'resolves outside the application through a symbolic link',
+      );
+    }
+    return File(filePath);
+  } on FileSystemException catch (error) {
+    throw StateError(
+        'Cannot resolve runtime bundle config "$relative": $error');
+  }
+}
+
+void _requireExactFields(
+  Map<String, Object?> value,
+  Set<String> expected,
+  String description,
+) {
+  final actual = value.keys.toSet();
+  if (actual.difference(expected).isNotEmpty ||
+      expected.difference(actual).isNotEmpty) {
+    throw FormatException('$description has missing or unknown fields.');
+  }
+}
+
+Set<String> _configInteractionIds(Object? value, int index) {
+  if (value is! List || value.any((id) => id is! String)) {
+    throw FormatException(
+      'Runtime bundle entry $index has invalid interactionIds.',
+    );
+  }
+  final ids = value.cast<String>();
+  final unique = ids.toSet();
+  if (ids.isEmpty || unique.length != ids.length) {
+    throw FormatException(
+      'Runtime bundle entry $index requires unique interactionIds.',
+    );
+  }
+  return Set<String>.unmodifiable(unique);
+}
+
 final class _ApplicationRuntimeBuildRequest {
   const _ApplicationRuntimeBuildRequest({
     required this.reference,
@@ -206,14 +600,7 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
           'letters, digits, underscores or dashes',
     );
   }
-  if (!_dartIdentifier.hasMatch(request.symbol) ||
-      _dartReservedWords.contains(request.symbol)) {
-    throw ArgumentError.value(
-      request.symbol,
-      'symbol',
-      'must be a valid non-reserved Dart identifier',
-    );
-  }
+  _validateSymbol(request.symbol);
   final interactionIds =
       reference is SeoDomFirstStepperEffectsApplicationRuntime
           ? _validatedStepperEffectInteractionIds(request.interactionIds)
@@ -227,19 +614,7 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
     );
   }
   final graph = await _PackageGraph.load(packageConfig, root);
-  final libraryUri = Uri.tryParse(request.library);
-  if (libraryUri == null ||
-      libraryUri.scheme != 'package' ||
-      libraryUri.hasQuery ||
-      libraryUri.hasFragment) {
-    throw ArgumentError.value(
-      request.library,
-      'library',
-      'must be a package: URI below the application lib directory',
-    );
-  }
-  final rootLibrary = graph.resolveApplicationLibrary(libraryUri);
-  _PureApplicationGraph(graph).check(rootLibrary);
+  final libraryUri = _checkedApplicationLibraryUri(graph, request.library);
 
   final scratchRoot = Directory('${root.path}/.dart_tool');
   final scratch = await scratchRoot.createTemp('esen-seo-runtime-');
@@ -269,7 +644,92 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
           request.symbol,
           interactionIds,
         ),
+      SeoDomFirstApplicationRuntimeBundle() => throw StateError(
+          'Bundle references require buildSeoApplicationRuntimeBundle.',
+        ),
     });
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [
+        'compile',
+        'js',
+        '-O2',
+        '--csp',
+        '--no-source-maps',
+        '--fatal-warnings',
+        '-o',
+        compiled.path,
+        entrypoint.path,
+      ],
+      workingDirectory: root.path,
+      runInShell: false,
+    );
+    if (result.exitCode != 0) {
+      throw StateError(
+        'Application ${reference.kind} runtime compilation failed.\n'
+        '${result.stdout}${result.stderr}',
+      );
+    }
+
+    final javascript = await compiled.readAsString();
+    final artifact = SeoDomFirstRuntimeArtifact.create(
+      reference: reference,
+      javascript: javascript,
+      dartVersion: Platform.version.split(' ').first,
+    );
+    if (write) {
+      await _writeArtifact(output, artifact);
+    } else {
+      await _verifyCurrentArtifact(output, artifact);
+    }
+    return artifact;
+  } finally {
+    if (await scratch.exists()) await scratch.delete(recursive: true);
+  }
+}
+
+void _validateSymbol(String symbol) {
+  if (!_dartIdentifier.hasMatch(symbol) ||
+      _dartReservedWords.contains(symbol)) {
+    throw ArgumentError.value(
+      symbol,
+      'symbol',
+      'must be a valid non-reserved Dart identifier',
+    );
+  }
+}
+
+Uri _checkedApplicationLibraryUri(_PackageGraph graph, String library) {
+  final libraryUri = Uri.tryParse(library);
+  if (libraryUri == null ||
+      libraryUri.scheme != 'package' ||
+      libraryUri.hasQuery ||
+      libraryUri.hasFragment) {
+    throw ArgumentError.value(
+      library,
+      'library',
+      'must be a package: URI below the application lib directory',
+    );
+  }
+  final rootLibrary = graph.resolveApplicationLibrary(libraryUri);
+  _PureApplicationGraph(graph).check(rootLibrary);
+  return libraryUri;
+}
+
+Future<SeoDomFirstRuntimeArtifact> _compileApplicationRuntime({
+  required Directory root,
+  required Directory output,
+  required SeoDomFirstApplicationRuntime reference,
+  required String entrypointSource,
+  required bool write,
+}) async {
+  final scratchRoot = Directory('${root.path}/.dart_tool');
+  final scratch = await scratchRoot.createTemp('esen-seo-runtime-');
+  try {
+    final entrypoint = File('${scratch.path}/entrypoint.dart');
+    final compiled = File('${scratch.path}/runtime.js');
+    await entrypoint.writeAsString(entrypointSource);
 
     final result = await Process.run(
       Platform.resolvedExecutable,
@@ -388,6 +848,117 @@ void main() => enhanceSeoDomFirstStepperEffects(
   interactionIds: _interactionIds,
   transition: _applicationTransition,
 );
+''';
+}
+
+String _bundleEntrypointSource(List<_CheckedRuntimeBundleEntry> entries) {
+  final packageImports = <String>{};
+  final applicationImports = StringBuffer();
+  final declarations = StringBuffer();
+  final initializers = StringBuffer();
+
+  void addPackageImport(String path) {
+    packageImports.add("import '$path';");
+  }
+
+  for (var index = 0; index < entries.length; index++) {
+    final entry = entries[index];
+    switch (entry.kind) {
+      case SeoDomFirstApplicationRuntimeKind.tabs:
+        addPackageImport(
+          'package:esen_seo/src/components/seo_tabs_transition.dart',
+        );
+        addPackageImport(
+          'package:esen_seo/src/renderer/dom_first_tabs_adapter_web.dart',
+        );
+      case SeoDomFirstApplicationRuntimeKind.carousel:
+        addPackageImport(
+          'package:esen_seo/src/components/seo_carousel_transition.dart',
+        );
+        addPackageImport(
+          'package:esen_seo/src/renderer/dom_first_carousel_adapter_web.dart',
+        );
+      case SeoDomFirstApplicationRuntimeKind.collection:
+        addPackageImport(
+          'package:esen_seo/src/renderer/dom_first_collection_adapter_web.dart',
+        );
+      case SeoDomFirstApplicationRuntimeKind.stepper ||
+            SeoDomFirstApplicationRuntimeKind.stepperEffects:
+        addPackageImport(
+          'package:esen_seo/src/components/seo_stepper_transition.dart',
+        );
+        addPackageImport(
+          'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart',
+        );
+    }
+    applicationImports.writeln(
+      'import ${jsonEncode(entry.library.toString())} as application$index;',
+    );
+
+    switch (entry.kind) {
+      case SeoDomFirstApplicationRuntimeKind.tabs:
+        declarations.writeln('''
+SeoTabsState _transition$index(
+  SeoTabsState state,
+  SeoTabsAction action,
+) => application$index.${entry.symbol}(state, action);
+''');
+        initializers.writeln('''
+  enhanceSeoDomFirstTabs(
+    transition: _transition$index,
+  );''');
+      case SeoDomFirstApplicationRuntimeKind.carousel:
+        declarations.writeln('''
+SeoCarouselState _transition$index(
+  SeoCarouselState state,
+  SeoCarouselAction action,
+) => application$index.${entry.symbol}(state, action);
+''');
+        initializers.writeln('''
+  enhanceSeoDomFirstCarousels(
+    transition: _transition$index,
+  );''');
+      case SeoDomFirstApplicationRuntimeKind.collection:
+        initializers.writeln('''
+  enhanceSeoDomFirstCollections(
+    transition: application$index.${entry.symbol},
+  );''');
+      case SeoDomFirstApplicationRuntimeKind.stepper:
+        declarations.writeln('''
+SeoStepperState _transition$index(
+  SeoStepperState state,
+  SeoStepperAction action,
+) => application$index.${entry.symbol}(state, action);
+''');
+        initializers.writeln('''
+  enhanceSeoDomFirstSteppers(
+    transition: _transition$index,
+  );''');
+      case SeoDomFirstApplicationRuntimeKind.stepperEffects:
+        final encodedIds = entry.interactionIds.map(jsonEncode).join(', ');
+        declarations.writeln('''
+const _interactionIds$index = <String>{$encodedIds};
+
+SeoStepperEffectResult _transition$index(
+  SeoStepperState state,
+  SeoStepperAction action,
+  SeoStepperEffectContext context,
+) => application$index.${entry.symbol}(state, action, context);
+''');
+        initializers.writeln('''
+  enhanceSeoDomFirstStepperEffects(
+    interactionIds: _interactionIds$index,
+    transition: _transition$index,
+  );''');
+    }
+  }
+
+  return '''
+${packageImports.join('\n')}
+$applicationImports
+$declarations
+void main() {$initializers
+}
 ''';
 }
 

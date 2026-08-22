@@ -13,6 +13,14 @@ const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _stepperEffectsReference =
     SeoDomFirstApplicationRuntime.stepperEffects('application-stepper');
+final _bundleReference = SeoDomFirstApplicationRuntime.bundle(
+  'application-page',
+  members: const {
+    SeoDomFirstApplicationRuntimeKind.stepperEffects,
+    SeoDomFirstApplicationRuntimeKind.tabs,
+    SeoDomFirstApplicationRuntimeKind.collection,
+  },
+);
 const _javascript = '(function(){var applicationTabs=true;})();';
 
 SeoDomFirstRuntimeArtifact _artifact([
@@ -201,6 +209,88 @@ void main() {
       expect(_collectionReference.kind, 'collection');
       expect(_stepperReference.kind, 'stepper');
       expect(_stepperEffectsReference.kind, 'stepper-effects');
+      expect(_bundleReference.kind, 'bundle');
+    });
+
+    test('bundle identity is canonical, immutable and family-safe', () {
+      final source = <SeoDomFirstApplicationRuntimeKind>[
+        SeoDomFirstApplicationRuntimeKind.collection,
+        SeoDomFirstApplicationRuntimeKind.tabs,
+      ];
+      final first = SeoDomFirstApplicationRuntime.bundle(
+        'same-bundle',
+        members: source,
+      );
+      source
+        ..clear()
+        ..add(SeoDomFirstApplicationRuntimeKind.carousel);
+      final second = SeoDomFirstApplicationRuntime.bundle(
+        'same-bundle',
+        members: const {
+          SeoDomFirstApplicationRuntimeKind.tabs,
+          SeoDomFirstApplicationRuntimeKind.collection,
+        },
+      );
+
+      expect(first, second);
+      expect(
+        first.memberKinds,
+        const [
+          SeoDomFirstApplicationRuntimeKind.tabs,
+          SeoDomFirstApplicationRuntimeKind.collection,
+        ],
+      );
+      expect(
+        () => first.memberKinds.add(
+          SeoDomFirstApplicationRuntimeKind.carousel,
+        ),
+        throwsUnsupportedError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {SeoDomFirstApplicationRuntimeKind.tabs},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {
+            SeoDomFirstApplicationRuntimeKind.stepper,
+            SeoDomFirstApplicationRuntimeKind.stepperEffects,
+          },
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('route rejects package ownership of every bundle member', () {
+      for (final feature in const [
+        SeoDomFirstFeature.tabs,
+        SeoDomFirstFeature.collection,
+        SeoDomFirstFeature.stepper,
+      ]) {
+        expect(
+          () => SeoRoute(
+            path: '/',
+            delivery: SeoRouteDelivery.domFirst,
+            domFirstFeatures: {feature},
+            applicationRuntime: _bundleReference,
+            meta: (_) => const SeoMeta(),
+          ),
+          throwsArgumentError,
+        );
+      }
+
+      final route = SeoRoute(
+        path: '/',
+        delivery: SeoRouteDelivery.domFirst,
+        domFirstFeatures: const {SeoDomFirstFeature.carousel},
+        applicationRuntime: _bundleReference,
+        meta: (_) => const SeoMeta(),
+      );
+      expect(route.applicationRuntime, _bundleReference);
     });
 
     test('page embeds only the verified application script with CSP data', () {
@@ -317,6 +407,38 @@ void main() {
       expect(runtimeIndex, greaterThan(bodyIndex));
       expect(cleanupIndex, greaterThan(runtimeIndex));
       expect('nonce="safe"'.allMatches(html).length, greaterThanOrEqualTo(3));
+    });
+
+    test('bundle emits one script and every member stylesheet', () {
+      final artifact = _artifact(_bundleReference);
+      final html = SeoPage.domFirstFromNodes(
+        body: [
+          ..._tabsNodes(),
+          ..._collectionNodes(),
+          ..._stepperNodes(),
+        ],
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      expect(html, contains(seoDomFirstTabsStylesheet));
+      expect(html, contains(seoDomFirstCollectionStylesheet));
+      expect(html, contains(seoDomFirstStepperStylesheet));
+      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(
+        seoDomFirstApplicationScriptAttribute.allMatches(html),
+        hasLength(1),
+      );
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime="application-page"',
+        ),
+      );
+      expect(
+        html,
+        contains(
+            'delete document.documentElement.dataset.esenCollectionPending'),
+      );
     });
   });
 

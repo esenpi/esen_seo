@@ -89,16 +89,17 @@ class SeoPage {
         ),
         enableInteractions = false,
         domFirstFeatures = Set.unmodifiable(features) {
-    final runtimeFeature = applicationRuntime == null
-        ? null
-        : _applicationRuntimeFeature(applicationRuntime!.reference);
-    if (runtimeFeature != null && features.contains(runtimeFeature)) {
-      throw ArgumentError.value(
-        applicationRuntime!.reference,
-        'applicationRuntime',
-        'cannot be combined with the package-owned '
-            '${applicationRuntime!.reference.kind} runtime',
-      );
+    for (final runtimeFeature
+        in applicationRuntime?.reference.memberKinds ?? const []) {
+      final feature = _applicationRuntimeFeature(runtimeFeature);
+      if (features.contains(feature)) {
+        throw ArgumentError.value(
+          applicationRuntime!.reference,
+          'applicationRuntime',
+          'cannot combine ${runtimeFeature.value} with the package-owned '
+              '${feature.name} runtime',
+        );
+      }
     }
   }
 
@@ -143,19 +144,9 @@ class SeoPage {
     final language = HtmlRenderer.escapeAttribute(lang);
     final effectiveFeatures = {
       ...domFirstFeatures,
-      if (applicationRuntime?.reference is SeoDomFirstTabsApplicationRuntime)
-        SeoDomFirstFeature.tabs,
-      if (applicationRuntime?.reference
-          is SeoDomFirstCarouselApplicationRuntime)
-        SeoDomFirstFeature.carousel,
-      if (applicationRuntime?.reference
-          is SeoDomFirstCollectionApplicationRuntime)
-        SeoDomFirstFeature.collection,
-      if (applicationRuntime?.reference is SeoDomFirstStepperApplicationRuntime)
-        SeoDomFirstFeature.stepper,
-      if (applicationRuntime?.reference
-          is SeoDomFirstStepperEffectsApplicationRuntime)
-        SeoDomFirstFeature.stepper,
+      for (final member
+          in applicationRuntime?.reference.memberKinds ?? const [])
+        _applicationRuntimeFeature(member),
     };
     final head = StringBuffer();
     head.write(
@@ -206,15 +197,15 @@ class SeoPage {
 }
 
 SeoDomFirstFeature _applicationRuntimeFeature(
-  SeoDomFirstApplicationRuntime reference,
+  SeoDomFirstApplicationRuntimeKind kind,
 ) =>
-    switch (reference) {
-      SeoDomFirstTabsApplicationRuntime() => SeoDomFirstFeature.tabs,
-      SeoDomFirstCarouselApplicationRuntime() => SeoDomFirstFeature.carousel,
-      SeoDomFirstCollectionApplicationRuntime() =>
+    switch (kind) {
+      SeoDomFirstApplicationRuntimeKind.tabs => SeoDomFirstFeature.tabs,
+      SeoDomFirstApplicationRuntimeKind.carousel => SeoDomFirstFeature.carousel,
+      SeoDomFirstApplicationRuntimeKind.collection =>
         SeoDomFirstFeature.collection,
-      SeoDomFirstStepperApplicationRuntime() => SeoDomFirstFeature.stepper,
-      SeoDomFirstStepperEffectsApplicationRuntime() =>
+      SeoDomFirstApplicationRuntimeKind.stepper ||
+      SeoDomFirstApplicationRuntimeKind.stepperEffects =>
         SeoDomFirstFeature.stepper,
     };
 
@@ -231,6 +222,6 @@ String _applicationRuntimeScriptHtml(
   return '<script $seoDomFirstApplicationScriptAttribute="$id" '
       'data-esen-seo-runtime-sha256="$hash"$nonceAttribute>'
       '${artifact.javascript}'
-      '${artifact.reference is SeoDomFirstCollectionApplicationRuntime ? ';delete document.documentElement.dataset.esenCollectionPending' : ''}'
+      '${artifact.reference.memberKinds.contains(SeoDomFirstApplicationRuntimeKind.collection) ? ';delete document.documentElement.dataset.esenCollectionPending' : ''}'
       '</script>';
 }

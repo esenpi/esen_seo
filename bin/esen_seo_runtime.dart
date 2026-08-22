@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:esen_seo/server.dart' show SeoDomFirstRuntimeArtifact;
 import 'package:esen_seo/src/tooling/application_runtime_builder.dart';
 
 Future<void> main(List<String> arguments) async {
@@ -16,77 +17,17 @@ Future<void> main(List<String> arguments) async {
     final values = _arguments(
       arguments.where((value) => value != '--check').toList(),
     );
-    final id = _required(values, 'id');
-    final library = _required(values, 'library');
-    final symbol = _required(values, 'symbol');
     final output = values['output'] ?? 'build/esen_seo/runtimes';
-    final kind = values['kind'] ?? 'tabs';
-    final Set<String> interactionIds;
-    if (kind == 'stepper-effects') {
-      interactionIds = _interactionIds(_required(values, 'interaction-ids'));
-    } else {
-      if (values.containsKey('interaction-ids')) {
-        throw FormatException(
-          'Option "--interaction-ids" is only valid for "stepper-effects".',
-        );
-      }
-      interactionIds = const {};
-    }
-    final artifact = switch (kind) {
-      'tabs' => await buildSeoTabsApplicationRuntime(
-          SeoTabsRuntimeBuildRequest(
-            id: id,
-            library: library,
-            symbol: symbol,
-            outputDirectory: output,
-          ),
-          write: !check,
-        ),
-      'carousel' => await buildSeoCarouselApplicationRuntime(
-          SeoCarouselRuntimeBuildRequest(
-            id: id,
-            library: library,
-            symbol: symbol,
-            outputDirectory: output,
-          ),
-          write: !check,
-        ),
-      'collection' => await buildSeoCollectionApplicationRuntime(
-          SeoCollectionRuntimeBuildRequest(
-            id: id,
-            library: library,
-            symbol: symbol,
-            outputDirectory: output,
-          ),
-          write: !check,
-        ),
-      'stepper' => await buildSeoStepperApplicationRuntime(
-          SeoStepperRuntimeBuildRequest(
-            id: id,
-            library: library,
-            symbol: symbol,
-            outputDirectory: output,
-          ),
-          write: !check,
-        ),
-      'stepper-effects' => await buildSeoStepperEffectsApplicationRuntime(
-          SeoStepperEffectsRuntimeBuildRequest(
-            id: id,
-            library: library,
-            symbol: symbol,
-            interactionIds: interactionIds,
-            outputDirectory: output,
-          ),
-          write: !check,
-        ),
-      _ => throw FormatException(
-          'Unknown runtime kind "$kind"; expected "tabs", "carousel", '
-          '"collection", "stepper" or "stepper-effects".',
-        ),
-    };
+    final artifact = values.containsKey('bundle')
+        ? await _buildBundle(values, output, check)
+        : await _buildSingle(values, output, check);
+    final members = artifact.reference.kind == 'bundle'
+        ? ', members '
+            '${artifact.reference.memberKinds.map((kind) => kind.value).join(',')}'
+        : '';
     stdout.writeln(
       '${check ? 'Verified' : 'Built'} ${artifact.reference.kind} runtime '
-      '"${artifact.reference.id}": '
+      '"${artifact.reference.id}"$members: '
       '${artifact.manifest.bytes} bytes, '
       '${artifact.manifest.gzipBytes} gzip bytes, '
       'sha256 ${artifact.manifest.sha256}.',
@@ -104,6 +45,100 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
+Future<SeoDomFirstRuntimeArtifact> _buildBundle(
+  Map<String, String> values,
+  String output,
+  bool check,
+) async {
+  const allowed = {'bundle', 'output'};
+  final incompatible = values.keys.toSet().difference(allowed);
+  if (incompatible.isNotEmpty) {
+    throw FormatException(
+      'Option "--bundle" cannot be combined with '
+      '${incompatible.map((name) => '"--$name"').join(', ')}.',
+    );
+  }
+  final request = await loadSeoRuntimeBundleBuildRequest(
+    _required(values, 'bundle'),
+    outputDirectory: output,
+  );
+  return buildSeoApplicationRuntimeBundle(request, write: !check);
+}
+
+Future<SeoDomFirstRuntimeArtifact> _buildSingle(
+  Map<String, String> values,
+  String output,
+  bool check,
+) async {
+  final id = _required(values, 'id');
+  final library = _required(values, 'library');
+  final symbol = _required(values, 'symbol');
+  final kind = values['kind'] ?? 'tabs';
+  final Set<String> interactionIds;
+  if (kind == 'stepper-effects') {
+    interactionIds = _interactionIds(_required(values, 'interaction-ids'));
+  } else {
+    if (values.containsKey('interaction-ids')) {
+      throw const FormatException(
+        'Option "--interaction-ids" is only valid for "stepper-effects".',
+      );
+    }
+    interactionIds = const {};
+  }
+  return switch (kind) {
+    'tabs' => await buildSeoTabsApplicationRuntime(
+        SeoTabsRuntimeBuildRequest(
+          id: id,
+          library: library,
+          symbol: symbol,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
+    'carousel' => await buildSeoCarouselApplicationRuntime(
+        SeoCarouselRuntimeBuildRequest(
+          id: id,
+          library: library,
+          symbol: symbol,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
+    'collection' => await buildSeoCollectionApplicationRuntime(
+        SeoCollectionRuntimeBuildRequest(
+          id: id,
+          library: library,
+          symbol: symbol,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
+    'stepper' => await buildSeoStepperApplicationRuntime(
+        SeoStepperRuntimeBuildRequest(
+          id: id,
+          library: library,
+          symbol: symbol,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
+    'stepper-effects' => await buildSeoStepperEffectsApplicationRuntime(
+        SeoStepperEffectsRuntimeBuildRequest(
+          id: id,
+          library: library,
+          symbol: symbol,
+          interactionIds: interactionIds,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
+    _ => throw FormatException(
+        'Unknown runtime kind "$kind"; expected "tabs", "carousel", '
+        '"collection", "stepper" or "stepper-effects".',
+      ),
+  };
+}
+
 Map<String, String> _arguments(List<String> arguments) {
   const allowed = {
     'id',
@@ -112,6 +147,7 @@ Map<String, String> _arguments(List<String> arguments) {
     'output',
     'kind',
     'interaction-ids',
+    'bundle',
   };
   final values = <String, String>{};
   for (var index = 0; index < arguments.length; index++) {
@@ -163,4 +199,15 @@ Usage: dart run esen_seo:esen_seo_runtime \\
   [--output build/esen_seo/runtimes] [--check]
 
 --interaction-ids is required for stepper-effects and rejected for other kinds.
+
+Bundle mode:
+  dart run esen_seo:esen_seo_runtime \\
+    --bundle <relative-config.json> \\
+    [--output build/esen_seo/runtimes] [--check]
+
+Bundle config schema:
+  {"schemaVersion":1,"id":"page-runtime","entries":[
+    {"kind":"tabs","library":"package:app/tabs.dart","symbol":"transitionTabs"},
+    {"kind":"collection","library":"package:app/collection.dart","symbol":"transitionCollection"}
+  ]}
 ''';

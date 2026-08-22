@@ -12,6 +12,14 @@ void main() {
       SeoDomFirstApplicationRuntime.stepperEffects('application-tabs');
   const carouselReference =
       SeoDomFirstApplicationRuntime.carousel('application-tabs');
+  final bundleReference = SeoDomFirstApplicationRuntime.bundle(
+    'application-page',
+    members: const {
+      SeoDomFirstApplicationRuntimeKind.stepperEffects,
+      SeoDomFirstApplicationRuntimeKind.tabs,
+      SeoDomFirstApplicationRuntimeKind.collection,
+    },
+  );
   const javascript = '(function(){var value=1;return value;})();';
   final dartVersion = Platform.version.split(' ').first;
 
@@ -30,6 +38,91 @@ void main() {
       expect(artifact.manifest.sha256, hasLength(64));
       expect(artifact.manifest.bytes, utf8.encode(javascript).length);
       expect(artifact.manifest.gzipBytes, greaterThan(0));
+      expect(artifact.manifest.toJson(), isNot(contains('members')));
+    });
+
+    test('bundle manifests bind canonical members in schema two', () {
+      final artifact = SeoDomFirstRuntimeArtifact.create(
+        reference: bundleReference,
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+
+      expect(artifact.manifest.schemaVersion, 2);
+      expect(artifact.manifest.kind, 'bundle');
+      expect(
+        artifact.manifest.memberKinds,
+        ['tabs', 'collection', 'stepper-effects'],
+      );
+      expect(
+        artifact.manifest.toJson()['members'],
+        ['tabs', 'collection', 'stepper-effects'],
+      );
+    });
+
+    test('verification snapshots bundle members supplied by its caller', () {
+      final members = <String>['tabs', 'collection'];
+      final source = SeoDomFirstRuntimeArtifact.create(
+        reference: SeoDomFirstApplicationRuntime.bundle(
+          'application-page',
+          members: const {
+            SeoDomFirstApplicationRuntimeKind.tabs,
+            SeoDomFirstApplicationRuntimeKind.collection,
+          },
+        ),
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+      final manifest = SeoDomFirstRuntimeManifest(
+        schemaVersion: seoDomFirstRuntimeBundleManifestSchema,
+        id: 'application-page',
+        kind: 'bundle',
+        dartVersion: dartVersion,
+        sha256: source.manifest.sha256,
+        bytes: source.manifest.bytes,
+        gzipBytes: source.manifest.gzipBytes,
+        memberKinds: members,
+      );
+      final verified = SeoDomFirstRuntimeArtifact.verify(
+        reference: source.reference,
+        manifest: manifest,
+        javascript: javascript,
+      );
+      members
+        ..clear()
+        ..add('carousel');
+
+      expect(verified.manifest.memberKinds, ['tabs', 'collection']);
+      expect(
+        () => verified.manifest.memberKinds.add('stepper'),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('bundle verification rejects missing or reordered members', () {
+      final artifact = SeoDomFirstRuntimeArtifact.create(
+        reference: bundleReference,
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+      for (final members in const <List<String>>[
+        ['tabs', 'collection'],
+        ['collection', 'tabs', 'stepper-effects'],
+        ['tabs', 'collection', 'unknown'],
+      ]) {
+        final manifest = SeoDomFirstRuntimeManifest.fromJson({
+          ...artifact.manifest.toJson(),
+          'members': members,
+        });
+        expect(
+          () => SeoDomFirstRuntimeArtifact.verify(
+            reference: bundleReference,
+            manifest: manifest,
+            javascript: javascript,
+          ),
+          throwsStateError,
+        );
+      }
     });
 
     for (final forbidden in const [
@@ -119,6 +212,12 @@ void main() {
         dartVersion: dartVersion,
       );
       await _write(directory, carouselArtifact);
+      final bundleArtifact = SeoDomFirstRuntimeArtifact.create(
+        reference: bundleReference,
+        javascript: '(function(){var bundle=5;return bundle;})();',
+        dartVersion: dartVersion,
+      );
+      await _write(directory, bundleArtifact);
 
       final store = SeoDirectoryRuntimeStore(directory.path);
       expect((await store.load(reference)).javascript, javascript);
@@ -134,6 +233,10 @@ void main() {
         (await store.load(stepperEffectsReference)).javascript,
         stepperEffectsJavascript,
       );
+      expect(
+        (await store.load(bundleReference)).reference,
+        bundleReference,
+      );
       expect(await _javascriptFile(directory, reference).exists(), isTrue);
       expect(
         await _javascriptFile(directory, stepperReference).exists(),
@@ -147,6 +250,8 @@ void main() {
         await _javascriptFile(directory, stepperEffectsReference).exists(),
         isTrue,
       );
+      expect(
+          await _javascriptFile(directory, bundleReference).exists(), isTrue);
     });
 
     test('bounds runtime files before reading or compressing them', () async {

@@ -10,6 +10,9 @@ import '../routing/seo_application_runtime_artifact.dart';
 /// Current on-disk format of an application DOM-first runtime manifest.
 const int seoDomFirstRuntimeManifestSchema = 1;
 
+/// On-disk format for a route-scoped application runtime bundle.
+const int seoDomFirstRuntimeBundleManifestSchema = 2;
+
 /// Maximum accepted application runtime size after level-9 gzip compression.
 const int seoDomFirstRuntimeMaxGzipBytes = 25 * 1024;
 
@@ -32,6 +35,7 @@ final class SeoDomFirstRuntimeManifest {
     required this.sha256,
     required this.bytes,
     required this.gzipBytes,
+    this.memberKinds = const [],
   });
 
   final int schemaVersion;
@@ -41,6 +45,7 @@ final class SeoDomFirstRuntimeManifest {
   final String sha256;
   final int bytes;
   final int gzipBytes;
+  final List<String> memberKinds;
 
   Map<String, Object> toJson() => {
         'schemaVersion': schemaVersion,
@@ -50,13 +55,15 @@ final class SeoDomFirstRuntimeManifest {
         'sha256': sha256,
         'bytes': bytes,
         'gzipBytes': gzipBytes,
+        if (schemaVersion == seoDomFirstRuntimeBundleManifestSchema)
+          'members': memberKinds,
       };
 
   factory SeoDomFirstRuntimeManifest.fromJson(Object? value) {
     if (value is! Map<String, Object?>) {
       throw const FormatException('Runtime manifest must be a JSON object.');
     }
-    const fields = {
+    const baseFields = {
       'schemaVersion',
       'id',
       'kind',
@@ -65,27 +72,46 @@ final class SeoDomFirstRuntimeManifest {
       'bytes',
       'gzipBytes',
     };
+    final rawSchemaVersion = value['schemaVersion'];
+    if (rawSchemaVersion is! int) {
+      throw const FormatException('Runtime manifest has invalid field types.');
+    }
+    final fields = rawSchemaVersion == seoDomFirstRuntimeBundleManifestSchema
+        ? {...baseFields, 'members'}
+        : baseFields;
     if (value.keys.toSet().difference(fields).isNotEmpty ||
         fields.difference(value.keys.toSet()).isNotEmpty) {
       throw const FormatException(
         'Runtime manifest has missing or unknown fields.',
       );
     }
-    final schemaVersion = value['schemaVersion'];
+    final schemaVersion = rawSchemaVersion;
     final id = value['id'];
     final kind = value['kind'];
     final dartVersion = value['dartVersion'];
     final hash = value['sha256'];
     final bytes = value['bytes'];
     final gzipBytes = value['gzipBytes'];
-    if (schemaVersion is! int ||
-        id is! String ||
+    final rawMembers = value['members'];
+    if (id is! String ||
         kind is! String ||
         dartVersion is! String ||
         hash is! String ||
         bytes is! int ||
         gzipBytes is! int) {
       throw const FormatException('Runtime manifest has invalid field types.');
+    }
+    final List<String> memberKinds;
+    if (schemaVersion == seoDomFirstRuntimeBundleManifestSchema) {
+      if (rawMembers is! List ||
+          rawMembers.any((member) => member is! String)) {
+        throw const FormatException(
+          'Runtime manifest has invalid field types.',
+        );
+      }
+      memberKinds = List<String>.unmodifiable(rawMembers.cast<String>());
+    } else {
+      memberKinds = const [];
     }
     return SeoDomFirstRuntimeManifest(
       schemaVersion: schemaVersion,
@@ -95,6 +121,7 @@ final class SeoDomFirstRuntimeManifest {
       sha256: hash,
       bytes: bytes,
       gzipBytes: gzipBytes,
+      memberKinds: memberKinds,
     );
   }
 }
@@ -123,14 +150,22 @@ final class SeoDomFirstRuntimeArtifact {
         'Runtime "${reference.id}" exceeds its uncompressed size budget.',
       );
     }
+    final bundle = reference is SeoDomFirstApplicationRuntimeBundle;
     final manifest = SeoDomFirstRuntimeManifest(
-      schemaVersion: seoDomFirstRuntimeManifestSchema,
+      schemaVersion: bundle
+          ? seoDomFirstRuntimeBundleManifestSchema
+          : seoDomFirstRuntimeManifestSchema,
       id: reference.id,
       kind: reference.kind,
       dartVersion: dartVersion,
       sha256: sha256.convert(encoded).toString(),
       bytes: encoded.length,
       gzipBytes: GZipCodec(level: 9).encode(encoded).length,
+      memberKinds: bundle
+          ? reference.memberKinds
+              .map((kind) => kind.value)
+              .toList(growable: false)
+          : const [],
     );
     return SeoDomFirstRuntimeArtifact.verify(
       reference: reference,
@@ -152,7 +187,10 @@ final class SeoDomFirstRuntimeArtifact {
     if (!isValidSeoApplicationRuntimeId(reference.id)) {
       throw StateError('Invalid application runtime id "${reference.id}".');
     }
-    if (manifest.schemaVersion != seoDomFirstRuntimeManifestSchema) {
+    final expectedSchema = reference is SeoDomFirstApplicationRuntimeBundle
+        ? seoDomFirstRuntimeBundleManifestSchema
+        : seoDomFirstRuntimeManifestSchema;
+    if (manifest.schemaVersion != expectedSchema) {
       throw StateError(
         'Unsupported runtime manifest schema ${manifest.schemaVersion} '
         'for "${reference.id}".',
@@ -161,6 +199,17 @@ final class SeoDomFirstRuntimeArtifact {
     if (manifest.id != reference.id || manifest.kind != reference.kind) {
       throw StateError(
         'Runtime manifest identity does not match "${reference.id}" '
+        '(${reference.kind}).',
+      );
+    }
+    final expectedMembers = reference is SeoDomFirstApplicationRuntimeBundle
+        ? reference.memberKinds
+            .map((kind) => kind.value)
+            .toList(growable: false)
+        : const <String>[];
+    if (!_sameStrings(manifest.memberKinds, expectedMembers)) {
+      throw StateError(
+        'Runtime manifest members do not match "${reference.id}" '
         '(${reference.kind}).',
       );
     }
@@ -203,9 +252,22 @@ final class SeoDomFirstRuntimeArtifact {
         _functionConstructor.hasMatch(javascript)) {
       throw StateError('Runtime "${reference.id}" contains forbidden code.');
     }
+    final verifiedManifest =
+        expectedSchema == seoDomFirstRuntimeBundleManifestSchema
+            ? SeoDomFirstRuntimeManifest(
+                schemaVersion: manifest.schemaVersion,
+                id: manifest.id,
+                kind: manifest.kind,
+                dartVersion: manifest.dartVersion,
+                sha256: manifest.sha256,
+                bytes: manifest.bytes,
+                gzipBytes: manifest.gzipBytes,
+                memberKinds: List<String>.unmodifiable(manifest.memberKinds),
+              )
+            : manifest;
     return SeoDomFirstRuntimeArtifact._(
       reference: reference,
-      manifest: manifest,
+      manifest: verifiedManifest,
       javascript: javascript,
     );
   }
@@ -352,3 +414,11 @@ bool _isControlCodePoint(int codePoint) =>
 final RegExp _sha256 = RegExp(r'^[0-9a-f]{64}$');
 final RegExp _eval = RegExp(r'\beval\s*\(');
 final RegExp _functionConstructor = RegExp(r'\b(?:new\s+)?Function\s*\(');
+
+bool _sameStrings(List<String> left, List<String> right) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
+}

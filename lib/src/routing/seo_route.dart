@@ -268,41 +268,32 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
           'letters, digits, underscores or dashes',
     );
   }
-  if (runtime is SeoDomFirstTabsApplicationRuntime &&
-      features.contains(SeoDomFirstFeature.tabs)) {
-    throw ArgumentError.value(
-      runtime,
-      'applicationRuntime',
-      'cannot be combined with the package-owned tabs runtime',
-    );
-  }
-  if (runtime is SeoDomFirstCarouselApplicationRuntime &&
-      features.contains(SeoDomFirstFeature.carousel)) {
-    throw ArgumentError.value(
-      runtime,
-      'applicationRuntime',
-      'cannot be combined with the package-owned carousel runtime',
-    );
-  }
-  if (runtime is SeoDomFirstCollectionApplicationRuntime &&
-      features.contains(SeoDomFirstFeature.collection)) {
-    throw ArgumentError.value(
-      runtime,
-      'applicationRuntime',
-      'cannot be combined with the package-owned collection runtime',
-    );
-  }
-  if ((runtime is SeoDomFirstStepperApplicationRuntime ||
-          runtime is SeoDomFirstStepperEffectsApplicationRuntime) &&
-      features.contains(SeoDomFirstFeature.stepper)) {
-    throw ArgumentError.value(
-      runtime,
-      'applicationRuntime',
-      'cannot be combined with the package-owned stepper runtime',
-    );
+  for (final member in runtime.memberKinds) {
+    final feature = _applicationRuntimeFeature(member);
+    if (features.contains(feature)) {
+      throw ArgumentError.value(
+        runtime,
+        'applicationRuntime',
+        'cannot combine ${member.value} with the package-owned '
+            '${feature.name} runtime',
+      );
+    }
   }
   return runtime;
 }
+
+SeoDomFirstFeature _applicationRuntimeFeature(
+  SeoDomFirstApplicationRuntimeKind kind,
+) =>
+    switch (kind) {
+      SeoDomFirstApplicationRuntimeKind.tabs => SeoDomFirstFeature.tabs,
+      SeoDomFirstApplicationRuntimeKind.carousel => SeoDomFirstFeature.carousel,
+      SeoDomFirstApplicationRuntimeKind.collection =>
+        SeoDomFirstFeature.collection,
+      SeoDomFirstApplicationRuntimeKind.stepper ||
+      SeoDomFirstApplicationRuntimeKind.stepperEffects =>
+        SeoDomFirstFeature.stepper,
+    };
 
 /// Wraps the convenience [SeoRoute]'s two builders into a single
 /// resolver, so the whole package has exactly one content source.
