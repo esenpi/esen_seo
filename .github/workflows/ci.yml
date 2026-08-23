@@ -43,6 +43,10 @@ jobs:
         working-directory: benchmark/dom_first_stepper_effects/fixtures/flutter
         run: flutter pub get
 
+      - name: Install runtime bundle benchmark dependencies
+        working-directory: benchmark/dom_first_runtime_bundle/fixtures/flutter
+        run: flutter pub get
+
       # pana bewertet die Formatierung — ein Verstoß kostet Punkte auf
       # pub.dev, also hier hart fehlschlagen statt dort still verlieren.
       - name: Verify formatting
@@ -87,6 +91,10 @@ jobs:
 
       - name: Install stepper effects benchmark dependencies
         working-directory: benchmark/dom_first_stepper_effects/fixtures/flutter
+        run: flutter pub get
+
+      - name: Install runtime bundle benchmark dependencies
+        working-directory: benchmark/dom_first_runtime_bundle/fixtures/flutter
         run: flutter pub get
 
       - name: Analyze package
