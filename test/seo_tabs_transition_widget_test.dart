@@ -1,8 +1,15 @@
 import 'dart:ui' show SemanticsAction, SemanticsFlag;
 
 import 'package:esen_seo/esen_seo.dart';
+import 'package:flutter/semantics.dart' show SemanticsData;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+bool _hasFlag(SemanticsData data, SemanticsFlag flag) {
+  // Flutter 3.27 does not expose SemanticsData.flagsCollection yet.
+  // ignore: deprecated_member_use
+  return data.hasFlag(flag);
+}
 
 void main() {
   testWidgets('Flutter exposes tab labels as selected buttons', (tester) async {
@@ -28,28 +35,28 @@ void main() {
     final second = tester.getSemantics(find.text('Tab 1')).getSemanticsData();
 
     expect(first.label, 'Tab 0');
-    expect(first.hasFlag(SemanticsFlag.isButton), isTrue);
-    expect(first.hasFlag(SemanticsFlag.isSelected), isFalse);
+    expect(_hasFlag(first, SemanticsFlag.isButton), isTrue);
+    expect(_hasFlag(first, SemanticsFlag.isSelected), isFalse);
     expect(first.hasAction(SemanticsAction.tap), isTrue);
     expect(second.label, 'Tab 1');
-    expect(second.hasFlag(SemanticsFlag.isButton), isTrue);
-    expect(second.hasFlag(SemanticsFlag.isSelected), isTrue);
+    expect(_hasFlag(second, SemanticsFlag.isButton), isTrue);
+    expect(_hasFlag(second, SemanticsFlag.isSelected), isTrue);
     expect(second.hasAction(SemanticsAction.tap), isTrue);
 
     await tester.tap(find.text('Tab 0'));
     await tester.pump();
     expect(
-      tester
-          .getSemantics(find.text('Tab 0'))
-          .getSemanticsData()
-          .hasFlag(SemanticsFlag.isSelected),
+      _hasFlag(
+        tester.getSemantics(find.text('Tab 0')).getSemanticsData(),
+        SemanticsFlag.isSelected,
+      ),
       isTrue,
     );
     expect(
-      tester
-          .getSemantics(find.text('Tab 1'))
-          .getSemanticsData()
-          .hasFlag(SemanticsFlag.isSelected),
+      _hasFlag(
+        tester.getSemantics(find.text('Tab 1')).getSemanticsData(),
+        SemanticsFlag.isSelected,
+      ),
       isFalse,
     );
     semantics.dispose();
