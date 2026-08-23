@@ -18,7 +18,7 @@ void main() {
     members: const {
       SeoDomFirstApplicationRuntimeKind.stepperEffects,
       SeoDomFirstApplicationRuntimeKind.tabs,
-      SeoDomFirstApplicationRuntimeKind.collection,
+      SeoDomFirstApplicationRuntimeKind.carousel,
     },
   );
   const javascript = '(function(){var value=1;return value;})();';
@@ -72,7 +72,7 @@ void main() {
       );
       expect(
         seoApplicationRuntimeArtifactStem(bundleReference),
-        'bundle+tabs+collection+stepper-effects+application-page',
+        'bundle+tabs+carousel+stepper-effects+application-page',
       );
       expect(
         seoApplicationRuntimeArtifactStem(bundleReference),
@@ -108,22 +108,22 @@ void main() {
       expect(artifact.manifest.kind, 'bundle');
       expect(
         artifact.manifest.memberKinds,
-        ['tabs', 'collection', 'stepper-effects'],
+        ['tabs', 'carousel', 'stepper-effects'],
       );
       expect(
         artifact.manifest.toJson()['members'],
-        ['tabs', 'collection', 'stepper-effects'],
+        ['tabs', 'carousel', 'stepper-effects'],
       );
     });
 
     test('verification snapshots bundle members supplied by its caller', () {
-      final members = <String>['tabs', 'collection'];
+      final members = <String>['tabs', 'carousel'];
       final source = SeoDomFirstRuntimeArtifact.create(
         reference: SeoDomFirstApplicationRuntime.bundle(
           'application-page',
           members: const {
             SeoDomFirstApplicationRuntimeKind.tabs,
-            SeoDomFirstApplicationRuntimeKind.collection,
+            SeoDomFirstApplicationRuntimeKind.carousel,
           },
         ),
         javascript: javascript,
@@ -148,7 +148,7 @@ void main() {
         ..clear()
         ..add('carousel');
 
-      expect(verified.manifest.memberKinds, ['tabs', 'collection']);
+      expect(verified.manifest.memberKinds, ['tabs', 'carousel']);
       expect(
         () => verified.manifest.memberKinds.add('stepper'),
         throwsUnsupportedError,
@@ -162,9 +162,9 @@ void main() {
         dartVersion: dartVersion,
       );
       for (final members in const <List<String>>[
-        ['tabs', 'collection'],
-        ['collection', 'tabs', 'stepper-effects'],
-        ['tabs', 'collection', 'unknown'],
+        ['tabs', 'carousel'],
+        ['carousel', 'tabs', 'stepper-effects'],
+        ['tabs', 'carousel', 'unknown'],
       ]) {
         final manifest = SeoDomFirstRuntimeManifest.fromJson({
           ...artifact.manifest.toJson(),
@@ -322,7 +322,7 @@ void main() {
         'shared-bundle',
         members: const {
           SeoDomFirstApplicationRuntimeKind.tabs,
-          SeoDomFirstApplicationRuntimeKind.collection,
+          SeoDomFirstApplicationRuntimeKind.stepper,
         },
       );
       final firstArtifact = SeoDomFirstRuntimeArtifact.create(

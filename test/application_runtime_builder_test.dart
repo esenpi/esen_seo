@@ -386,7 +386,7 @@ void main() {
 
   test('bundle checks every library and symbol before compilation', () async {
     await write('lib/tabs.dart', 'const tabs = 1;');
-    await write('lib/collection.dart', "import 'dart:io';");
+    await write('lib/carousel.dart', "import 'dart:io';");
 
     await expectLater(
       buildSeoApplicationRuntimeBundle(
@@ -397,9 +397,9 @@ void main() {
               library: 'package:fixture_app/tabs.dart',
               symbol: 'transitionTabs',
             ),
-            SeoRuntimeBundleEntry.collection(
-              library: 'package:fixture_app/collection.dart',
-              symbol: 'transitionCollection',
+            SeoRuntimeBundleEntry.carousel(
+              library: 'package:fixture_app/carousel.dart',
+              symbol: 'transitionCarousel',
             ),
           ],
         ),
@@ -417,7 +417,7 @@ void main() {
               library: 'package:fixture_app/tabs.dart',
               symbol: 'transitionTabs',
             ),
-            SeoRuntimeBundleEntry.collection(
+            SeoRuntimeBundleEntry.carousel(
               library: 'package:fixture_app/tabs.dart',
               symbol: 'await',
             ),
@@ -497,9 +497,9 @@ void main() {
           'id': 'fixture-bundle',
           'entries': [
             {
-              'kind': 'collection',
-              'library': 'package:fixture_app/collection.dart',
-              'symbol': 'transitionCollection',
+              'kind': 'carousel',
+              'library': 'package:fixture_app/carousel.dart',
+              'symbol': 'transitionCarousel',
             },
             {
               'kind': 'stepper-effects',
@@ -519,7 +519,7 @@ void main() {
     expect(request.id, 'fixture-bundle');
     expect(request.outputDirectory, 'build/custom');
     expect(request.entries, hasLength(2));
-    expect(request.entries.first, isA<SeoCollectionRuntimeBundleEntry>());
+    expect(request.entries.first, isA<SeoCarouselRuntimeBundleEntry>());
     expect(
       request.entries.last.interactionIds,
       {'stepper-a', 'stepper-b'},
@@ -536,6 +536,22 @@ void main() {
         'id': 'fixture-bundle',
         'entries': const [],
         'unknown': true,
+      },
+      {
+        'schemaVersion': 1,
+        'id': 'fixture-bundle',
+        'entries': [
+          {
+            'kind': 'collection',
+            'library': 'package:fixture_app/collection.dart',
+            'symbol': 'transitionCollection',
+          },
+          {
+            'kind': 'tabs',
+            'library': 'package:fixture_app/tabs.dart',
+            'symbol': 'transitionTabs',
+          },
+        ],
       },
       {
         'schemaVersion': 1,

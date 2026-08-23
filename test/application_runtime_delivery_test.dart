@@ -18,7 +18,7 @@ final _bundleReference = SeoDomFirstApplicationRuntime.bundle(
   members: const {
     SeoDomFirstApplicationRuntimeKind.stepperEffects,
     SeoDomFirstApplicationRuntimeKind.tabs,
-    SeoDomFirstApplicationRuntimeKind.collection,
+    SeoDomFirstApplicationRuntimeKind.carousel,
   },
 );
 const _javascript = '(function(){var applicationTabs=true;})();';
@@ -214,7 +214,7 @@ void main() {
 
     test('bundle identity is canonical, immutable and family-safe', () {
       final source = <SeoDomFirstApplicationRuntimeKind>[
-        SeoDomFirstApplicationRuntimeKind.collection,
+        SeoDomFirstApplicationRuntimeKind.carousel,
         SeoDomFirstApplicationRuntimeKind.tabs,
       ];
       final first = SeoDomFirstApplicationRuntime.bundle(
@@ -228,7 +228,7 @@ void main() {
         'same-bundle',
         members: const {
           SeoDomFirstApplicationRuntimeKind.tabs,
-          SeoDomFirstApplicationRuntimeKind.collection,
+          SeoDomFirstApplicationRuntimeKind.carousel,
         },
       );
 
@@ -237,7 +237,7 @@ void main() {
         first.memberKinds,
         const [
           SeoDomFirstApplicationRuntimeKind.tabs,
-          SeoDomFirstApplicationRuntimeKind.collection,
+          SeoDomFirstApplicationRuntimeKind.carousel,
         ],
       );
       expect(
@@ -257,6 +257,16 @@ void main() {
         () => SeoDomFirstApplicationRuntime.bundle(
           'same-bundle',
           members: const {
+            SeoDomFirstApplicationRuntimeKind.tabs,
+            SeoDomFirstApplicationRuntimeKind.collection,
+          },
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {
             SeoDomFirstApplicationRuntimeKind.stepper,
             SeoDomFirstApplicationRuntimeKind.stepperEffects,
           },
@@ -268,7 +278,7 @@ void main() {
     test('route rejects package ownership of every bundle member', () {
       for (final feature in const [
         SeoDomFirstFeature.tabs,
-        SeoDomFirstFeature.collection,
+        SeoDomFirstFeature.carousel,
         SeoDomFirstFeature.stepper,
       ]) {
         expect(
@@ -286,7 +296,7 @@ void main() {
       final route = SeoRoute(
         path: '/',
         delivery: SeoRouteDelivery.domFirst,
-        domFirstFeatures: const {SeoDomFirstFeature.carousel},
+        domFirstFeatures: const {SeoDomFirstFeature.collection},
         applicationRuntime: _bundleReference,
         meta: (_) => const SeoMeta(),
       );
@@ -414,16 +424,16 @@ void main() {
       final html = SeoPage.domFirstFromNodes(
         body: [
           ..._tabsNodes(),
-          ..._collectionNodes(),
+          ..._carouselNodes(),
           ..._stepperNodes(),
         ],
         applicationRuntime: artifact,
       ).toHtmlDocument();
 
       expect(html, contains(seoDomFirstTabsStylesheet));
-      expect(html, contains(seoDomFirstCollectionStylesheet));
+      expect(html, contains(seoDomFirstCarouselStylesheet));
       expect(html, contains(seoDomFirstStepperStylesheet));
-      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
       expect(
         seoDomFirstApplicationScriptAttribute.allMatches(html),
         hasLength(1),
@@ -436,8 +446,8 @@ void main() {
       );
       expect(
         html,
-        contains(
-            'delete document.documentElement.dataset.esenCollectionPending'),
+        isNot(contains(
+            'delete document.documentElement.dataset.esenCollectionPending')),
       );
     });
   });

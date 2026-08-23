@@ -296,7 +296,7 @@ Future<SeoDomFirstRuntimeArtifact> loadSeoDomFirstRuntime(
   return artifact;
 }
 
-/// Loads `<kind>-<id>.json` and `<kind>-<id>.js` from a build-owned directory.
+/// Loads collision-free `.json` and `.js` artifacts from a build-owned directory.
 ///
 /// A successful verification is cached for this store's lifetime. Build
 /// artifacts are immutable deployment inputs; create a new store after

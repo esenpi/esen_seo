@@ -57,7 +57,11 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.stepperEffects(String id) =
       SeoDomFirstStepperEffectsApplicationRuntime;
 
-  /// Uses one artifact containing two to four different adapter families.
+  /// Uses one artifact containing two or three bundle-capable families.
+  ///
+  /// Collection runtimes remain standalone because their measured JavaScript
+  /// floor leaves no room for a second adapter inside the fixed artifact
+  /// budget.
   factory SeoDomFirstApplicationRuntime.bundle(
     String id, {
     required Iterable<SeoDomFirstApplicationRuntimeKind> members,
@@ -71,16 +75,23 @@ sealed class SeoDomFirstApplicationRuntime {
       );
     }
     final ordered = members.toList();
-    if (ordered.length < 2 || ordered.length > 4) {
+    if (ordered.length < 2 || ordered.length > 3) {
       throw ArgumentError.value(
         ordered,
         'members',
-        'must contain between two and four adapter families',
+        'must contain between two and three adapter families',
       );
     }
     final exactKinds = <SeoDomFirstApplicationRuntimeKind>{};
     final families = <String>{};
     for (final member in ordered) {
+      if (member == SeoDomFirstApplicationRuntimeKind.collection) {
+        throw ArgumentError.value(
+          ordered,
+          'members',
+          'collection runtimes must use a standalone artifact',
+        );
+      }
       if (!exactKinds.add(member) || !families.add(member._ownershipFamily)) {
         throw ArgumentError.value(
           ordered,
@@ -185,7 +196,7 @@ final class SeoDomFirstStepperEffectsApplicationRuntime
       const [SeoDomFirstApplicationRuntimeKind.stepperEffects];
 }
 
-/// A route-scoped artifact containing different application adapter families.
+/// A route-scoped artifact containing two or three bundle-capable families.
 final class SeoDomFirstApplicationRuntimeBundle
     extends SeoDomFirstApplicationRuntime {
   SeoDomFirstApplicationRuntimeBundle._(super.id, this.memberKinds) : super._();

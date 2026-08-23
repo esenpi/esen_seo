@@ -71,8 +71,9 @@ The HTML only exists on the web.
 - **DOM-first routes (opt-in)**: let a pure route body remain the permanent
   page without loading Flutter Web. `SeoTabs` and bounded `SeoCollection`
   interactions run through transitions compiled from the same pure Dart
-  source used by Flutter. A route may combine different application-owned
-  adapter families in one verified runtime bundle.
+  source used by Flutter. A route may combine Tabs, Carousel and one Stepper
+  family in one verified runtime bundle; Collection remains a standalone
+  runtime under the same fixed JavaScript budget.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -1057,9 +1058,10 @@ without returning closures or retaining state. The build-time validated
 `--interaction-ids` list limits enhancement before the first DOM mutation;
 unlisted steppers remain complete static HTML.
 
-For a route that uses several application transitions, describe two to four
-different adapter families in one bounded JSON file. Member order in the file
-does not affect the generated entrypoint or manifest:
+For a route that uses several application transitions, describe two or three
+bundle-capable adapter families in one bounded JSON file. Bundles admit Tabs,
+Carousel and either Stepper or Stepper Effects. Member order in the file does
+not affect the generated entrypoint or manifest:
 
 ```json
 {
@@ -1086,22 +1088,26 @@ dart run esen_seo:esen_seo_runtime \
 ```
 
 `stepper` and `stepper-effects` are the same ownership family and cannot both
-appear in one bundle. Unknown fields and kinds, duplicate families, invalid
-symbols, files outside the application root and configurations above 32 KiB
-are rejected before compilation. Every member independently passes the same
-complete pure-Dart graph and held-state checks as a single runtime. The
-artifact is accepted only when the complete combined output remains inside the
-unchanged 25 KiB gzip and 512 KiB raw limits; a large combination may therefore
-fail even when each transition compiles separately.
+appear in one bundle. Collection uses its standalone application runtime: all
+measured two-member Collection combinations exceeded the unchanged 25 KiB
+artifact ceiling, so bundle configuration rejects it before compilation.
+Unknown fields and kinds, duplicate families, invalid symbols, files outside
+the application root and configurations above 32 KiB are also rejected before
+compilation. Every admitted member independently passes the same complete
+pure-Dart graph and held-state checks as a single runtime. The complete output
+must remain inside the 25 KiB gzip and 512 KiB raw limits.
 
 The command parses the complete application import/export/part graph before
 compilation. It rejects Flutter, IO, browser libraries, third-party packages,
 conditional and deferred imports, path escapes and invalid identifiers. It
 also rejects non-const top-level or static fields, so the transition cannot
 hold current state between calls. It then runs
-`dart compile js -O2 --csp --no-source-maps --fatal-warnings` and writes
-`<kind>-<runtime-id>.js` plus a SHA-256 manifest below
-`build/esen_seo/runtimes/`. Compiler output above 512 KiB raw or the fixed
+`dart compile js -O2 --csp --no-source-maps --fatal-warnings` and writes a
+collision-free artifact stem plus `.js` and a SHA-256 `.json` manifest below
+`build/esen_seo/runtimes/`. Existing unambiguous single runtimes retain their
+established names. A plain Stepper id beginning with `effects-` uses a `+`
+separator to remain distinct from Stepper Effects, and bundle names include
+their canonical member set. Compiler output above 512 KiB raw or the fixed
 25 KiB gzip budget, script-tokenizer hazards and string-to-code constructors
 are refused.
 

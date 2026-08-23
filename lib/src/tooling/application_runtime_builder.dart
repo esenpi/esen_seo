@@ -91,6 +91,9 @@ final class SeoStepperEffectsRuntimeBuildRequest {
 }
 
 /// One checked transition included in an application runtime bundle.
+///
+/// Bundles admit Tabs, Carousel and one Stepper ownership family. Collection
+/// uses its standalone application runtime under the fixed artifact budget.
 sealed class SeoRuntimeBundleEntry {
   const SeoRuntimeBundleEntry._({
     required this.library,
@@ -106,11 +109,6 @@ sealed class SeoRuntimeBundleEntry {
     required String library,
     required String symbol,
   }) = SeoCarouselRuntimeBundleEntry;
-
-  const factory SeoRuntimeBundleEntry.collection({
-    required String library,
-    required String symbol,
-  }) = SeoCollectionRuntimeBundleEntry;
 
   const factory SeoRuntimeBundleEntry.stepper({
     required String library,
@@ -151,17 +149,6 @@ final class SeoCarouselRuntimeBundleEntry extends SeoRuntimeBundleEntry {
       SeoDomFirstApplicationRuntimeKind.carousel;
 }
 
-final class SeoCollectionRuntimeBundleEntry extends SeoRuntimeBundleEntry {
-  const SeoCollectionRuntimeBundleEntry({
-    required super.library,
-    required super.symbol,
-  }) : super._();
-
-  @override
-  SeoDomFirstApplicationRuntimeKind get kind =>
-      SeoDomFirstApplicationRuntimeKind.collection;
-}
-
 final class SeoStepperRuntimeBundleEntry extends SeoRuntimeBundleEntry {
   const SeoStepperRuntimeBundleEntry({
     required super.library,
@@ -188,7 +175,7 @@ final class SeoStepperEffectsRuntimeBundleEntry extends SeoRuntimeBundleEntry {
   final Set<String> interactionIds;
 }
 
-/// Inputs for one route-scoped bundle of checked application transitions.
+/// Inputs for one route-scoped bundle of two or three checked transitions.
 final class SeoRuntimeBundleBuildRequest {
   const SeoRuntimeBundleBuildRequest({
     required this.id,
@@ -298,10 +285,9 @@ Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
           library: library,
           symbol: symbol,
         ),
-      SeoDomFirstApplicationRuntimeKind.collection =>
-        SeoRuntimeBundleEntry.collection(
-          library: library,
-          symbol: symbol,
+      SeoDomFirstApplicationRuntimeKind.collection => throw FormatException(
+          'Runtime bundle entry $index uses collection, which requires a '
+          'standalone artifact.',
         ),
       SeoDomFirstApplicationRuntimeKind.stepper =>
         SeoRuntimeBundleEntry.stepper(
@@ -610,77 +596,40 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
   final graph = await _PackageGraph.load(packageConfig, root);
   final libraryUri = _checkedApplicationLibraryUri(graph, request.library);
 
-  final scratchRoot = Directory('${root.path}/.dart_tool');
-  final scratch = await scratchRoot.createTemp('esen-seo-runtime-');
-  try {
-    final entrypoint = File('${scratch.path}/entrypoint.dart');
-    final compiled = File('${scratch.path}/runtime.js');
-    await entrypoint.writeAsString(switch (reference) {
-      SeoDomFirstTabsApplicationRuntime() => _tabsEntrypointSource(
-          libraryUri,
-          request.symbol,
-        ),
-      SeoDomFirstCarouselApplicationRuntime() => _carouselEntrypointSource(
-          libraryUri,
-          request.symbol,
-        ),
-      SeoDomFirstCollectionApplicationRuntime() => _collectionEntrypointSource(
-          libraryUri,
-          request.symbol,
-        ),
-      SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
-          libraryUri,
-          request.symbol,
-        ),
-      SeoDomFirstStepperEffectsApplicationRuntime() =>
-        _stepperEffectsEntrypointSource(
-          libraryUri,
-          request.symbol,
-          interactionIds,
-        ),
-      SeoDomFirstApplicationRuntimeBundle() => throw StateError(
-          'Bundle references require buildSeoApplicationRuntimeBundle.',
-        ),
-    });
-
-    final result = await Process.run(
-      Platform.resolvedExecutable,
-      [
-        'compile',
-        'js',
-        '-O2',
-        '--csp',
-        '--no-source-maps',
-        '--fatal-warnings',
-        '-o',
-        compiled.path,
-        entrypoint.path,
-      ],
-      workingDirectory: root.path,
-      runInShell: false,
-    );
-    if (result.exitCode != 0) {
-      throw StateError(
-        'Application ${reference.kind} runtime compilation failed.\n'
-        '${result.stdout}${result.stderr}',
-      );
-    }
-
-    final javascript = await compiled.readAsString();
-    final artifact = SeoDomFirstRuntimeArtifact.create(
-      reference: reference,
-      javascript: javascript,
-      dartVersion: Platform.version.split(' ').first,
-    );
-    if (write) {
-      await _writeArtifact(output, artifact);
-    } else {
-      await _verifyCurrentArtifact(output, artifact);
-    }
-    return artifact;
-  } finally {
-    if (await scratch.exists()) await scratch.delete(recursive: true);
-  }
+  final entrypointSource = switch (reference) {
+    SeoDomFirstTabsApplicationRuntime() => _tabsEntrypointSource(
+        libraryUri,
+        request.symbol,
+      ),
+    SeoDomFirstCarouselApplicationRuntime() => _carouselEntrypointSource(
+        libraryUri,
+        request.symbol,
+      ),
+    SeoDomFirstCollectionApplicationRuntime() => _collectionEntrypointSource(
+        libraryUri,
+        request.symbol,
+      ),
+    SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
+        libraryUri,
+        request.symbol,
+      ),
+    SeoDomFirstStepperEffectsApplicationRuntime() =>
+      _stepperEffectsEntrypointSource(
+        libraryUri,
+        request.symbol,
+        interactionIds,
+      ),
+    SeoDomFirstApplicationRuntimeBundle() => throw StateError(
+        'Bundle references require buildSeoApplicationRuntimeBundle.',
+      ),
+  };
+  return _compileApplicationRuntime(
+    root: root,
+    output: output,
+    reference: reference,
+    entrypointSource: entrypointSource,
+    write: write,
+  );
 }
 
 void _validateSymbol(String symbol) {
@@ -873,8 +822,8 @@ String _bundleEntrypointSource(List<_CheckedRuntimeBundleEntry> entries) {
           'package:esen_seo/src/renderer/dom_first_carousel_adapter_web.dart',
         );
       case SeoDomFirstApplicationRuntimeKind.collection:
-        addPackageImport(
-          'package:esen_seo/src/renderer/dom_first_collection_adapter_web.dart',
+        throw StateError(
+          'Collection runtimes must use a standalone artifact.',
         );
       case SeoDomFirstApplicationRuntimeKind.stepper ||
             SeoDomFirstApplicationRuntimeKind.stepperEffects:
@@ -913,10 +862,9 @@ SeoCarouselState _transition$index(
     transition: _transition$index,
   );''');
       case SeoDomFirstApplicationRuntimeKind.collection:
-        initializers.writeln('''
-  enhanceSeoDomFirstCollections(
-    transition: application$index.${entry.symbol},
-  );''');
+        throw StateError(
+          'Collection runtimes must use a standalone artifact.',
+        );
       case SeoDomFirstApplicationRuntimeKind.stepper:
         declarations.writeln('''
 SeoStepperState _transition$index(
