@@ -1,4 +1,4 @@
-## Unreleased
+## 0.13.0
 
 * Prevented Tabs, Carousel and Stepper enhancement from collapsing the complete
   source document after first paint. Their pure builders now emit native-hidden,
