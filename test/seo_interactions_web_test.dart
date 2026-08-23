@@ -22,7 +22,7 @@ void main() {
       ..id = 'esen-seo-content'
       ..setAttribute('data-esen-seo-shell', 'visible');
     fixture.appendChild(shell);
-    final root = _appendTabs(shell, 'browser-tabs');
+    final root = _appendTabs(shell, 'browser-tabs', stableLayout: true);
     final inert = web.document.createElement('div')..setAttribute('inert', '');
     shell.appendChild(inert);
     final inertRoot = _appendTabs(inert, 'inert-tabs');
@@ -38,7 +38,7 @@ void main() {
     final outsideRoot = _appendTabs(fixture, 'outside-tabs');
 
     expect(root.querySelectorAll('button').length, 0);
-    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 1);
     expect(root.textContent, contains('Overview content'));
     expect(root.textContent, contains('Details content'));
 
@@ -60,6 +60,7 @@ void main() {
     expect(firstPanel.hasAttribute('hidden'), isFalse);
     expect(secondPanel.hasAttribute('hidden'), isTrue);
     expect(root.querySelectorAll('h3[hidden]').length, 2);
+    expect(root.querySelector('[data-esen-prepaint-placeholder]'), isNull);
 
     secondTab.dispatchEvent(
       web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
@@ -210,7 +211,11 @@ void main() {
       ..id = 'esen-seo-content'
       ..setAttribute('data-esen-seo-shell', 'visible');
     fixture.appendChild(shell);
-    final root = _appendCarousel(shell, 'product-carousel');
+    final root = _appendCarousel(
+      shell,
+      'product-carousel',
+      stableLayout: true,
+    );
 
     final malformed = _appendCarousel(shell, 'malformed-carousel');
     malformed.appendChild(web.document.createElement('div'));
@@ -229,12 +234,17 @@ void main() {
       web.document.createElement('div')..id = 'collision-carousel-previous',
     );
     final single = _appendCarousel(shell, 'single-carousel', count: 1);
+    final oversized = _appendCarousel(
+      shell,
+      'oversized-carousel',
+      count: seoCarouselMaxEnhancedSlides + 1,
+    );
     final outside = _appendCarousel(fixture, 'outside-carousel');
     final rtl = _appendCarousel(shell, 'rtl-carousel')
       ..setAttribute('dir', 'rtl');
 
     expect(root.querySelectorAll('button').length, 0);
-    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 1);
     expect(root.querySelectorAll('a').length, 3);
     expect(root.textContent, contains('Slide 1 content'));
     expect(root.textContent, contains('Slide 3 content'));
@@ -259,6 +269,7 @@ void main() {
     expect((slides.item(0)! as web.Element).hasAttribute('hidden'), isTrue);
     expect((slides.item(1)! as web.Element).hasAttribute('hidden'), isFalse);
     expect((slides.item(2)! as web.Element).hasAttribute('hidden'), isTrue);
+    expect(root.querySelector('[data-esen-prepaint-placeholder]'), isNull);
     expect(root.querySelector('a[href="/slide/2"]')?.textContent, 'Slide 3');
 
     next.dispatchEvent(
@@ -304,6 +315,7 @@ void main() {
       invalidInitial,
       collision,
       single,
+      oversized,
       outside,
     ]) {
       expect(rejected.querySelectorAll('button').length, 0);
@@ -317,7 +329,7 @@ void main() {
       ..id = 'esen-seo-content'
       ..setAttribute('data-esen-seo-shell', 'visible');
     fixture.appendChild(shell);
-    final root = _appendStepper(shell, 'checkout-steps');
+    final root = _appendStepper(shell, 'checkout-steps', stableLayout: true);
 
     final malformed = _appendStepper(shell, 'malformed-stepper');
     malformed.querySelector('li')?.appendChild(web.document.createElement('p'));
@@ -346,7 +358,7 @@ void main() {
       ..setAttribute('dir', 'rtl');
 
     expect(root.querySelectorAll('button').length, 0);
-    expect(root.querySelectorAll('[hidden]').length, 0);
+    expect(root.querySelectorAll('[hidden]').length, 4);
     expect(root.textContent, contains('Account content'));
     expect(root.textContent, contains('Review content'));
 
@@ -369,6 +381,7 @@ void main() {
     expect(buttons.length, 3);
     expect(controls.length, 2);
     expect(root.querySelectorAll('h3[hidden]').length, 3);
+    expect(root.querySelector('[data-esen-prepaint-placeholder]'), isNull);
     expect(secondButton.getAttribute('aria-current'), 'step');
     expect(secondButton.getAttribute('aria-expanded'), 'true');
     expect(secondButton.getAttribute('tabindex'), '0');
@@ -452,16 +465,41 @@ void _keydown(web.Element element, String key) {
   );
 }
 
-web.Element _appendTabs(web.Element parent, String id) {
+web.Element _appendTabs(
+  web.Element parent,
+  String id, {
+  bool stableLayout = false,
+}) {
   final root = web.document.createElement('div')
     ..id = id
     ..setAttribute('data-esen-component', 'tabs')
     ..setAttribute('data-esen-label', 'Product information')
     ..setAttribute('data-esen-initial-index', '0');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-tab-list'
+      ..setAttribute('data-esen-prepaint-placeholder', 'tabs')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    for (var index = 0; index < 2; index += 1) {
+      final item = web.document.createElement('span')
+        ..className = 'esen-seo-tab'
+        ..textContent = index == 0 ? 'Overview' : 'Details';
+      if (index == 0) {
+        item.setAttribute('data-esen-placeholder-selected', 'true');
+      }
+      placeholder.appendChild(item);
+    }
+    root.appendChild(placeholder);
+  }
   for (var index = 0; index < 2; index += 1) {
     final panel = web.document.createElement('section')
       ..id = '$id-panel-$index'
       ..setAttribute('data-esen-tab-panel', '');
+    if (stableLayout && index == 0) {
+      panel.setAttribute('data-esen-initial-active', 'true');
+    }
     panel.appendChild(web.document.createElement('h3')
       ..textContent = index == 0 ? 'Overview' : 'Details');
     panel.appendChild(web.document.createElement('p')
@@ -477,6 +515,7 @@ web.Element _appendCarousel(
   String id, {
   int count = 3,
   int initialIndex = 1,
+  bool stableLayout = false,
 }) {
   final root = web.document.createElement('div')
     ..id = id
@@ -485,10 +524,39 @@ web.Element _appendCarousel(
     ..setAttribute('data-esen-previous-label', 'Previous slide')
     ..setAttribute('data-esen-next-label', 'Next slide')
     ..setAttribute('data-esen-initial-index', '$initialIndex');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-carousel-controls'
+      ..setAttribute('data-esen-prepaint-placeholder', 'carousel')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    final previous = web.document.createElement('span')
+      ..className = 'esen-seo-carousel-control-placeholder'
+      ..textContent = '\u2039';
+    if (initialIndex == 0) {
+      previous.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(previous);
+    placeholder.appendChild(web.document.createElement('span')
+      ..className = 'esen-seo-carousel-status'
+      ..textContent = '${initialIndex + 1} / $count');
+    final next = web.document.createElement('span')
+      ..className = 'esen-seo-carousel-control-placeholder'
+      ..textContent = '\u203a';
+    if (initialIndex == count - 1) {
+      next.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(next);
+    root.appendChild(placeholder);
+  }
   for (var index = 0; index < count; index += 1) {
     final slide = web.document.createElement('section')
       ..id = '$id-slide-$index'
       ..setAttribute('data-esen-carousel-slide', '');
+    if (stableLayout && index == initialIndex) {
+      slide.setAttribute('data-esen-initial-active', 'true');
+    }
     slide.appendChild(
       web.document.createElement('h3')..textContent = 'Slide ${index + 1}',
     );
@@ -508,6 +576,7 @@ web.Element _appendStepper(
   String id, {
   int count = 3,
   int initialIndex = 1,
+  bool stableLayout = false,
 }) {
   final root = web.document.createElement('div')
     ..id = id
@@ -517,6 +586,32 @@ web.Element _appendStepper(
     ..setAttribute('data-esen-next-label', 'Next')
     ..setAttribute('data-esen-position-label', 'Step')
     ..setAttribute('data-esen-initial-index', '$initialIndex');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-stepper-controls'
+      ..setAttribute('data-esen-prepaint-placeholder', 'stepper')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    final previous = web.document.createElement('span')
+      ..className = 'esen-seo-stepper-control-placeholder'
+      ..textContent = 'Back';
+    if (initialIndex == 0) {
+      previous.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(previous);
+    placeholder.appendChild(web.document.createElement('span')
+      ..className = 'esen-seo-stepper-status'
+      ..textContent = 'Step ${initialIndex + 1} / $count');
+    final next = web.document.createElement('span')
+      ..className = 'esen-seo-stepper-control-placeholder'
+      ..textContent = 'Next';
+    if (initialIndex == count - 1) {
+      next.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(next);
+    root.appendChild(placeholder);
+  }
   final list = web.document.createElement('ol')
     ..setAttribute('data-esen-step-list', '');
   const labels = ['Account', 'Address', 'Review'];
@@ -524,12 +619,25 @@ web.Element _appendStepper(
     final step = web.document.createElement('li')
       ..id = '$id-step-$index'
       ..setAttribute('data-esen-step', '');
+    if (stableLayout) {
+      step.appendChild(web.document.createElement('span')
+        ..className = 'esen-seo-step-button'
+        ..textContent = labels[index]
+        ..setAttribute('data-esen-prepaint-placeholder', 'stepper-button')
+        ..setAttribute('hidden', '')
+        ..setAttribute('aria-hidden', 'true'));
+    }
     step.appendChild(
-      web.document.createElement('h3')..textContent = labels[index],
+      web.document.createElement('h3')
+        ..textContent = labels[index]
+        ..toggleAttribute('data-esen-step-heading', stableLayout),
     );
     final panel = web.document.createElement('div')
       ..id = '$id-panel-$index'
       ..setAttribute('data-esen-step-panel', '');
+    if (stableLayout && index == initialIndex) {
+      panel.setAttribute('data-esen-initial-active', 'true');
+    }
     panel.appendChild(web.document.createElement('p')
       ..textContent = '${labels[index]} content');
     step.appendChild(panel);

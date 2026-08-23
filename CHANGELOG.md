@@ -1,5 +1,14 @@
 ## Unreleased
 
+* Prevented Tabs, Carousel and Stepper enhancement from collapsing the complete
+  source document after first paint. Their pure builders now emit native-hidden,
+  non-interactive control geometry and one fixed initial-content marker. A
+  runtime-scoped head bootstrap reveals that geometry before paint; each
+  adapter validates and replaces it atomically, while missing, rejected or
+  failed JavaScript restores the complete static document. Old component
+  markup remains progressively enhanceable. The shipped three-member runtime
+  bundle records `0.004 / 0.004` CLS (median/p75 over seven cold runs) without
+  fixture-level minimum heights.
 * Exposed Flutter `SeoTabs` labels as selected buttons in the accessibility
   semantics tree. Selection continues to follow the shared transition, while
   visual layout and semantic HTML output remain unchanged.

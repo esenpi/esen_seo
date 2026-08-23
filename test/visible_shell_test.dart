@@ -236,8 +236,15 @@ void main() {
       expect(html, isNot(contains('<button')));
       expect(
         'nonce="build-nonce"'.allMatches(html),
-        hasLength(3),
-        reason: 'base CSS, interaction CSS and runtime share the nonce',
+        hasLength(4),
+        reason: 'bootstrap, base CSS, interaction CSS and runtime share nonce',
+      );
+      expect(html, contains('esenInteractionPending'));
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
       );
       expect(html, contains('<script data-esen-seo-interactions '));
       expect(

@@ -128,6 +128,7 @@ void main() {
         html,
         startsWith('<div class="esen-seo-carousel" id="product-carousel" '
             'data-esen-component="carousel" '
+            'data-esen-layout-stable="true" '
             'data-esen-label="Product gallery" '
             'data-esen-previous-label="Previous product" '
             'data-esen-next-label="Next product" '
@@ -135,12 +136,17 @@ void main() {
       );
       expect(html, contains('id="product-carousel-slide-0"'));
       expect(html, contains('id="product-carousel-slide-1"'));
+      expect(
+        html,
+        contains('data-esen-prepaint-placeholder="carousel" hidden="" '
+            'aria-hidden="true"'),
+      );
+      expect('data-esen-initial-active="true"'.allMatches(html), hasLength(1));
       expect('data-esen-carousel-slide=""'.allMatches(html), hasLength(2));
       expect(html, contains('<h6>Overview</h6><p>Complete overview</p>'));
       expect(html, contains('<h6>Details</h6><p>Complete details</p>'));
       expect(html, isNot(contains('<button')));
       expect(html, isNot(contains('<script')));
-      expect(html, isNot(contains(' hidden')));
     });
 
     test('invalid interaction ids leave carousels static', () {
@@ -160,6 +166,59 @@ void main() {
         '<section><h3>Overview</h3><p>Content</p></section>'
         '</div>',
       );
+    });
+
+    test('rejected structures never opt into the pre-paint layout', () {
+      final outputs = [
+        renderer.render(buildSeoCarouselNodes(
+          slides: [
+            (
+              label: 'Only slide',
+              nodes: [SeoNode(tag: 'p', text: 'Complete carousel')],
+            ),
+          ],
+          interactionId: 'single-carousel',
+        )),
+        renderer.render(buildSeoCarouselNodes(
+          slides: [
+            for (var index = 0; index < 201; index++)
+              (
+                label: 'Slide $index',
+                nodes: [SeoNode(tag: 'p', text: 'Content $index')],
+              ),
+          ],
+          interactionId: 'oversized-carousel',
+        )),
+        renderer.render(buildSeoTabsNodes(
+          tabs: [
+            (
+              label: '   ',
+              nodes: [SeoNode(tag: 'p', text: 'Complete tabs')],
+            ),
+          ],
+          interactionId: 'blank-tabs',
+        )),
+        renderer.render(buildSeoStepperNodes(
+          steps: [
+            (
+              label: 'Only step',
+              nodes: [SeoNode(tag: 'p', text: 'Complete stepper')],
+            ),
+          ],
+          interactionId: 'single-stepper',
+        )),
+      ];
+
+      for (final html in outputs) {
+        expect(html, contains('data-esen-component='));
+        expect(html, isNot(contains('data-esen-layout-stable')));
+        expect(html, isNot(contains('data-esen-prepaint-placeholder')));
+        expect(html, isNot(contains('data-esen-initial-active')));
+      }
+      expect(outputs[0], contains('Complete carousel'));
+      expect(outputs[1], contains('Content 200'));
+      expect(outputs[2], contains('Complete tabs'));
+      expect(outputs[3], contains('Complete stepper'));
     });
 
     test('nav menu opts in with stable branch ids and complete links', () {
@@ -246,17 +305,25 @@ void main() {
         html,
         startsWith('<div class="esen-seo-tabs" id="product-tabs" '
             'data-esen-component="tabs" '
+            'data-esen-layout-stable="true" '
             'data-esen-label="Product information" '
             'data-esen-initial-index="1">'),
       );
       expect(html, contains('id="product-tabs-panel-0"'));
       expect(html, contains('id="product-tabs-panel-1"'));
       expect('data-esen-tab-panel=""'.allMatches(html), hasLength(2));
+      expect(
+        html,
+        contains('data-esen-prepaint-placeholder="tabs" hidden="" '
+            'aria-hidden="true"'),
+      );
+      expect('data-esen-placeholder-selected="true"'.allMatches(html),
+          hasLength(1));
+      expect('data-esen-initial-active="true"'.allMatches(html), hasLength(1));
       expect(html, contains('<p>Complete overview</p>'));
       expect(html, contains('<p>Complete details</p>'));
       expect(html, isNot(contains('<button')));
       expect(html, isNot(contains('<script')));
-      expect(html, isNot(contains(' hidden')));
     });
 
     test('invalid interaction ids leave tabs static', () {
@@ -302,21 +369,30 @@ void main() {
       expect(
         html,
         startsWith('<div class="esen-seo-stepper" id="checkout-steps" '
-            'data-esen-component="stepper" data-esen-label="Checkout" '
+            'data-esen-component="stepper" '
+            'data-esen-layout-stable="true" data-esen-label="Checkout" '
             'data-esen-previous-label="Previous" '
             'data-esen-next-label="Continue" '
             'data-esen-position-label="Stage" '
-            'data-esen-initial-index="1">'
-            '<ol data-esen-step-list="">'),
+            'data-esen-initial-index="1">'),
       );
+      expect(
+        html,
+        contains('data-esen-prepaint-placeholder="stepper" hidden="" '
+            'aria-hidden="true"'),
+      );
+      expect(
+        'data-esen-prepaint-placeholder="stepper-button"'.allMatches(html),
+        hasLength(2),
+      );
+      expect('data-esen-initial-active="true"'.allMatches(html), hasLength(1));
       expect(html, contains('id="checkout-steps-step-0"'));
       expect(html, contains('id="checkout-steps-panel-1"'));
       expect('data-esen-step=""'.allMatches(html), hasLength(2));
       expect('data-esen-step-panel=""'.allMatches(html), hasLength(2));
-      expect(html, contains('<h6>Account</h6>'));
+      expect(html, contains('<h6 data-esen-step-heading="">Account</h6>'));
       expect(html, contains('<p>Review content</p>'));
       expect(html, isNot(contains('<button')));
-      expect(html, isNot(contains(' hidden')));
     });
 
     test('invalid interaction ids leave steppers static and complete', () {

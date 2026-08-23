@@ -7,8 +7,6 @@ h2{font-size:20px;line-height:1.3;margin:28px 0 10px}
 h3{font-size:18px;line-height:1.3;margin:0 0 8px}
 p{font-size:16px;line-height:1.5;margin:0 0 16px}
 .esen-seo-tabs,.esen-seo-carousel,.esen-seo-stepper{border-top:1px solid #cbd3df;padding-top:12px}
-.esen-seo-tabs,.esen-seo-carousel{min-height:270px}
-.esen-seo-stepper{min-height:350px}
 .esen-seo-tab-list{display:flex;gap:8px;margin-bottom:14px}
 .esen-seo-tab{font:inherit;color:inherit;background:#f4f6f9;border:1px solid #cbd3df;border-radius:4px;padding:8px 10px;cursor:pointer}
 .esen-seo-tab[aria-selected="true"]{color:#fff;background:#2454a6;border-color:#2454a6}

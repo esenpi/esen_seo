@@ -231,6 +231,13 @@ List<SeoNode> buildSeoCarouselNodes({
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, slides.length - 1);
+  final stableLayout = id != null &&
+      slides.length >= 2 &&
+      slides.length <= seoCarouselMaxEnhancedSlides &&
+      interactionLabel.trim().isNotEmpty &&
+      previousLabel.trim().isNotEmpty &&
+      nextLabel.trim().isNotEmpty &&
+      slides.every((slide) => slide.label.trim().isNotEmpty);
   return [
     SeoNode(
       tag: 'div',
@@ -239,6 +246,7 @@ List<SeoNode> buildSeoCarouselNodes({
         if (id != null) ...{
           'id': id,
           'data-esen-component': 'carousel',
+          if (stableLayout) 'data-esen-layout-stable': 'true',
           'data-esen-label': interactionLabel,
           'data-esen-previous-label': previousLabel,
           'data-esen-next-label': nextLabel,
@@ -246,6 +254,43 @@ List<SeoNode> buildSeoCarouselNodes({
         },
       },
       children: [
+        if (stableLayout)
+          SeoNode(
+            tag: 'div',
+            attributes: const {
+              'class': 'esen-seo-carousel-controls',
+              'data-esen-prepaint-placeholder': 'carousel',
+              'hidden': '',
+              'aria-hidden': 'true',
+            },
+            children: [
+              SeoNode(
+                tag: 'span',
+                text: '\u2039',
+                attributes: {
+                  'class': 'esen-seo-carousel-control-placeholder',
+                  if (selectedIndex == 0)
+                    'data-esen-placeholder-disabled': 'true',
+                },
+              ),
+              SeoNode(
+                tag: 'span',
+                text: '${selectedIndex + 1} / ${slides.length}',
+                attributes: const {
+                  'class': 'esen-seo-carousel-status',
+                },
+              ),
+              SeoNode(
+                tag: 'span',
+                text: '\u203a',
+                attributes: {
+                  'class': 'esen-seo-carousel-control-placeholder',
+                  if (selectedIndex == slides.length - 1)
+                    'data-esen-placeholder-disabled': 'true',
+                },
+              ),
+            ],
+          ),
         for (var i = 0; i < slides.length; i++)
           SeoNode(
             tag: 'section',
@@ -253,6 +298,8 @@ List<SeoNode> buildSeoCarouselNodes({
               if (id != null) ...{
                 'id': '$id-slide-$i',
                 'data-esen-carousel-slide': '',
+                if (stableLayout && i == selectedIndex)
+                  'data-esen-initial-active': 'true',
               },
             },
             children: [
@@ -879,6 +926,13 @@ List<SeoNode> buildSeoStepperNodes({
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, steps.length - 1);
+  final stableLayout = id != null &&
+      steps.length >= 2 &&
+      interactionLabel.trim().isNotEmpty &&
+      previousLabel.trim().isNotEmpty &&
+      nextLabel.trim().isNotEmpty &&
+      positionLabel.trim().isNotEmpty &&
+      steps.every((step) => step.label.trim().isNotEmpty);
   return [
     SeoNode(
       tag: 'div',
@@ -887,6 +941,7 @@ List<SeoNode> buildSeoStepperNodes({
         if (id != null) ...{
           'id': id,
           'data-esen-component': 'stepper',
+          if (stableLayout) 'data-esen-layout-stable': 'true',
           'data-esen-label': interactionLabel,
           'data-esen-previous-label': previousLabel,
           'data-esen-next-label': nextLabel,
@@ -895,6 +950,43 @@ List<SeoNode> buildSeoStepperNodes({
         },
       },
       children: [
+        if (stableLayout)
+          SeoNode(
+            tag: 'div',
+            attributes: const {
+              'class': 'esen-seo-stepper-controls',
+              'data-esen-prepaint-placeholder': 'stepper',
+              'hidden': '',
+              'aria-hidden': 'true',
+            },
+            children: [
+              SeoNode(
+                tag: 'span',
+                text: previousLabel,
+                attributes: {
+                  'class': 'esen-seo-stepper-control-placeholder',
+                  if (selectedIndex == 0)
+                    'data-esen-placeholder-disabled': 'true',
+                },
+              ),
+              SeoNode(
+                tag: 'span',
+                text: '$positionLabel ${selectedIndex + 1} / ${steps.length}',
+                attributes: const {
+                  'class': 'esen-seo-stepper-status',
+                },
+              ),
+              SeoNode(
+                tag: 'span',
+                text: nextLabel,
+                attributes: {
+                  'class': 'esen-seo-stepper-control-placeholder',
+                  if (selectedIndex == steps.length - 1)
+                    'data-esen-placeholder-disabled': 'true',
+                },
+              ),
+            ],
+          ),
         SeoNode(
           tag: 'ol',
           attributes: {
@@ -911,13 +1003,32 @@ List<SeoNode> buildSeoStepperNodes({
                   },
                 },
                 children: [
-                  SeoNode(tag: 'h$level', text: steps[index].label),
+                  if (stableLayout)
+                    SeoNode(
+                      tag: 'span',
+                      text: steps[index].label,
+                      attributes: const {
+                        'class': 'esen-seo-step-button',
+                        'data-esen-prepaint-placeholder': 'stepper-button',
+                        'hidden': '',
+                        'aria-hidden': 'true',
+                      },
+                    ),
+                  SeoNode(
+                    tag: 'h$level',
+                    text: steps[index].label,
+                    attributes: {
+                      if (stableLayout) 'data-esen-step-heading': '',
+                    },
+                  ),
                   SeoNode(
                     tag: 'div',
                     attributes: {
                       if (id != null) ...{
                         'id': '$id-panel-$index',
                         'data-esen-step-panel': '',
+                        if (stableLayout && index == selectedIndex)
+                          'data-esen-initial-active': 'true',
                       },
                     },
                     children: steps[index].nodes,
@@ -946,6 +1057,8 @@ List<SeoNode> buildSeoTabsNodes({
       ? candidate
       : null;
   final selectedIndex = initialIndex.clamp(0, tabs.length - 1);
+  final stableLayout =
+      id != null && tabs.every((tab) => tab.label.trim().isNotEmpty);
   return [
     SeoNode(
       tag: 'div',
@@ -954,11 +1067,34 @@ List<SeoNode> buildSeoTabsNodes({
         if (id != null) ...{
           'id': id,
           'data-esen-component': 'tabs',
+          if (stableLayout) 'data-esen-layout-stable': 'true',
           'data-esen-label': interactionLabel,
           'data-esen-initial-index': '$selectedIndex',
         },
       },
       children: [
+        if (stableLayout)
+          SeoNode(
+            tag: 'div',
+            attributes: const {
+              'class': 'esen-seo-tab-list',
+              'data-esen-prepaint-placeholder': 'tabs',
+              'hidden': '',
+              'aria-hidden': 'true',
+            },
+            children: [
+              for (var i = 0; i < tabs.length; i++)
+                SeoNode(
+                  tag: 'span',
+                  text: tabs[i].label,
+                  attributes: {
+                    'class': 'esen-seo-tab',
+                    if (i == selectedIndex)
+                      'data-esen-placeholder-selected': 'true',
+                  },
+                ),
+            ],
+          ),
         for (var i = 0; i < tabs.length; i++)
           SeoNode(
             tag: 'section',
@@ -966,6 +1102,8 @@ List<SeoNode> buildSeoTabsNodes({
               if (id != null) ...{
                 'id': '$id-panel-$i',
                 'data-esen-tab-panel': '',
+                if (stableLayout && i == selectedIndex)
+                  'data-esen-initial-active': 'true',
               },
             },
             children: [

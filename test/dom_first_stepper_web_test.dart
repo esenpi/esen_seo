@@ -20,11 +20,22 @@ void main() {
 
   test('compiled stepper uses the shared transition for every control', () {
     final container = _container(fixture);
-    final root = _stepper(container, 'compiled-stepper', initialIndex: 1);
+    final root = _stepper(
+      container,
+      'compiled-stepper',
+      initialIndex: 1,
+      stableLayout: true,
+    );
 
     expect(root.textContent, contains('Account content'));
     expect(root.textContent, contains('Review content'));
     expect(root.querySelectorAll('button').length, 0);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder="stepper"]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
     _runCompiledCandidate();
 
     final buttons = root.querySelectorAll('[data-esen-step-button]');
@@ -42,6 +53,7 @@ void main() {
     expect(buttons.length, 3);
     expect(controls.length, 2);
     expect(root.querySelectorAll('h3[hidden]').length, 3);
+    expect(root.querySelector('[data-esen-prepaint-placeholder]'), isNull);
     expect(second.getAttribute('aria-current'), 'step');
     expect(second.getAttribute('aria-expanded'), 'true');
     expect(second.getAttribute('tabindex'), '0');
@@ -152,6 +164,34 @@ void main() {
 
     expect(root.querySelectorAll('button').length, 0);
     expect(root.querySelectorAll('[hidden]').length, 0);
+  });
+
+  test('rejects a mismatched pre-paint plan before the first mutation', () {
+    final container = _container(fixture);
+    final root = _stepper(
+      container,
+      'mismatched-layout-stepper',
+      initialIndex: 1,
+      stableLayout: true,
+    );
+    root
+        .querySelector('[data-esen-prepaint-placeholder="stepper-button"]')
+        ?.textContent = 'Borrowed label';
+
+    _runCompiledCandidate();
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(root.querySelectorAll('button'), isEmpty);
+    expect(root.querySelectorAll('[role]'), isEmpty);
+    expect(root.querySelectorAll('[data-esen-step-panel][hidden]'), isEmpty);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder="stepper"]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(root.textContent, contains('Account content'));
+    expect(root.textContent, contains('Review content'));
   });
 
   test('copies hostile-looking labels only through text content', () {
@@ -528,6 +568,7 @@ web.HTMLElement _stepper(
   String id, {
   int count = 3,
   int initialIndex = 1,
+  bool stableLayout = false,
 }) {
   final root = web.document.createElement('div') as web.HTMLElement
     ..id = id
@@ -538,6 +579,33 @@ web.HTMLElement _stepper(
     ..setAttribute('data-esen-next-label', 'Next')
     ..setAttribute('data-esen-position-label', 'Step')
     ..setAttribute('data-esen-initial-index', '$initialIndex');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-stepper-controls'
+      ..setAttribute('data-esen-prepaint-placeholder', 'stepper')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    final previous = web.document.createElement('span')
+      ..className = 'esen-seo-stepper-control-placeholder'
+      ..textContent = 'Back';
+    if (initialIndex == 0) {
+      previous.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    final status = web.document.createElement('span')
+      ..className = 'esen-seo-stepper-status'
+      ..textContent = 'Step ${initialIndex + 1} / $count';
+    final next = web.document.createElement('span')
+      ..className = 'esen-seo-stepper-control-placeholder'
+      ..textContent = 'Next';
+    if (initialIndex == count - 1) {
+      next.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(previous);
+    placeholder.appendChild(status);
+    placeholder.appendChild(next);
+    root.appendChild(placeholder);
+  }
   final list = web.document.createElement('ol')
     ..setAttribute('data-esen-step-list', '');
   const labels = ['Account', 'Address', 'Review'];
@@ -545,12 +613,27 @@ web.HTMLElement _stepper(
     final step = web.document.createElement('li')
       ..id = '$id-step-$index'
       ..setAttribute('data-esen-step', '');
+    if (stableLayout) {
+      step.appendChild(
+        web.document.createElement('span')
+          ..className = 'esen-seo-step-button'
+          ..textContent = labels[index]
+          ..setAttribute('data-esen-prepaint-placeholder', 'stepper-button')
+          ..setAttribute('hidden', '')
+          ..setAttribute('aria-hidden', 'true'),
+      );
+    }
     step.appendChild(
-      web.document.createElement('h3')..textContent = labels[index],
+      web.document.createElement('h3')
+        ..textContent = labels[index]
+        ..toggleAttribute('data-esen-step-heading', stableLayout),
     );
     final panel = web.document.createElement('div')
       ..id = '$id-panel-$index'
       ..setAttribute('data-esen-step-panel', '');
+    if (stableLayout && index == initialIndex) {
+      panel.setAttribute('data-esen-initial-active', 'true');
+    }
     panel.appendChild(
       web.document.createElement('p')..textContent = '${labels[index]} content',
     );

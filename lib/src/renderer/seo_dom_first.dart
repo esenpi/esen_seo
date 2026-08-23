@@ -20,34 +20,50 @@ const String seoDomFirstScriptAttribute = 'data-esen-seo-dom-first-runtime';
 /// Structural styles for the compiled DOM-first tabs control.
 const String seoDomFirstTabsStylesheet = '''
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>.esen-seo-tab-list{display:flex;flex-wrap:wrap;gap:.5rem;border-bottom:1px solid currentColor;margin-bottom:1rem}
-#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab{font:inherit;color:inherit;background:transparent;border:0;border-bottom:2px solid transparent;padding:.5rem .75rem;cursor:pointer}
-#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"]{border-bottom-color:currentColor;font-weight:600}
+#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab{display:inline-flex;box-sizing:border-box;align-items:center;font:inherit;color:inherit;background:transparent;border:0;border-bottom:2px solid transparent;padding:.5rem .75rem;cursor:pointer}
+#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"],#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[data-esen-placeholder-selected="true"]{border-bottom-color:currentColor;font-weight:600}
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>section[data-esen-tab-panel][hidden]{display:none}
+#$seoContainerId [data-esen-component="tabs"]>[data-esen-prepaint-placeholder="tabs"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="tabs"][hidden]{display:flex!important;flex-wrap:wrap;gap:.5rem;border-bottom:1px solid currentColor;margin-bottom:1rem}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-tab-panel]:not([data-esen-initial-active="true"]){display:none}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-tab-panel][data-esen-initial-active="true"]>:first-child{display:none}
 ''';
 
 /// Structural styles for the compiled DOM-first carousel control.
 const String seoDomFirstCarouselStylesheet = '''
 #$seoContainerId [data-esen-component="carousel"]>.esen-seo-carousel-controls{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-block:.75rem}
-#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;height:2.5rem;padding:0;cursor:pointer}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control],#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;min-width:2.5rem;height:2.5rem;min-height:2.5rem;padding:0}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{cursor:pointer}
 #$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control][disabled]{opacity:.4;cursor:default}
 #$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-status{display:inline-block;min-width:4rem;text-align:center}
 #$seoContainerId [data-esen-component="carousel"][data-esen-enhanced="true"]>section[data-esen-carousel-slide][hidden]{display:none}
+#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-control-placeholder[data-esen-placeholder-disabled="true"]{opacity:.4}
+#$seoContainerId [data-esen-component="carousel"]>[data-esen-prepaint-placeholder="carousel"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="carousel"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="carousel"][hidden]{display:flex!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="carousel"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-carousel-slide]:not([data-esen-initial-active="true"]){display:none}
 ''';
 
 /// Structural styles for the compiled DOM-first stepper control.
 const String seoDomFirstStepperStylesheet = '''
 #$seoContainerId [data-esen-component="stepper"]>[data-esen-step-list]{list-style:none;padding:0}
-#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]{font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-step-button{display:block;box-sizing:border-box;font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-step-button][aria-current="step"]{font-weight:600}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-controls{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-block:.75rem}
-#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:.5rem .75rem;cursor:pointer;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control],#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;min-height:2.5rem;padding:.5rem .75rem;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{cursor:pointer}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control][aria-disabled="true"]{opacity:.4;cursor:default}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-status{display:inline-block;min-width:6rem;text-align:center}
 #$seoContainerId [data-esen-component="stepper"][data-esen-enhanced="true"] [data-esen-step-panel][hidden]{display:none}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-control-placeholder[data-esen-placeholder-disabled="true"]{opacity:.4}
+#$seoContainerId [data-esen-component="stepper"]>[data-esen-prepaint-placeholder="stepper"][hidden],#$seoContainerId [data-esen-component="stepper"] [data-esen-prepaint-placeholder="stepper-button"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="stepper"][hidden]{display:flex!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-prepaint-placeholder="stepper-button"][hidden]{display:block!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-step-heading]{display:none}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-step-panel]:not([data-esen-initial-active="true"]){display:none}
 ''';
 
 /// Structural styles for the compiled DOM-first collection control.
@@ -96,7 +112,10 @@ String seoDomFirstFeatureBootstrapScriptHtml(
 }) {
   final theme = features.contains(SeoDomFirstFeature.themeToggle);
   final collection = features.contains(SeoDomFirstFeature.collection);
-  if (!theme && !collection) return '';
+  final interaction = features.contains(SeoDomFirstFeature.tabs) ||
+      features.contains(SeoDomFirstFeature.carousel) ||
+      features.contains(SeoDomFirstFeature.stepper);
+  if (!theme && !collection && !interaction) return '';
   final nonceAttribute = _nonceAttribute(nonce);
   final javascript = StringBuffer();
   if (theme) {
@@ -112,6 +131,14 @@ String seoDomFirstFeatureBootstrapScriptHtml(
       'document.documentElement.dataset.esenCollectionPending=1;'
       'addEventListener("DOMContentLoaded",'
       '()=>delete document.documentElement.dataset.esenCollectionPending)',
+    );
+  }
+  if (interaction) {
+    if (javascript.isNotEmpty) javascript.write(';');
+    javascript.write(
+      'document.documentElement.dataset.esenInteractionPending=1;'
+      'addEventListener("DOMContentLoaded",()=>setTimeout('
+      '()=>delete document.documentElement.dataset.esenInteractionPending))',
     );
   }
   return '<script $seoDomFirstBootstrapScriptAttribute$nonceAttribute>'
@@ -177,6 +204,13 @@ String seoDomFirstFeatureScriptHtml(
   if (features.contains(SeoDomFirstFeature.collection)) {
     runtime.write(
       ';delete document.documentElement.dataset.esenCollectionPending',
+    );
+  }
+  if (features.contains(SeoDomFirstFeature.tabs) ||
+      features.contains(SeoDomFirstFeature.carousel) ||
+      features.contains(SeoDomFirstFeature.stepper)) {
+    runtime.write(
+      ';delete document.documentElement.dataset.esenInteractionPending',
     );
   }
   return '<script $seoDomFirstScriptAttribute$nonceAttribute>'

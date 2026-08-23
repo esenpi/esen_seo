@@ -20,11 +20,22 @@ void main() {
 
   test('compiled tabs use the shared transition for pointer and keyboard', () {
     final container = _container(fixture);
-    final root = _tabs(container, 'compiled-tabs', initialIndex: 1);
+    final root = _tabs(
+      container,
+      'compiled-tabs',
+      initialIndex: 1,
+      stableLayout: true,
+    );
 
     expect(root.textContent, contains('Overview content'));
     expect(root.textContent, contains('Details content'));
     expect(root.querySelectorAll('button').length, 0);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder="tabs"]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
     _runCompiledCandidate();
 
     final tabs = root.querySelectorAll('[role="tab"]');
@@ -39,6 +50,10 @@ void main() {
     expect(firstPanel.hasAttribute('hidden'), isTrue);
     expect(secondPanel.hasAttribute('hidden'), isFalse);
     expect(root.querySelectorAll('h3[hidden]').length, 2);
+    expect(
+      root.querySelector('[data-esen-prepaint-placeholder]'),
+      isNull,
+    );
 
     firstTab.dispatchEvent(
       web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
@@ -117,6 +132,33 @@ void main() {
     expect(hiddenParent.hasAttribute('hidden'), isTrue);
     expect(hiddenRoot.querySelectorAll('[role="tab"]').length, 2);
     expect(hiddenRoot.hasAttribute('data-esen-enhanced'), isTrue);
+  });
+
+  test('rejects a mismatched pre-paint plan before the first mutation', () {
+    final container = _container(fixture);
+    final root = _tabs(
+      container,
+      'mismatched-layout-tabs',
+      initialIndex: 1,
+      stableLayout: true,
+    );
+    root.querySelector('[data-esen-prepaint-placeholder] span')?.textContent =
+        'Borrowed label';
+
+    _runCompiledCandidate();
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(root.querySelectorAll('button'), isEmpty);
+    expect(root.querySelectorAll('[role]'), isEmpty);
+    expect(root.querySelectorAll('section[hidden]'), isEmpty);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(root.textContent, contains('Overview content'));
+    expect(root.textContent, contains('Details content'));
   });
 
   test('requires one unambiguous package-owned DOM-first container', () {
@@ -199,6 +241,7 @@ web.HTMLElement _tabs(
   web.Element parent,
   String id, {
   int initialIndex = 0,
+  bool stableLayout = false,
 }) {
   final root = web.document.createElement('div') as web.HTMLElement
     ..id = id
@@ -206,10 +249,31 @@ web.HTMLElement _tabs(
     ..setAttribute('data-esen-component', 'tabs')
     ..setAttribute('data-esen-label', 'Product information')
     ..setAttribute('data-esen-initial-index', '$initialIndex');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-tab-list'
+      ..setAttribute('data-esen-prepaint-placeholder', 'tabs')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    for (var index = 0; index < 2; index++) {
+      final item = web.document.createElement('span')
+        ..className = 'esen-seo-tab'
+        ..textContent = index == 0 ? 'Overview' : 'Details';
+      if (index == initialIndex) {
+        item.setAttribute('data-esen-placeholder-selected', 'true');
+      }
+      placeholder.appendChild(item);
+    }
+    root.appendChild(placeholder);
+  }
   for (var index = 0; index < 2; index++) {
     final section = web.document.createElement('section') as web.HTMLElement
       ..id = '$id-panel-$index'
       ..setAttribute('data-esen-tab-panel', '');
+    if (stableLayout && index == initialIndex) {
+      section.setAttribute('data-esen-initial-active', 'true');
+    }
     section.appendChild(
       web.document.createElement('h3')
         ..textContent = index == 0 ? 'Overview' : 'Details',

@@ -148,10 +148,18 @@ class SeoPage {
           in applicationRuntime?.reference.memberKinds ?? const [])
         _applicationRuntimeFeature(member),
     };
+    final bootstrapFeatures = {
+      ...effectiveFeatures,
+      if (enableInteractions) ...const {
+        SeoDomFirstFeature.tabs,
+        SeoDomFirstFeature.carousel,
+        SeoDomFirstFeature.stepper,
+      },
+    };
     final head = StringBuffer();
     head.write(
       seoDomFirstFeatureBootstrapScriptHtml(
-        effectiveFeatures,
+        bootstrapFeatures,
         nonce: interactionNonce,
       ),
     );
@@ -219,9 +227,12 @@ String _applicationRuntimeScriptHtml(
   final nonceAttribute = value == null || value.isEmpty
       ? ''
       : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
+  final hasInteractionLayout = artifact.reference.memberKinds
+      .any((kind) => kind != SeoDomFirstApplicationRuntimeKind.collection);
   return '<script $seoDomFirstApplicationScriptAttribute="$id" '
       'data-esen-seo-runtime-sha256="$hash"$nonceAttribute>'
       '${artifact.javascript}'
       '${artifact.reference.memberKinds.contains(SeoDomFirstApplicationRuntimeKind.collection) ? ';delete document.documentElement.dataset.esenCollectionPending' : ''}'
+      '${hasInteractionLayout ? ';delete document.documentElement.dataset.esenInteractionPending' : ''}'
       '</script>';
 }

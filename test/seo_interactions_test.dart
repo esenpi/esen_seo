@@ -34,6 +34,23 @@ void main() {
             'nonce="one&quot;&lt;two">'),
       );
     });
+
+    test('stepper prepaint rules do not reach nested components', () {
+      expect(
+        seoInteractionStylesheet,
+        contains(
+          '>[data-esen-step-list]>[data-esen-step]>'
+          '[data-esen-step-panel]',
+        ),
+      );
+      expect(
+        seoInteractionStylesheet,
+        isNot(contains(
+          ':not([data-esen-enhanced="true"]) '
+          '[data-esen-step-panel]',
+        )),
+      );
+    });
   });
 
   group('SeoPage interactions', () {

@@ -3,6 +3,9 @@ library;
 
 final RegExp _seoInteractionId = RegExp(r'^[A-Za-z][A-Za-z0-9_-]{0,127}$');
 
+/// Largest carousel emitted with progressive-enhancement layout markers.
+const int seoCarouselMaxEnhancedSlides = 200;
+
 /// Whether [value] is safe to use as a package interaction identifier.
 ///
 /// The closed ASCII form is valid in HTML ids and can be extended with fixed

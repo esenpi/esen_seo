@@ -90,12 +90,20 @@ void main() {
       expect(html, contains('&lt;img src=x onerror=alert(1)&gt;'));
       expect(html, contains('Everything at a glance.'));
       expect(html, contains('All technical details.'));
+      expect(html, contains('data-esen-prepaint-placeholder="tabs"'));
       expect(html, isNot(contains('<button')));
       expect(html, isNot(contains('data-esen-seo-shell')));
       expect(html, isNot(contains('data-esen-seo-interactions')));
       expect(html, isNot(contains('flutter_bootstrap.js')));
       expect(html, isNot(contains('main.dart.js')));
       expect(html, contains('data-esen-seo-dom-first-runtime'));
+      expect(html, contains('esenInteractionPending'));
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
+      );
       expect(html, contains('nonce="one&quot;&lt;two"'));
     });
 
@@ -164,6 +172,18 @@ void main() {
       expect(html, contains('nonce="safe"'));
       expect(style, contains('data-esen-component="carousel"'));
       expect(
+        seoDomFirstFeatureBootstrapScriptHtml(
+          const {SeoDomFirstFeature.carousel},
+        ),
+        contains('esenInteractionPending'),
+      );
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
+      );
+      expect(
         seoDomFirstCarouselRuntime.toLowerCase(),
         isNot(contains('</script')),
       );
@@ -188,6 +208,32 @@ void main() {
       expect(html, contains('data-esen-seo-dom-first-runtime'));
       expect(html, contains('nonce="safe"'));
       expect(style, contains('data-esen-component="stepper"'));
+      expect(
+        style,
+        contains(
+          '>[data-esen-step-list]>[data-esen-step]>'
+          '[data-esen-step-panel]',
+        ),
+      );
+      expect(
+        style,
+        isNot(contains(
+          ':not([data-esen-enhanced="true"]) '
+          '[data-esen-step-panel]',
+        )),
+      );
+      expect(
+        seoDomFirstFeatureBootstrapScriptHtml(
+          const {SeoDomFirstFeature.stepper},
+        ),
+        contains('esenInteractionPending'),
+      );
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
+      );
       expect(
         seoDomFirstStepperRuntime.toLowerCase(),
         isNot(contains('</script')),

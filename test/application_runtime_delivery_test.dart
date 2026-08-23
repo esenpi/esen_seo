@@ -322,6 +322,13 @@ void main() {
       );
       expect(html, contains('data-esen-seo-runtime-sha256='));
       expect(html, contains('nonce="safe&quot;nonce"'));
+      expect(html, contains('esenInteractionPending'));
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
+      );
       expect(
         'data-esen-seo-dom-first-runtime'.allMatches(html),
         isEmpty,
@@ -416,6 +423,7 @@ void main() {
       expect(bootstrapIndex, lessThan(bodyIndex));
       expect(runtimeIndex, greaterThan(bodyIndex));
       expect(cleanupIndex, greaterThan(runtimeIndex));
+      expect(html, isNot(contains('esenInteractionPending')));
       expect('nonce="safe"'.allMatches(html).length, greaterThanOrEqualTo(3));
     });
 
@@ -448,6 +456,13 @@ void main() {
         html,
         isNot(contains(
             'delete document.documentElement.dataset.esenCollectionPending')),
+      );
+      expect(html, contains('esenInteractionPending'));
+      expect(
+        html,
+        contains(
+          'delete document.documentElement.dataset.esenInteractionPending',
+        ),
       );
     });
   });

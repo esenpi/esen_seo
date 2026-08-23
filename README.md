@@ -850,6 +850,15 @@ belong to Flutter's visible shell. The middleware uses the same
 `domFirstStylesheet` default. `domFirstNonce` can supply a per-response CSP
 nonce.
 
+Tabs, Carousel and Stepper reserve their package-owned control geometry before
+the first paint whenever an admitted runtime is present. The pure builders emit
+only native-hidden, `aria-hidden` spans for that reservation, never focusable
+controls. After the complete component contract validates, the adapter replaces
+the reservation atomically. With JavaScript disabled, rejected or interrupted,
+the reservation stays hidden and every panel, slide and step remains readable.
+Custom CSS may restyle the controls, but should preserve the structural display
+and sizing rules emitted after the route stylesheet.
+
 The built-in executable slices use package-owned transitions. They do not
 translate arbitrary Flutter `State`, Cubits or callbacks. `SeoTabs`,
 `SeoCarousel` and `SeoStepper` share their pure transitions with separate

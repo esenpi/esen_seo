@@ -239,8 +239,8 @@ async function interactDom(page, action) {
 async function interactFlutter(page, action) {
   const start = await page.evaluate(() => performance.now());
   if (action === 'tab-second') {
-    await page.getByText('Architecture', { exact: true }).last()
-      .locator('..').click({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Architecture', exact: true })
+      .last().click({ timeout: 30000 });
     await waitForFlutterText(page, 'Pure Dart owns every state transition.');
   } else if (action === 'carousel-next' || action === 'carousel-end') {
     await page.getByRole('button', { name: 'Next slide', exact: true })
@@ -254,8 +254,8 @@ async function interactFlutter(page, action) {
       document.activeElement?.textContent?.trim().startsWith('Review'),
     null, { timeout: 30000 });
   } else {
-    await page.getByText('Overview', { exact: true }).last()
-      .locator('..').click({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Overview', exact: true })
+      .last().click({ timeout: 30000 });
     await waitForFlutterText(page, 'The page starts as complete HTML.');
     await waitForFlutterText(page, 'Native parity');
     await waitForFlutterText(page, 'Review');

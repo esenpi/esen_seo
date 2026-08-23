@@ -15,9 +15,11 @@ The supported Tabs + Carousel + Stepper Effects candidate has a separate
 protocol in `SHIPPED_CANDIDATE_PROTOCOL.md`. Its complete four-cell browser
 matrix is recorded in `SHIPPED_RESULTS.md`; every absolute and applicable
 relative gate passed. A pre-measurement smoke run also exposed cumulative
-layout movement when three controls enhanced at once. The shared fixture CSS
-now reserves the same stable component geometry in every cell before the seven
-recorded runs.
+layout movement when three controls enhanced at once. The original recorded
+matrix reserved stable component areas in shared fixture CSS. The package now
+emits runtime-scoped pre-paint geometry for Tabs, Carousel and Stepper itself;
+the current fixture deliberately has no component `min-height`, so subsequent
+measurements exercise that shipped path rather than a benchmark-only guard.
 
 The Next.js fixture requires Node.js 20.9 or newer. Reproduce the complete
 matrix from the repository root:

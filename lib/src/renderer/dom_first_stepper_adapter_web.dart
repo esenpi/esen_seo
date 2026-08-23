@@ -155,12 +155,14 @@ final class _StepperEntry {
     required this.heading,
     required this.panel,
     required this.buttonId,
+    required this.buttonPlaceholder,
   });
 
   final web.HTMLElement step;
   final web.HTMLElement heading;
   final web.HTMLElement panel;
   final String buttonId;
+  final web.Element? buttonPlaceholder;
 }
 
 final class _StepperPlan {
@@ -174,6 +176,7 @@ final class _StepperPlan {
     required this.initialIndex,
     required this.entries,
     required this.rtl,
+    required this.placeholder,
   });
 
   final web.Element root;
@@ -185,6 +188,7 @@ final class _StepperPlan {
   final int initialIndex;
   final List<_StepperEntry> entries;
   final bool rtl;
+  final web.Element? placeholder;
 }
 
 final class _StepperApplyBoundary {
@@ -235,8 +239,14 @@ final class _StepperApplyBoundary {
     }
 
     final rootChildren = root.children;
-    if (rootChildren.length != 1) return null;
-    final list = rootChildren.item(0);
+    final firstChild = rootChildren.item(0);
+    final placeholder = firstChild != null &&
+            firstChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? firstChild
+        : null;
+    final listOffset = placeholder == null ? 0 : 1;
+    if (rootChildren.length != listOffset + 1) return null;
+    final list = rootChildren.item(listOffset);
     if (list == null ||
         list.tagName != 'OL' ||
         !list.hasAttribute('data-esen-step-list')) {
@@ -264,14 +274,20 @@ final class _StepperApplyBoundary {
     if (steps.length < 2) return null;
     for (var index = 0; index < steps.length; index++) {
       final step = steps.item(index);
+      final stepFirstChild = step?.children.item(0);
+      final buttonPlaceholder = stepFirstChild != null &&
+              stepFirstChild.hasAttribute('data-esen-prepaint-placeholder')
+          ? stepFirstChild
+          : null;
+      final entryOffset = buttonPlaceholder == null ? 0 : 1;
       if (step == null ||
           step.tagName != 'LI' ||
           !step.hasAttribute('data-esen-step') ||
-          step.children.length != 2) {
+          step.children.length != entryOffset + 2) {
         return null;
       }
-      final heading = step.children.item(0);
-      final panel = step.children.item(1);
+      final heading = step.children.item(entryOffset);
+      final panel = step.children.item(entryOffset + 1);
       final expectedStepId = '$id-step-$index';
       final expectedPanelId = '$id-panel-$index';
       final buttonId = '$id-step-button-$index';
@@ -295,11 +311,23 @@ final class _StepperApplyBoundary {
         heading: heading as web.HTMLElement,
         panel: panel as web.HTMLElement,
         buttonId: buttonId,
+        buttonPlaceholder: buttonPlaceholder,
       ));
     }
     if (initialIndex == null ||
         initialIndex < 0 ||
         initialIndex >= entries.length) {
+      return null;
+    }
+    if (!_validStableLayout(
+      root: root,
+      placeholder: placeholder,
+      entries: entries,
+      previousLabel: previousLabel,
+      nextLabel: nextLabel,
+      positionLabel: positionLabel,
+      initialIndex: initialIndex,
+    )) {
       return null;
     }
 
@@ -317,7 +345,74 @@ final class _StepperApplyBoundary {
       initialIndex: initialIndex,
       entries: entries,
       rtl: web.window.getComputedStyle(root).direction == 'rtl',
+      placeholder: placeholder,
     );
+  }
+
+  static bool _validStableLayout({
+    required web.Element root,
+    required web.Element? placeholder,
+    required List<_StepperEntry> entries,
+    required String previousLabel,
+    required String nextLabel,
+    required String positionLabel,
+    required int initialIndex,
+  }) {
+    final stable = root.getAttribute('data-esen-layout-stable') == 'true';
+    if (!stable) {
+      return placeholder == null &&
+          entries.every((entry) => entry.buttonPlaceholder == null);
+    }
+    if (placeholder == null ||
+        placeholder.tagName != 'DIV' ||
+        placeholder.getAttribute('data-esen-prepaint-placeholder') !=
+            'stepper' ||
+        !placeholder.classList.contains('esen-seo-stepper-controls') ||
+        !placeholder.hasAttribute('hidden') ||
+        placeholder.getAttribute('aria-hidden') != 'true' ||
+        placeholder.children.length != 3) {
+      return false;
+    }
+    final previous = placeholder.children.item(0);
+    final status = placeholder.children.item(1);
+    final next = placeholder.children.item(2);
+    if (previous == null ||
+        status == null ||
+        next == null ||
+        previous.tagName != 'SPAN' ||
+        status.tagName != 'SPAN' ||
+        next.tagName != 'SPAN' ||
+        !previous.classList.contains('esen-seo-stepper-control-placeholder') ||
+        !status.classList.contains('esen-seo-stepper-status') ||
+        !next.classList.contains('esen-seo-stepper-control-placeholder') ||
+        previous.textContent != previousLabel ||
+        status.textContent !=
+            '$positionLabel ${initialIndex + 1} / ${entries.length}' ||
+        next.textContent != nextLabel ||
+        previous.getAttribute('data-esen-placeholder-disabled') !=
+            (initialIndex == 0 ? 'true' : null) ||
+        next.getAttribute('data-esen-placeholder-disabled') !=
+            (initialIndex == entries.length - 1 ? 'true' : null)) {
+      return false;
+    }
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      final button = entry.buttonPlaceholder;
+      if (button == null ||
+          button.tagName != 'SPAN' ||
+          button.getAttribute('data-esen-prepaint-placeholder') !=
+              'stepper-button' ||
+          !button.classList.contains('esen-seo-step-button') ||
+          !button.hasAttribute('hidden') ||
+          button.getAttribute('aria-hidden') != 'true' ||
+          button.textContent != entry.heading.textContent ||
+          !entry.heading.hasAttribute('data-esen-step-heading') ||
+          entry.panel.getAttribute('data-esen-initial-active') !=
+              (index == initialIndex ? 'true' : null)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static bool _hiddenByAncestor(
@@ -386,7 +481,12 @@ final class _StepperApplyBoundary {
           dispatch(index, action, true);
         }).toJS,
       );
-      entry.step.insertBefore(button, entry.heading);
+      final placeholder = entry.buttonPlaceholder;
+      if (placeholder == null) {
+        entry.step.insertBefore(button, entry.heading);
+      } else {
+        entry.step.replaceChild(button, placeholder);
+      }
       entry.panel.setAttribute('role', 'region');
       entry.panel.setAttribute('aria-labelledby', button.id);
       entry.heading.setAttribute('hidden', '');
@@ -419,7 +519,12 @@ final class _StepperApplyBoundary {
     controls.appendChild(_status);
     controls.appendChild(_next);
 
-    plan.root.insertBefore(controls, plan.root.firstChild);
+    final placeholder = plan.placeholder;
+    if (placeholder == null) {
+      plan.root.insertBefore(controls, plan.root.firstChild);
+    } else {
+      plan.root.replaceChild(controls, placeholder);
+    }
     plan.root.setAttribute('role', 'region');
     plan.root.setAttribute('aria-label', plan.label);
     plan.root.setAttribute('data-esen-enhanced', 'true');

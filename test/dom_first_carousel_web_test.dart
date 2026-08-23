@@ -2,6 +2,7 @@
 library;
 
 import 'package:esen_seo/src/components/seo_carousel_transition.dart';
+import 'package:esen_seo/src/components/seo_component_format.dart';
 import 'package:esen_seo/src/renderer/dom_first_carousel_adapter_web.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,11 +21,22 @@ void main() {
 
   test('compiled carousel uses the shared transition for every control', () {
     final container = _container(fixture);
-    final root = _carousel(container, 'compiled-carousel', initialIndex: 1);
+    final root = _carousel(
+      container,
+      'compiled-carousel',
+      initialIndex: 1,
+      stableLayout: true,
+    );
 
     expect(root.textContent, contains('Overview content'));
     expect(root.textContent, contains('Reviews content'));
     expect(root.querySelectorAll('button').length, 0);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder="carousel"]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
     _runCompiledCandidate();
 
     final slides = root.querySelectorAll('[data-esen-carousel-slide]');
@@ -41,6 +53,7 @@ void main() {
     expect((slides.item(2)! as web.Element).hasAttribute('hidden'), isTrue);
     expect(status.textContent, '2 / 3');
     expect(status.getAttribute('aria-live'), 'polite');
+    expect(root.querySelector('[data-esen-prepaint-placeholder]'), isNull);
 
     next.dispatchEvent(
       web.MouseEvent('click', web.MouseEventInit(bubbles: true)),
@@ -164,6 +177,32 @@ void main() {
 
     expect(root.querySelectorAll('button').length, 0);
     expect(root.querySelectorAll('[hidden]').length, 0);
+  });
+
+  test('rejects a mismatched pre-paint plan before the first mutation', () {
+    final container = _container(fixture);
+    final root = _carousel(
+      container,
+      'mismatched-layout-carousel',
+      initialIndex: 1,
+      stableLayout: true,
+    );
+    root.querySelector('.esen-seo-carousel-status')?.textContent = '99 / 99';
+
+    _runCompiledCandidate();
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(root.querySelectorAll('button'), isEmpty);
+    expect(root.querySelectorAll('[role]'), isEmpty);
+    expect(root.querySelectorAll('section[hidden]'), isEmpty);
+    expect(
+      root
+          .querySelector('[data-esen-prepaint-placeholder]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(root.textContent, contains('Overview content'));
+    expect(root.textContent, contains('Reviews content'));
   });
 
   test('nested carousels enhance independently after complete validation', () {
@@ -291,6 +330,7 @@ web.HTMLElement _carousel(
   int count = 3,
   int initialIndex = 1,
   String rootTag = 'div',
+  bool stableLayout = false,
 }) {
   final root = web.document.createElement(rootTag) as web.HTMLElement
     ..id = id
@@ -300,12 +340,42 @@ web.HTMLElement _carousel(
     ..setAttribute('data-esen-previous-label', 'Previous slide')
     ..setAttribute('data-esen-next-label', 'Next slide')
     ..setAttribute('data-esen-initial-index', '$initialIndex');
+  if (stableLayout) {
+    root.setAttribute('data-esen-layout-stable', 'true');
+    final placeholder = web.document.createElement('div')
+      ..className = 'esen-seo-carousel-controls'
+      ..setAttribute('data-esen-prepaint-placeholder', 'carousel')
+      ..setAttribute('hidden', '')
+      ..setAttribute('aria-hidden', 'true');
+    final previous = web.document.createElement('span')
+      ..className = 'esen-seo-carousel-control-placeholder'
+      ..textContent = '\u2039';
+    if (initialIndex == 0) {
+      previous.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    final status = web.document.createElement('span')
+      ..className = 'esen-seo-carousel-status'
+      ..textContent = '${initialIndex + 1} / $count';
+    final next = web.document.createElement('span')
+      ..className = 'esen-seo-carousel-control-placeholder'
+      ..textContent = '\u203a';
+    if (initialIndex == count - 1) {
+      next.setAttribute('data-esen-placeholder-disabled', 'true');
+    }
+    placeholder.appendChild(previous);
+    placeholder.appendChild(status);
+    placeholder.appendChild(next);
+    root.appendChild(placeholder);
+  }
   const labels = ['Overview', 'Details', 'Reviews'];
   for (var index = 0; index < count; index++) {
     final label = index < labels.length ? labels[index] : 'Slide $index';
     final slide = web.document.createElement('section')
       ..id = '$id-slide-$index'
       ..setAttribute('data-esen-carousel-slide', '');
+    if (stableLayout && index == initialIndex) {
+      slide.setAttribute('data-esen-initial-active', 'true');
+    }
     slide.appendChild(
       web.document.createElement('h3')..textContent = label,
     );

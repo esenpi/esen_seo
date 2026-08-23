@@ -58,6 +58,7 @@ final class _TabsPlan {
     required this.initialIndex,
     required this.panels,
     required this.headings,
+    required this.placeholder,
   });
 
   final web.Element root;
@@ -66,6 +67,7 @@ final class _TabsPlan {
   final int initialIndex;
   final List<web.Element> panels;
   final List<web.HTMLElement> headings;
+  final web.Element? placeholder;
 }
 
 final class _TabsApplyBoundary {
@@ -113,15 +115,22 @@ final class _TabsApplyBoundary {
     final headings = <web.HTMLElement>[];
     final panelIds = <String>{};
     final children = root.children;
-    for (var index = 0; index < children.length; index++) {
+    final firstChild = children.item(0);
+    final placeholder = firstChild != null &&
+            firstChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? firstChild
+        : null;
+    final panelOffset = placeholder == null ? 0 : 1;
+    for (var index = panelOffset; index < children.length; index++) {
       final child = children.item(index);
+      final panelIndex = index - panelOffset;
       if (child == null ||
           child.tagName != 'SECTION' ||
           !child.hasAttribute('data-esen-tab-panel')) {
         return null;
       }
-      final expectedPanelId = '$id-panel-$index';
-      final expectedTabId = '$id-tab-$index';
+      final expectedPanelId = '$id-panel-$panelIndex';
+      final expectedTabId = '$id-tab-$panelIndex';
       final heading = child.firstElementChild;
       if (child.id != expectedPanelId ||
           !panelIds.add(child.id) ||
@@ -145,6 +154,15 @@ final class _TabsApplyBoundary {
         initialIndex >= panels.length) {
       return null;
     }
+    if (!_validStableLayout(
+      root: root,
+      placeholder: placeholder,
+      panels: panels,
+      headings: headings,
+      initialIndex: initialIndex,
+    )) {
+      return null;
+    }
 
     final rawLabel = root.getAttribute('data-esen-label');
     return _TabsPlan(
@@ -154,7 +172,43 @@ final class _TabsApplyBoundary {
       initialIndex: initialIndex,
       panels: panels,
       headings: headings,
+      placeholder: placeholder,
     );
+  }
+
+  static bool _validStableLayout({
+    required web.Element root,
+    required web.Element? placeholder,
+    required List<web.Element> panels,
+    required List<web.HTMLElement> headings,
+    required int initialIndex,
+  }) {
+    final stable = root.getAttribute('data-esen-layout-stable') == 'true';
+    if (!stable) return placeholder == null;
+    if (placeholder == null ||
+        placeholder.tagName != 'DIV' ||
+        placeholder.getAttribute('data-esen-prepaint-placeholder') != 'tabs' ||
+        !placeholder.classList.contains('esen-seo-tab-list') ||
+        !placeholder.hasAttribute('hidden') ||
+        placeholder.getAttribute('aria-hidden') != 'true' ||
+        placeholder.children.length != panels.length) {
+      return false;
+    }
+    for (var index = 0; index < panels.length; index++) {
+      final item = placeholder.children.item(index);
+      final selected = index == initialIndex;
+      if (item == null ||
+          item.tagName != 'SPAN' ||
+          !item.classList.contains('esen-seo-tab') ||
+          item.textContent != headings[index].textContent ||
+          item.getAttribute('data-esen-placeholder-selected') !=
+              (selected ? 'true' : null) ||
+          panels[index].getAttribute('data-esen-initial-active') !=
+              (selected ? 'true' : null)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static bool _hiddenByAncestor(
@@ -229,7 +283,12 @@ final class _TabsApplyBoundary {
       heading.setAttribute('hidden', '');
     }
 
-    plan.root.insertBefore(tablist, plan.panels.first);
+    final placeholder = plan.placeholder;
+    if (placeholder == null) {
+      plan.root.insertBefore(tablist, plan.panels.first);
+    } else {
+      plan.root.replaceChild(tablist, placeholder);
+    }
     plan.root.setAttribute('data-esen-enhanced', 'true');
   }
 

@@ -3,12 +3,14 @@ import 'dart:io';
 import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
+import '../renderer/seo_dom_first.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_application_runtime.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
+import '../routing/seo_route_delivery.dart';
 import 'llms_txt.dart';
 import 'seo_page.dart';
 import 'seo_runtime_store.dart';
@@ -428,6 +430,16 @@ String _applyTemplate(
   // Kritisches CSS gehört inline in den Head: Der Shell soll malen,
   // bevor irgendein zusätzlicher Request gelaufen ist.
   final head = StringBuffer(meta.toHtml());
+  if (enableInteractions) {
+    head.write(seoDomFirstFeatureBootstrapScriptHtml(
+      const {
+        SeoDomFirstFeature.tabs,
+        SeoDomFirstFeature.carousel,
+        SeoDomFirstFeature.stepper,
+      },
+      nonce: interactionNonce,
+    ));
+  }
   if (stylesheet != null && stylesheet.trim().isNotEmpty) {
     head.write(seoStyleTagHtml(stylesheet, nonce: interactionNonce));
   }

@@ -6,9 +6,6 @@ import '../components/seo_carousel_transition.dart';
 import '../components/seo_component_format.dart';
 import 'seo_container.dart';
 
-/// Largest carousel the progressive adapter will enhance.
-const int seoCarouselMaxEnhancedSlides = 200;
-
 /// Enhances every valid carousel in the package-owned DOM-first container.
 ///
 /// The complete control is validated before [_CarouselApplyBoundary] performs
@@ -73,6 +70,7 @@ final class _CarouselPlan {
     required this.initialIndex,
     required this.entries,
     required this.rtl,
+    required this.placeholder,
   });
 
   final web.Element root;
@@ -83,6 +81,7 @@ final class _CarouselPlan {
   final int initialIndex;
   final List<_CarouselEntry> entries;
   final bool rtl;
+  final web.Element? placeholder;
 }
 
 final class _CarouselApplyBoundary {
@@ -150,12 +149,19 @@ final class _CarouselApplyBoundary {
 
     final entries = <_CarouselEntry>[];
     final ids = <String>{};
-    final slides = root.children;
-    if (slides.length < 2 || slides.length > seoCarouselMaxEnhancedSlides) {
+    final children = root.children;
+    final firstChild = children.item(0);
+    final placeholder = firstChild != null &&
+            firstChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? firstChild
+        : null;
+    final slideOffset = placeholder == null ? 0 : 1;
+    final slideCount = children.length - slideOffset;
+    if (slideCount < 2 || slideCount > seoCarouselMaxEnhancedSlides) {
       return null;
     }
-    for (var index = 0; index < slides.length; index++) {
-      final slide = slides.item(index);
+    for (var index = 0; index < slideCount; index++) {
+      final slide = children.item(index + slideOffset);
       final heading = slide?.firstElementChild;
       final expectedSlideId = '$id-slide-$index';
       if (slide == null ||
@@ -179,6 +185,14 @@ final class _CarouselApplyBoundary {
         initialIndex >= entries.length) {
       return null;
     }
+    if (!_validStableLayout(
+      root: root,
+      placeholder: placeholder,
+      entries: entries,
+      initialIndex: initialIndex,
+    )) {
+      return null;
+    }
 
     for (final suffix in const ['previous', 'next', 'status']) {
       if (_idCount(document, '$id-$suffix') != 0) return null;
@@ -193,7 +207,56 @@ final class _CarouselApplyBoundary {
       initialIndex: initialIndex,
       entries: entries,
       rtl: web.window.getComputedStyle(root).direction == 'rtl',
+      placeholder: placeholder,
     );
+  }
+
+  static bool _validStableLayout({
+    required web.Element root,
+    required web.Element? placeholder,
+    required List<_CarouselEntry> entries,
+    required int initialIndex,
+  }) {
+    final stable = root.getAttribute('data-esen-layout-stable') == 'true';
+    if (!stable) return placeholder == null;
+    if (placeholder == null ||
+        placeholder.tagName != 'DIV' ||
+        placeholder.getAttribute('data-esen-prepaint-placeholder') !=
+            'carousel' ||
+        !placeholder.classList.contains('esen-seo-carousel-controls') ||
+        !placeholder.hasAttribute('hidden') ||
+        placeholder.getAttribute('aria-hidden') != 'true' ||
+        placeholder.children.length != 3) {
+      return false;
+    }
+    final previous = placeholder.children.item(0);
+    final status = placeholder.children.item(1);
+    final next = placeholder.children.item(2);
+    if (previous == null ||
+        status == null ||
+        next == null ||
+        previous.tagName != 'SPAN' ||
+        next.tagName != 'SPAN' ||
+        status.tagName != 'SPAN' ||
+        !previous.classList.contains('esen-seo-carousel-control-placeholder') ||
+        !next.classList.contains('esen-seo-carousel-control-placeholder') ||
+        !status.classList.contains('esen-seo-carousel-status') ||
+        previous.textContent != '\u2039' ||
+        next.textContent != '\u203a' ||
+        status.textContent != '${initialIndex + 1} / ${entries.length}' ||
+        previous.getAttribute('data-esen-placeholder-disabled') !=
+            (initialIndex == 0 ? 'true' : null) ||
+        next.getAttribute('data-esen-placeholder-disabled') !=
+            (initialIndex == entries.length - 1 ? 'true' : null)) {
+      return false;
+    }
+    for (var index = 0; index < entries.length; index++) {
+      if (entries[index].slide.getAttribute('data-esen-initial-active') !=
+          (index == initialIndex ? 'true' : null)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static bool _hiddenByAncestor(
@@ -253,7 +316,12 @@ final class _CarouselApplyBoundary {
     controls.appendChild(_status);
     controls.appendChild(_next);
 
-    plan.root.insertBefore(controls, plan.root.firstChild);
+    final placeholder = plan.placeholder;
+    if (placeholder == null) {
+      plan.root.insertBefore(controls, plan.root.firstChild);
+    } else {
+      plan.root.replaceChild(controls, placeholder);
+    }
     plan.root.setAttribute('role', 'region');
     plan.root.setAttribute('aria-label', plan.label);
     plan.root.setAttribute('data-esen-enhanced', 'true');

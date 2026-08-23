@@ -1,6 +1,7 @@
 /// Trusted progressive-enhancement assets for semantic components.
 library;
 
+import '../components/seo_component_format.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_stylesheet.dart';
@@ -15,26 +16,42 @@ const String seoInteractionScriptAttribute = 'data-esen-seo-interactions';
 /// the palette.
 const String seoInteractionStylesheet = '''
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>.esen-seo-tab-list{display:flex;flex-wrap:wrap;gap:.5rem;border-bottom:1px solid currentColor;margin-bottom:1rem}
-#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab{font:inherit;color:inherit;background:transparent;border:0;border-bottom:2px solid transparent;padding:.5rem .75rem;cursor:pointer}
-#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"]{border-bottom-color:currentColor;font-weight:600}
+#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab{display:inline-flex;box-sizing:border-box;align-items:center;font:inherit;color:inherit;background:transparent;border:0;border-bottom:2px solid transparent;padding:.5rem .75rem;cursor:pointer}
+#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[aria-selected="true"],#$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab[data-esen-placeholder-selected="true"]{border-bottom-color:currentColor;font-weight:600}
 #$seoContainerId [data-esen-component="tabs"]>.esen-seo-tab-list>.esen-seo-tab:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="tabs"][data-esen-enhanced="true"]>section[data-esen-tab-panel][hidden]{display:none}
+#$seoContainerId [data-esen-component="tabs"]>[data-esen-prepaint-placeholder="tabs"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="tabs"][hidden]{display:flex!important;flex-wrap:wrap;gap:.5rem;border-bottom:1px solid currentColor;margin-bottom:1rem}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-tab-panel]:not([data-esen-initial-active="true"]){display:none}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="tabs"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-tab-panel][data-esen-initial-active="true"]>:first-child{display:none}
 #$seoContainerId [data-esen-component="carousel"]>.esen-seo-carousel-controls{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-block:.75rem}
-#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;height:2.5rem;padding:0;cursor:pointer}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control],#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;width:2.5rem;min-width:2.5rem;height:2.5rem;min-height:2.5rem;padding:0}
+#$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]{cursor:pointer}
 #$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control][aria-disabled="true"]{opacity:.4;cursor:default}
 #$seoContainerId [data-esen-component="carousel"] [data-esen-carousel-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-status{display:inline-block;min-width:4rem;text-align:center}
 #$seoContainerId [data-esen-component="carousel"][data-esen-enhanced="true"]>section[data-esen-carousel-slide][hidden]{display:none}
+#$seoContainerId [data-esen-component="carousel"] .esen-seo-carousel-control-placeholder[data-esen-placeholder-disabled="true"]{opacity:.4}
+#$seoContainerId [data-esen-component="carousel"]>[data-esen-prepaint-placeholder="carousel"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="carousel"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="carousel"][hidden]{display:flex!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="carousel"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-carousel-slide]:not([data-esen-initial-active="true"]){display:none}
 #$seoContainerId [data-esen-component="stepper"]>[data-esen-step-list]{list-style:none;padding:0}
-#$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]{font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-step-button{display:block;box-sizing:border-box;font:inherit;color:inherit;background:transparent;border:0;padding:.5rem 0;cursor:pointer;text-align:start;width:100%;overflow-wrap:anywhere}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-step-button][aria-current="step"]{font-weight:600}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-step-button]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-controls{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-block:.75rem}
-#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:.5rem .75rem;cursor:pointer;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control],#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;min-height:2.5rem;padding:.5rem .75rem;flex:1;min-width:0;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]{cursor:pointer}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control][aria-disabled="true"]{opacity:.4;cursor:default}
 #$seoContainerId [data-esen-component="stepper"] [data-esen-stepper-control]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-status{display:inline-block;min-width:6rem;text-align:center}
 #$seoContainerId [data-esen-component="stepper"][data-esen-enhanced="true"] [data-esen-step-panel][hidden]{display:none}
+#$seoContainerId [data-esen-component="stepper"] .esen-seo-stepper-control-placeholder[data-esen-placeholder-disabled="true"]{opacity:.4}
+#$seoContainerId [data-esen-component="stepper"]>[data-esen-prepaint-placeholder="stepper"][hidden],#$seoContainerId [data-esen-component="stepper"] [data-esen-prepaint-placeholder="stepper-button"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="stepper"][hidden]{display:flex!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-prepaint-placeholder="stepper-button"][hidden]{display:block!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-step-heading]{display:none}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="stepper"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-step-list]>[data-esen-step]>[data-esen-step-panel]:not([data-esen-initial-active="true"]){display:none}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]{font:inherit;color:inherit;background:transparent;border:0;padding:.25rem;cursor:pointer}
 #$seoContainerId [data-esen-component="nav-menu"] [data-esen-nav-toggle]:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 #$seoContainerId [data-esen-component="nav-menu"] .esen-seo-nav-toggle-label{padding:.25rem 0}
@@ -111,8 +128,15 @@ const String seoInteractionRuntime = r'''
   function enhanceTabs(root) {
     if (!canEnhance(root)) return;
 
+    var placeholder = root.firstElementChild &&
+        root.firstElementChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? root.firstElementChild : null;
+    var stableLayout =
+        root.getAttribute('data-esen-layout-stable') === 'true';
+    if (!!placeholder !== stableLayout) return;
     var panels = directPanels(root);
-    if (!panels.length || panels.length !== root.children.length) return;
+    if (!panels.length ||
+        panels.length + (placeholder ? 1 : 0) !== root.children.length) return;
 
     var headings = [];
     var ids = Object.create(null);
@@ -130,6 +154,32 @@ const String seoInteractionRuntime = r'''
       return true;
     });
     if (!valid) return;
+
+    var initialValue = root.getAttribute('data-esen-initial-index') || '0';
+    var initial = /^(0|[1-9][0-9]*)$/.test(initialValue)
+        ? Number(initialValue) : 0;
+    if (!Number.isSafeInteger(initial) || initial >= panels.length) initial = 0;
+    if (stableLayout) {
+      if (placeholder.tagName !== 'DIV' ||
+          placeholder.getAttribute('data-esen-prepaint-placeholder') !==
+              'tabs' ||
+          !placeholder.classList.contains('esen-seo-tab-list') ||
+          !placeholder.hasAttribute('hidden') ||
+          placeholder.getAttribute('aria-hidden') !== 'true' ||
+          placeholder.children.length !== panels.length) return;
+      var placeholderValid = panels.every(function (panel, index) {
+        var item = placeholder.children[index];
+        var selected = index === initial;
+        return item.tagName === 'SPAN' &&
+            item.classList.contains('esen-seo-tab') &&
+            item.textContent === headings[index].textContent &&
+            item.getAttribute('data-esen-placeholder-selected') ===
+                (selected ? 'true' : null) &&
+            panel.getAttribute('data-esen-initial-active') ===
+                (selected ? 'true' : null);
+      });
+      if (!placeholderValid) return;
+    }
 
     var tablist = document.createElement('div');
     tablist.className = 'esen-seo-tab-list';
@@ -184,21 +234,29 @@ const String seoInteractionRuntime = r'''
       });
     });
 
-    root.insertBefore(tablist, root.firstChild);
-    root.setAttribute('data-esen-enhanced', 'true');
-    var initial = Number.parseInt(
-        root.getAttribute('data-esen-initial-index') || '0', 10);
-    if (!Number.isFinite(initial) || initial < 0 || initial >= tabs.length) {
-      initial = 0;
+    if (placeholder) {
+      root.replaceChild(tablist, placeholder);
+    } else {
+      root.insertBefore(tablist, root.firstChild);
     }
+    root.setAttribute('data-esen-enhanced', 'true');
     activate(initial, false);
   }
 
   function enhanceCarousel(root) {
     if (!canEnhance(root)) return;
 
+    var placeholder = root.firstElementChild &&
+        root.firstElementChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? root.firstElementChild : null;
+    var stableLayout =
+        root.getAttribute('data-esen-layout-stable') === 'true';
+    if (!!placeholder !== stableLayout) return;
     var slides = directCarouselSlides(root);
-    if (slides.length < 2 || slides.length !== root.children.length) return;
+    if (slides.length < 2 || slides.length > '''
+    '$seoCarouselMaxEnhancedSlides'
+    r''' ||
+        slides.length + (placeholder ? 1 : 0) !== root.children.length) return;
 
     var label = root.getAttribute('data-esen-label') || '';
     var previousLabel = root.getAttribute('data-esen-previous-label') || '';
@@ -230,6 +288,42 @@ const String seoInteractionRuntime = r'''
       return true;
     });
     if (!valid) return;
+    if (stableLayout) {
+      var placeholderChildren = placeholder.children;
+      var placeholderPrevious = placeholderChildren[0];
+      var placeholderStatus = placeholderChildren[1];
+      var placeholderNext = placeholderChildren[2];
+      if (placeholder.tagName !== 'DIV' ||
+          placeholder.getAttribute('data-esen-prepaint-placeholder') !==
+              'carousel' ||
+          !placeholder.classList.contains('esen-seo-carousel-controls') ||
+          !placeholder.hasAttribute('hidden') ||
+          placeholder.getAttribute('aria-hidden') !== 'true' ||
+          placeholderChildren.length !== 3 ||
+          placeholderPrevious.tagName !== 'SPAN' ||
+          placeholderStatus.tagName !== 'SPAN' ||
+          placeholderNext.tagName !== 'SPAN' ||
+          !placeholderPrevious.classList.contains(
+              'esen-seo-carousel-control-placeholder') ||
+          !placeholderStatus.classList.contains('esen-seo-carousel-status') ||
+          !placeholderNext.classList.contains(
+              'esen-seo-carousel-control-placeholder') ||
+          placeholderPrevious.textContent !== '\u2039' ||
+          placeholderStatus.textContent !==
+              (initial + 1) + ' / ' + slides.length ||
+          placeholderNext.textContent !== '\u203A' ||
+          placeholderPrevious.getAttribute(
+              'data-esen-placeholder-disabled') !==
+              (initial === 0 ? 'true' : null) ||
+          placeholderNext.getAttribute(
+              'data-esen-placeholder-disabled') !==
+              (initial === slides.length - 1 ? 'true' : null)) return;
+      var initialSlidesValid = slides.every(function (slide, index) {
+        return slide.getAttribute('data-esen-initial-active') ===
+            (index === initial ? 'true' : null);
+      });
+      if (!initialSlidesValid) return;
+    }
 
     var rtl = window.getComputedStyle(root).direction === 'rtl';
     var controls = document.createElement('div');
@@ -305,7 +399,11 @@ const String seoInteractionRuntime = r'''
 
     bind(previous, -1);
     bind(next, 1);
-    root.insertBefore(controls, root.firstChild);
+    if (placeholder) {
+      root.replaceChild(controls, placeholder);
+    } else {
+      root.insertBefore(controls, root.firstChild);
+    }
     root.setAttribute('role', 'region');
     root.setAttribute('aria-label', label);
     root.setAttribute('data-esen-enhanced', 'true');
@@ -313,8 +411,16 @@ const String seoInteractionRuntime = r'''
   }
 
   function enhanceStepper(root) {
-    if (!canEnhance(root) || root.children.length !== 1) return;
-    var list = root.firstElementChild;
+    if (!canEnhance(root)) return;
+    var placeholder = root.firstElementChild &&
+        root.firstElementChild.hasAttribute('data-esen-prepaint-placeholder')
+        ? root.firstElementChild : null;
+    var stableLayout =
+        root.getAttribute('data-esen-layout-stable') === 'true';
+    if (!!placeholder !== stableLayout ||
+        root.children.length !== (placeholder ? 2 : 1)) return;
+    var list = placeholder ? placeholder.nextElementSibling :
+        root.firstElementChild;
     if (!list || list.tagName !== 'OL' ||
         !list.hasAttribute('data-esen-step-list')) return;
 
@@ -344,9 +450,13 @@ const String seoInteractionRuntime = r'''
     var ids = Object.create(null);
     var entries = [];
     var valid = steps.every(function (step, index) {
-      if (step.children.length !== 2) return false;
-      var heading = step.children[0];
-      var panel = step.children[1];
+      var buttonPlaceholder = step.firstElementChild &&
+          step.firstElementChild.hasAttribute('data-esen-prepaint-placeholder')
+          ? step.firstElementChild : null;
+      if (!!buttonPlaceholder !== stableLayout ||
+          step.children.length !== (buttonPlaceholder ? 3 : 2)) return false;
+      var heading = step.children[buttonPlaceholder ? 1 : 0];
+      var panel = step.children[buttonPlaceholder ? 2 : 1];
       var headingTag = heading ? heading.tagName : '';
       var headingText = heading ? heading.textContent || '' : '';
       var buttonId = root.id + '-step-button-' + index;
@@ -366,11 +476,57 @@ const String seoInteractionRuntime = r'''
         step: step,
         heading: heading,
         panel: panel,
-        buttonId: buttonId
+        buttonId: buttonId,
+        buttonPlaceholder: buttonPlaceholder
       });
       return true;
     });
     if (!valid) return;
+    if (stableLayout) {
+      var placeholderChildren = placeholder.children;
+      var placeholderPrevious = placeholderChildren[0];
+      var placeholderStatus = placeholderChildren[1];
+      var placeholderNext = placeholderChildren[2];
+      if (placeholder.tagName !== 'DIV' ||
+          placeholder.getAttribute('data-esen-prepaint-placeholder') !==
+              'stepper' ||
+          !placeholder.classList.contains('esen-seo-stepper-controls') ||
+          !placeholder.hasAttribute('hidden') ||
+          placeholder.getAttribute('aria-hidden') !== 'true' ||
+          placeholderChildren.length !== 3 ||
+          placeholderPrevious.tagName !== 'SPAN' ||
+          placeholderStatus.tagName !== 'SPAN' ||
+          placeholderNext.tagName !== 'SPAN' ||
+          !placeholderPrevious.classList.contains(
+              'esen-seo-stepper-control-placeholder') ||
+          !placeholderStatus.classList.contains('esen-seo-stepper-status') ||
+          !placeholderNext.classList.contains(
+              'esen-seo-stepper-control-placeholder') ||
+          placeholderPrevious.textContent !== previousLabel ||
+          placeholderStatus.textContent !== positionLabel + ' ' +
+              (initial + 1) + ' / ' + entries.length ||
+          placeholderNext.textContent !== nextLabel ||
+          placeholderPrevious.getAttribute(
+              'data-esen-placeholder-disabled') !==
+              (initial === 0 ? 'true' : null) ||
+          placeholderNext.getAttribute(
+              'data-esen-placeholder-disabled') !==
+              (initial === entries.length - 1 ? 'true' : null)) return;
+      var initialStepsValid = entries.every(function (entry, index) {
+        var buttonPlaceholder = entry.buttonPlaceholder;
+        return buttonPlaceholder.tagName === 'SPAN' &&
+            buttonPlaceholder.getAttribute(
+                'data-esen-prepaint-placeholder') === 'stepper-button' &&
+            buttonPlaceholder.classList.contains('esen-seo-step-button') &&
+            buttonPlaceholder.hasAttribute('hidden') &&
+            buttonPlaceholder.getAttribute('aria-hidden') === 'true' &&
+            buttonPlaceholder.textContent === entry.heading.textContent &&
+            entry.heading.hasAttribute('data-esen-step-heading') &&
+            entry.panel.getAttribute('data-esen-initial-active') ===
+                (index === initial ? 'true' : null);
+      });
+      if (!initialStepsValid) return;
+    }
 
     var rtl = window.getComputedStyle(root).direction === 'rtl';
     var buttons = entries.map(function (entry) {
@@ -384,7 +540,11 @@ const String seoInteractionRuntime = r'''
       entry.panel.setAttribute('role', 'region');
       entry.panel.setAttribute('aria-labelledby', button.id);
       entry.heading.hidden = true;
-      entry.step.insertBefore(button, entry.heading);
+      if (entry.buttonPlaceholder) {
+        entry.step.replaceChild(button, entry.buttonPlaceholder);
+      } else {
+        entry.step.insertBefore(button, entry.heading);
+      }
       return button;
     });
 
@@ -476,7 +636,11 @@ const String seoInteractionRuntime = r'''
       }
     });
 
-    root.appendChild(controls);
+    if (placeholder) {
+      root.replaceChild(controls, placeholder);
+    } else {
+      root.appendChild(controls);
+    }
     root.setAttribute('role', 'region');
     root.setAttribute('aria-label', label);
     root.setAttribute('data-esen-enhanced', 'true');
@@ -600,12 +764,17 @@ const String seoInteractionRuntime = r'''
     enhanceSelector(root, navSelector, enhanceNav);
   }
 
+  function enhanceDocument() {
+    enhanceAll(document);
+    delete document.documentElement.dataset.esenInteractionPending;
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      enhanceAll(document);
+      enhanceDocument();
     }, {once: true});
   } else {
-    enhanceAll(document);
+    enhanceDocument();
   }
 })();
 ''';

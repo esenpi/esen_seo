@@ -82,9 +82,18 @@ void main() {
 
     expect(find.text('Flutter account'), findsOneWidget);
     expect(find.text('Flutter address'), findsNothing);
-    expect(initialHtml, contains('<h3>Account</h3>'));
-    expect(initialHtml, contains('<h3>Address</h3>'));
-    expect(initialHtml, contains('<h3>Review</h3>'));
+    expect(
+      initialHtml,
+      contains('<h3 data-esen-step-heading="">Account</h3>'),
+    );
+    expect(
+      initialHtml,
+      contains('<h3 data-esen-step-heading="">Address</h3>'),
+    );
+    expect(
+      initialHtml,
+      contains('<h3 data-esen-step-heading="">Review</h3>'),
+    );
     expect(initialHtml, contains('<p>Semantic review</p>'));
     expect(initialHtml, isNot(contains('<button')));
 
