@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "benchmark-page",
+  "entries": [
+    {
+      "kind": "stepper-effects",
+      "library": "package:esen_seo_runtime_bundle_benchmark_app/runtime_transitions.dart",
+      "symbol": "transitionBenchmarkStepperEffects",
+      "interactionIds": ["benchmark-stepper"]
+    },
+    {
+      "kind": "carousel",
+      "library": "package:esen_seo_runtime_bundle_benchmark_app/runtime_transitions.dart",
+      "symbol": "transitionBenchmarkCarousel"
+    },
+    {
+      "kind": "tabs",
+      "library": "package:esen_seo_runtime_bundle_benchmark_app/runtime_transitions.dart",
+      "symbol": "transitionBenchmarkTabs"
+    }
+  ]
+}

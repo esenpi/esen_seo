@@ -1,0 +1,16 @@
+name: esen_dom_first_runtime_bundle_flutter_baseline
+publish_to: none
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  esen_seo:
+    path: ../../../..
+  esen_seo_runtime_bundle_benchmark_app:
+    path: ../application
+
+flutter:
+  uses-material-design: true

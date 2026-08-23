@@ -34,6 +34,7 @@ node_modules/
 benchmark/dom_first/fixtures/next/out/
 benchmark/dom_first_collection/fixtures/next/out/
 benchmark/dom_first_stepper_effects/fixtures/next/out/
+benchmark/dom_first_runtime_bundle/fixtures/next/out/
 
 # Local-only files (not part of the repository)
 *.local.md

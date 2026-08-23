@@ -26,7 +26,17 @@ replacement acceptance matrix and do not change the failed result above.
 | Tabs + Stepper Effects | 72,438 bytes | 22,192 bytes | pass |
 | Tabs + Carousel + Stepper Effects | 79,148 bytes | 23,777 bytes | pass |
 
-The bundle mechanism remains usable only when the complete application output
-fits the unchanged limits. The public example uses the passing three-member
-combination; larger combinations continue to fail closed instead of weakening
-the route budget.
+Every minimal Collection pair was then compiled with the same safe `-O2`, CSP
+and gzip settings:
+
+| Members | Level-9 gzip | Artifact gate |
+| --- | ---: | --- |
+| Tabs + Collection | 27,100 bytes | fail |
+| Carousel + Collection | 27,124 bytes | fail |
+| Collection + Stepper | 27,763 bytes | fail |
+| Collection + Stepper Effects | 28,337 bytes | fail |
+
+The public bundle boundary therefore admits two or three members from Tabs,
+Carousel and one Stepper ownership family. Collection remains available as a
+standalone application runtime. The public example uses the passing
+three-member combination; the fixed threshold remains unchanged.
