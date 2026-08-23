@@ -34,6 +34,8 @@ class SeoTab {
 /// [SeoTabs] keeps every panel as data. Flutter shows one at a time;
 /// the mirror contains all of them, each behind its own heading so the
 /// document outline stays readable:
+/// Flutter exposes every label as a button and reports the selected label to
+/// accessibility services.
 ///
 /// ```dart
 /// SeoTabs(
@@ -161,31 +163,36 @@ class _SeoTabsState extends State<SeoTabs> with SeoBlockState<SeoTabs> {
 
   Widget _buildLabel(int index) {
     final selected = index == _index;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() {
-        _tabsState = applySeoTabsTransition(
-          widget.transition,
-          _tabsState,
-          SeoTabsSelect(index),
-        );
-      }),
-      child: Container(
-        padding: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected ? widget.indicatorColor : const Color(0x00000000),
-              width: 2,
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() {
+          _tabsState = applySeoTabsTransition(
+            widget.transition,
+            _tabsState,
+            SeoTabsSelect(index),
+          );
+        }),
+        child: Container(
+          padding: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color:
+                    selected ? widget.indicatorColor : const Color(0x00000000),
+                width: 2,
+              ),
             ),
           ),
-        ),
-        child: Text(
-          widget.tabs[index].label,
-          style: selected
-              ? (widget.selectedLabelStyle ??
-                  const TextStyle(fontWeight: FontWeight.w600))
-              : widget.labelStyle,
+          child: Text(
+            widget.tabs[index].label,
+            style: selected
+                ? (widget.selectedLabelStyle ??
+                    const TextStyle(fontWeight: FontWeight.w600))
+                : widget.labelStyle,
+          ),
         ),
       ),
     );

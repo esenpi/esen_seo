@@ -1,5 +1,8 @@
 ## Unreleased
 
+* Exposed Flutter `SeoTabs` labels as selected buttons in the accessibility
+  semantics tree. Selection continues to follow the shared transition, while
+  visual layout and semantic HTML output remain unchanged.
 * Added route-scoped application runtime bundles. Two or three bundle-capable
   adapter families can be compiled from checked application transitions into
   one verified JavaScript artifact and selected through

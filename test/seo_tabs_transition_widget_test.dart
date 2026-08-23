@@ -1,8 +1,60 @@
+import 'dart:ui' show SemanticsAction, SemanticsFlag;
+
 import 'package:esen_seo/esen_seo.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('Flutter exposes tab labels as selected buttons', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: SeoTabs(
+          initialIndex: 1,
+          tabs: [
+            for (var index = 0; index < 2; index++)
+              SeoTab(
+                label: 'Tab $index',
+                content: Text('Panel $index'),
+                nodes: [SeoNode(tag: 'p', text: 'Panel $index')],
+              ),
+          ],
+        ),
+      ),
+    );
+
+    final first = tester.getSemantics(find.text('Tab 0')).getSemanticsData();
+    final second = tester.getSemantics(find.text('Tab 1')).getSemanticsData();
+
+    expect(first.label, 'Tab 0');
+    expect(first.hasFlag(SemanticsFlag.isButton), isTrue);
+    expect(first.hasFlag(SemanticsFlag.isSelected), isFalse);
+    expect(first.hasAction(SemanticsAction.tap), isTrue);
+    expect(second.label, 'Tab 1');
+    expect(second.hasFlag(SemanticsFlag.isButton), isTrue);
+    expect(second.hasFlag(SemanticsFlag.isSelected), isTrue);
+    expect(second.hasAction(SemanticsAction.tap), isTrue);
+
+    await tester.tap(find.text('Tab 0'));
+    await tester.pump();
+    expect(
+      tester
+          .getSemantics(find.text('Tab 0'))
+          .getSemanticsData()
+          .hasFlag(SemanticsFlag.isSelected),
+      isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.text('Tab 1'))
+          .getSemanticsData()
+          .hasFlag(SemanticsFlag.isSelected),
+      isFalse,
+    );
+    semantics.dispose();
+  });
+
   testWidgets('Flutter follows the shared selection transition',
       (tester) async {
     final tabs = [
