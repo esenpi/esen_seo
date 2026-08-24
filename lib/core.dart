@@ -39,6 +39,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstFeatureStyleHtml,
         seoDomFirstBootstrapScriptAttribute,
         seoDomFirstCarouselStylesheet,
+        seoDomFirstConfiguratorStylesheet,
         seoDomFirstScriptAttribute,
         seoDomFirstCollectionStylesheet,
         seoDomFirstStepperStylesheet,

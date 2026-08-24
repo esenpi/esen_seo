@@ -86,6 +86,28 @@ html[data-esen-collection-pending] #$seoContainerId [data-esen-component="collec
 #$seoContainerId [data-esen-component="collection"] [hidden]{display:none}
 ''';
 
+/// Structural styling for the closed DOM-first configurator controls.
+const String seoDomFirstConfiguratorStylesheet = '''
+#$seoContainerId [data-esen-component="configurator"]>.esen-seo-configurator-controls{display:grid;gap:1rem;margin-block:1.25rem;padding:1rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:8px;background:var(--esen-color-surface-container-low,#eff5f2)}
+#$seoContainerId [data-esen-component="configurator"] .esen-seo-configurator-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(9rem,100%),1fr));gap:.5rem}
+#$seoContainerId [data-esen-component="configurator"] [data-esen-configurator-choice-control],#$seoContainerId [data-esen-component="configurator"] [data-esen-configurator-option-control],#$seoContainerId [data-esen-component="configurator"] [data-esen-configurator-decrement],#$seoContainerId [data-esen-component="configurator"] [data-esen-configurator-increment],#$seoContainerId [data-esen-component="configurator"] .esen-seo-configurator-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;min-height:2.75rem;padding:.5rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface,#f5fbf8);color:var(--esen-color-on-surface,#171d1b);font:inherit;font-weight:600;text-align:center;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="configurator"] button{cursor:pointer}
+#$seoContainerId [data-esen-component="configurator"] [role="radio"][aria-checked="true"],#$seoContainerId [data-esen-component="configurator"] [data-esen-configurator-option-control][aria-pressed="true"],#$seoContainerId [data-esen-component="configurator"] [data-esen-placeholder-selected="true"]{border-color:var(--esen-color-primary,#006b5f);background:var(--esen-color-primary-container,#9ef2df);color:var(--esen-color-on-primary-container,#00201b)}
+#$seoContainerId [data-esen-component="configurator"] .esen-seo-configurator-quantity{display:grid;grid-template-columns:minmax(2.75rem,auto) minmax(4rem,1fr) minmax(2.75rem,auto);align-items:stretch;gap:.5rem}
+#$seoContainerId [data-esen-component="configurator"] .esen-seo-configurator-quantity-value{display:flex;align-items:center;justify-content:center;min-height:2.75rem;font-weight:700;font-variant-numeric:tabular-nums}
+#$seoContainerId [data-esen-component="configurator"] button[disabled],#$seoContainerId [data-esen-component="configurator"] [data-esen-placeholder-disabled="true"]{opacity:.45;cursor:default}
+#$seoContainerId [data-esen-component="configurator"] button:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+#$seoContainerId [data-esen-component="configurator"]>.esen-seo-configurator-price{font-size:1.375rem}
+#$seoContainerId [data-esen-component="configurator"]>.esen-seo-configurator-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#$seoContainerId [data-esen-component="configurator"]>[data-esen-prepaint-placeholder="configurator"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="configurator"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="configurator"][hidden]{display:grid!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="configurator"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-configurator-choice-region]:not([data-esen-initial-active="true"]){display:none}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="configurator"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-configurator-option-region]:not([data-esen-initial-visible="true"]){display:none}
+#$seoContainerId [data-esen-component="configurator"][data-esen-enhanced="true"]:not([data-esen-configurator-changed="true"])>section[data-esen-configurator-choice-region]:not([data-esen-initial-active="true"]){display:none}
+#$seoContainerId [data-esen-component="configurator"][data-esen-enhanced="true"]:not([data-esen-configurator-changed="true"])>section[data-esen-configurator-option-region]:not([data-esen-initial-visible="true"]){display:none}
+#$seoContainerId [data-esen-component="configurator"][data-esen-configurator-changed="true"]>section[hidden]{display:none}
+''';
+
 /// Self-contained styling for the package-owned theme toggle control.
 const String seoDomFirstThemeToggleStylesheet = '''
 html{color-scheme:light}
@@ -114,7 +136,8 @@ String seoDomFirstFeatureBootstrapScriptHtml(
   final collection = features.contains(SeoDomFirstFeature.collection);
   final interaction = features.contains(SeoDomFirstFeature.tabs) ||
       features.contains(SeoDomFirstFeature.carousel) ||
-      features.contains(SeoDomFirstFeature.stepper);
+      features.contains(SeoDomFirstFeature.stepper) ||
+      features.contains(SeoDomFirstFeature.configurator);
   if (!theme && !collection && !interaction) return '';
   final nonceAttribute = _nonceAttribute(nonce);
   final javascript = StringBuffer();
@@ -163,6 +186,9 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
   }
+  if (features.contains(SeoDomFirstFeature.configurator)) {
+    css.write(seoDomFirstConfiguratorStylesheet);
+  }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
     css.write(seoDomFirstThemeToggleStylesheet);
   }
@@ -208,7 +234,8 @@ String seoDomFirstFeatureScriptHtml(
   }
   if (features.contains(SeoDomFirstFeature.tabs) ||
       features.contains(SeoDomFirstFeature.carousel) ||
-      features.contains(SeoDomFirstFeature.stepper)) {
+      features.contains(SeoDomFirstFeature.stepper) ||
+      features.contains(SeoDomFirstFeature.configurator)) {
     runtime.write(
       ';delete document.documentElement.dataset.esenInteractionPending',
     );

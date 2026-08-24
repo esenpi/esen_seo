@@ -351,6 +351,43 @@ void main() {
     );
   });
 
+  test('configurator validates both symbols and admission before compilation',
+      () async {
+    await write('lib/pricing.dart', 'const value = 1;');
+
+    for (final request in const [
+      SeoConfiguratorRuntimeBuildRequest(
+        id: 'fixture-configurator',
+        library: 'package:fixture_app/pricing.dart',
+        transitionSymbol: 'transitionPricing',
+        projectionSymbol: 'break',
+        interactionIds: {'fixture-configurator'},
+      ),
+      SeoConfiguratorRuntimeBuildRequest(
+        id: 'fixture-configurator',
+        library: 'package:fixture_app/pricing.dart',
+        transitionSymbol: 'transitionPricing',
+        projectionSymbol: 'projectPricing',
+        interactionIds: {},
+      ),
+      SeoConfiguratorRuntimeBuildRequest(
+        id: 'fixture-configurator',
+        library: 'package:fixture_app/pricing.dart',
+        transitionSymbol: 'transitionPricing',
+        projectionSymbol: 'projectPricing',
+        interactionIds: {'invalid id'},
+      ),
+    ]) {
+      await expectLater(
+        buildSeoConfiguratorApplicationRuntime(
+          request,
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
+  });
+
   test('bundle rejects invalid ownership before compilation', () async {
     const tabs = SeoRuntimeBundleEntry.tabs(
       library: 'package:fixture_app/tabs.dart',

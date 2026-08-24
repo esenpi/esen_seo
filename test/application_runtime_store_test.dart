@@ -46,6 +46,14 @@ void main() {
       );
       expect(
         seoApplicationRuntimeArtifactStem(
+          const SeoDomFirstApplicationRuntime.configurator(
+            'application-tabs',
+          ),
+        ),
+        'configurator-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(
           const SeoDomFirstApplicationRuntime.stepper('application-tabs'),
         ),
         'stepper-application-tabs',

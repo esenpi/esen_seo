@@ -56,6 +56,27 @@ final class SeoCollectionRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one closed application-authored configurator runtime build.
+final class SeoConfiguratorRuntimeBuildRequest {
+  const SeoConfiguratorRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.transitionSymbol,
+    required this.projectionSymbol,
+    required this.interactionIds,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String transitionSymbol;
+  final String projectionSymbol;
+
+  /// Stable configurator ids this runtime may enhance.
+  final Set<String> interactionIds;
+  final String outputDirectory;
+}
+
 /// Inputs for one application-authored stepper runtime build.
 final class SeoStepperRuntimeBuildRequest {
   const SeoStepperRuntimeBuildRequest({
@@ -289,6 +310,10 @@ Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
           'Runtime bundle entry $index uses collection, which requires a '
           'standalone artifact.',
         ),
+      SeoDomFirstApplicationRuntimeKind.configurator => throw FormatException(
+          'Runtime bundle entry $index uses configurator, which requires a '
+          'standalone artifact.',
+        ),
       SeoDomFirstApplicationRuntimeKind.stepper =>
         SeoRuntimeBundleEntry.stepper(
           library: library,
@@ -357,6 +382,25 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoCollectionApplicationRuntime(
         reference: SeoDomFirstApplicationRuntime.collection(request.id),
         library: request.library,
         symbol: request.symbol,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked configurator transition and view projection.
+Future<SeoDomFirstRuntimeArtifact> buildSeoConfiguratorApplicationRuntime(
+  SeoConfiguratorRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.configurator(request.id),
+        library: request.library,
+        symbol: request.transitionSymbol,
+        projectionSymbol: request.projectionSymbol,
+        interactionIds: request.interactionIds,
         outputDirectory: request.outputDirectory,
       ),
       packageRoot: packageRoot,
@@ -556,6 +600,7 @@ final class _ApplicationRuntimeBuildRequest {
     required this.symbol,
     required this.outputDirectory,
     this.interactionIds = const {},
+    this.projectionSymbol,
   });
 
   final SeoDomFirstApplicationRuntime reference;
@@ -563,6 +608,7 @@ final class _ApplicationRuntimeBuildRequest {
   final String symbol;
   final String outputDirectory;
   final Set<String> interactionIds;
+  final String? projectionSymbol;
 }
 
 Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
@@ -581,8 +627,12 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
     );
   }
   _validateSymbol(request.symbol);
+  if (request.projectionSymbol case final projectionSymbol?) {
+    _validateSymbol(projectionSymbol);
+  }
   final interactionIds =
-      reference is SeoDomFirstStepperEffectsApplicationRuntime
+      reference is SeoDomFirstStepperEffectsApplicationRuntime ||
+              reference is SeoDomFirstConfiguratorApplicationRuntime
           ? _validatedStepperEffectInteractionIds(request.interactionIds)
           : const <String>[];
   final output = _checkedOutputDirectory(root, request.outputDirectory);
@@ -608,6 +658,13 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
     SeoDomFirstCollectionApplicationRuntime() => _collectionEntrypointSource(
         libraryUri,
         request.symbol,
+      ),
+    SeoDomFirstConfiguratorApplicationRuntime() =>
+      _configuratorEntrypointSource(
+        libraryUri,
+        request.symbol,
+        request.projectionSymbol!,
+        interactionIds,
       ),
     SeoDomFirstStepperApplicationRuntime() => _stepperEntrypointSource(
         libraryUri,
@@ -753,6 +810,38 @@ void main() => enhanceSeoDomFirstCollections(
 );
 ''';
 
+String _configuratorEntrypointSource(
+  Uri library,
+  String transitionSymbol,
+  String projectionSymbol,
+  List<String> interactionIds,
+) {
+  final encodedIds = interactionIds.map(jsonEncode).join(', ');
+  return '''
+import 'package:esen_seo/src/components/seo_configurator_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_configurator_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+const _interactionIds = <String>{$encodedIds};
+
+SeoConfiguratorState _applicationTransition(
+  SeoConfiguratorState state,
+  SeoConfiguratorAction action,
+  SeoConfiguratorConstraints constraints,
+) => application.$transitionSymbol(state, action, constraints);
+
+SeoConfiguratorView _applicationProjection(
+  SeoConfiguratorState state,
+) => application.$projectionSymbol(state);
+
+void main() => enhanceSeoDomFirstConfigurators(
+  interactionIds: _interactionIds,
+  transition: _applicationTransition,
+  project: _applicationProjection,
+);
+''';
+}
+
 String _stepperEntrypointSource(Uri library, String symbol) => '''
 import 'package:esen_seo/src/components/seo_stepper_transition.dart';
 import 'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart';
@@ -825,6 +914,10 @@ String _bundleEntrypointSource(List<_CheckedRuntimeBundleEntry> entries) {
         throw StateError(
           'Collection runtimes must use a standalone artifact.',
         );
+      case SeoDomFirstApplicationRuntimeKind.configurator:
+        throw StateError(
+          'Configurator runtimes must use a standalone artifact.',
+        );
       case SeoDomFirstApplicationRuntimeKind.stepper ||
             SeoDomFirstApplicationRuntimeKind.stepperEffects:
         addPackageImport(
@@ -864,6 +957,10 @@ SeoCarouselState _transition$index(
       case SeoDomFirstApplicationRuntimeKind.collection:
         throw StateError(
           'Collection runtimes must use a standalone artifact.',
+        );
+      case SeoDomFirstApplicationRuntimeKind.configurator:
+        throw StateError(
+          'Configurator runtimes must use a standalone artifact.',
         );
       case SeoDomFirstApplicationRuntimeKind.stepper:
         declarations.writeln('''
@@ -1085,6 +1182,7 @@ final class _PackageGraph {
       }
       if (segments.first == 'esen_seo' &&
           (rawUri == 'package:esen_seo/core.dart' ||
+              rawUri == 'package:esen_seo/configurator.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_tabs_transition.dart' ||
               rawUri ==
@@ -1092,7 +1190,9 @@ final class _PackageGraph {
               rawUri ==
                   'package:esen_seo/src/components/seo_collection_transition.dart' ||
               rawUri ==
-                  'package:esen_seo/src/components/seo_stepper_transition.dart')) {
+                  'package:esen_seo/src/components/seo_stepper_transition.dart' ||
+              rawUri ==
+                  'package:esen_seo/src/components/seo_configurator_transition.dart')) {
         return File('');
       }
       if (segments.first != applicationPackage) {

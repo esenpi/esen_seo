@@ -75,15 +75,21 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
   final symbol = _required(values, 'symbol');
   final kind = values['kind'] ?? 'tabs';
   final Set<String> interactionIds;
-  if (kind == 'stepper-effects') {
+  if (kind == 'stepper-effects' || kind == 'configurator') {
     interactionIds = _interactionIds(_required(values, 'interaction-ids'));
   } else {
     if (values.containsKey('interaction-ids')) {
       throw const FormatException(
-        'Option "--interaction-ids" is only valid for "stepper-effects".',
+        'Option "--interaction-ids" is only valid for "stepper-effects" '
+        'or "configurator".',
       );
     }
     interactionIds = const {};
+  }
+  if (kind != 'configurator' && values.containsKey('projection-symbol')) {
+    throw const FormatException(
+      'Option "--projection-symbol" is only valid for "configurator".',
+    );
   }
   return switch (kind) {
     'tabs' => await buildSeoTabsApplicationRuntime(
@@ -113,6 +119,17 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
         ),
         write: !check,
       ),
+    'configurator' => await buildSeoConfiguratorApplicationRuntime(
+        SeoConfiguratorRuntimeBuildRequest(
+          id: id,
+          library: library,
+          transitionSymbol: symbol,
+          projectionSymbol: _required(values, 'projection-symbol'),
+          interactionIds: interactionIds,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
     'stepper' => await buildSeoStepperApplicationRuntime(
         SeoStepperRuntimeBuildRequest(
           id: id,
@@ -134,7 +151,7 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
       ),
     _ => throw FormatException(
         'Unknown runtime kind "$kind"; expected "tabs", "carousel", '
-        '"collection", "stepper" or "stepper-effects".',
+        '"collection", "configurator", "stepper" or "stepper-effects".',
       ),
   };
 }
@@ -147,6 +164,7 @@ Map<String, String> _arguments(List<String> arguments) {
     'output',
     'kind',
     'interaction-ids',
+    'projection-symbol',
     'bundle',
   };
   final values = <String, String>{};
@@ -194,11 +212,13 @@ Usage: dart run esen_seo:esen_seo_runtime \\
   --id <runtime-id> \\
   --library package:<app>/<file.dart> \\
   --symbol <top-level-transition> \\
-  [--kind tabs|carousel|collection|stepper|stepper-effects] \\
+  [--kind tabs|carousel|collection|configurator|stepper|stepper-effects] \\
+  [--projection-symbol <top-level-view-projection>] \\
   [--interaction-ids <id[,id...]>] \\
   [--output build/esen_seo/runtimes] [--check]
 
---interaction-ids is required for stepper-effects and rejected for other kinds.
+--interaction-ids is required for stepper-effects and configurator.
+--projection-symbol is required for configurator and rejected for other kinds.
 
 Bundle mode:
   dart run esen_seo:esen_seo_runtime \\

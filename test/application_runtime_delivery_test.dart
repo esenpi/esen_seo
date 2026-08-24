@@ -9,6 +9,8 @@ const _carouselReference =
     SeoDomFirstApplicationRuntime.carousel('application-carousel');
 const _collectionReference =
     SeoDomFirstApplicationRuntime.collection('application-collection');
+const _configuratorReference =
+    SeoDomFirstApplicationRuntime.configurator('application-configurator');
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _stepperEffectsReference =
@@ -94,6 +96,17 @@ List<SeoNode> _collectionNodes() => buildSeoCollectionNodes(
       interactionId: 'application-collection-control',
     );
 
+List<SeoNode> _configuratorNodes() => [
+      SeoNode(
+        tag: 'section',
+        attributes: const {
+          'data-esen-component': 'configurator',
+          'data-esen-layout-stable': 'true',
+        },
+        children: [SeoNode(tag: 'h2', text: 'Configurator')],
+      ),
+    ];
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -110,6 +123,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.configurator},
+          applicationRuntime: _configuratorReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -204,9 +227,14 @@ void main() {
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.collection('same-id')),
       );
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(const SeoDomFirstApplicationRuntime.configurator('same-id')),
+      );
       expect(_reference.kind, 'tabs');
       expect(_carouselReference.kind, 'carousel');
       expect(_collectionReference.kind, 'collection');
+      expect(_configuratorReference.kind, 'configurator');
       expect(_stepperReference.kind, 'stepper');
       expect(_stepperEffectsReference.kind, 'stepper-effects');
       expect(_bundleReference.kind, 'bundle');
@@ -250,6 +278,16 @@ void main() {
         () => SeoDomFirstApplicationRuntime.bundle(
           'same-bundle',
           members: const {SeoDomFirstApplicationRuntimeKind.tabs},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {
+            SeoDomFirstApplicationRuntimeKind.tabs,
+            SeoDomFirstApplicationRuntimeKind.configurator,
+          },
         ),
         throwsArgumentError,
       );
@@ -425,6 +463,28 @@ void main() {
       expect(cleanupIndex, greaterThan(runtimeIndex));
       expect(html, isNot(contains('esenInteractionPending')));
       expect('nonce="safe"'.allMatches(html).length, greaterThanOrEqualTo(3));
+    });
+
+    test('configurator runtime selects only its structural stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _configuratorNodes(),
+        applicationRuntime: _artifact(_configuratorReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="configurator"'));
+      expect(html, contains(seoDomFirstConfiguratorStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
+      expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-configurator"',
+        ),
+      );
+      expect(html, contains('esenInteractionPending'));
     });
 
     test('bundle emits one script and every member stylesheet', () {

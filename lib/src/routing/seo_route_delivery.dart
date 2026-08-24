@@ -26,6 +26,9 @@ enum SeoDomFirstFeature {
   /// Enhance a validated complete collection with search and pagination.
   collection,
 
+  /// Style a validated configurator enhanced by a route-scoped application.
+  configurator,
+
   /// Apply and persist a validated light/dark presentation preference.
   themeToggle,
 

@@ -212,6 +212,8 @@ SeoDomFirstFeature _applicationRuntimeFeature(
       SeoDomFirstApplicationRuntimeKind.carousel => SeoDomFirstFeature.carousel,
       SeoDomFirstApplicationRuntimeKind.collection =>
         SeoDomFirstFeature.collection,
+      SeoDomFirstApplicationRuntimeKind.configurator =>
+        SeoDomFirstFeature.configurator,
       SeoDomFirstApplicationRuntimeKind.stepper ||
       SeoDomFirstApplicationRuntimeKind.stepperEffects =>
         SeoDomFirstFeature.stepper,

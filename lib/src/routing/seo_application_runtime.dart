@@ -6,6 +6,7 @@ enum SeoDomFirstApplicationRuntimeKind {
   tabs('tabs'),
   carousel('carousel'),
   collection('collection'),
+  configurator('configurator'),
   stepper('stepper'),
   stepperEffects('stepper-effects');
 
@@ -49,6 +50,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.collection(String id) =
       SeoDomFirstCollectionApplicationRuntime;
 
+  /// Uses an application transition and projection with fixed package slots.
+  const factory SeoDomFirstApplicationRuntime.configurator(String id) =
+      SeoDomFirstConfiguratorApplicationRuntime;
+
   /// Uses an application-authored transition with the package stepper adapter.
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
@@ -85,11 +90,12 @@ sealed class SeoDomFirstApplicationRuntime {
     final exactKinds = <SeoDomFirstApplicationRuntimeKind>{};
     final families = <String>{};
     for (final member in ordered) {
-      if (member == SeoDomFirstApplicationRuntimeKind.collection) {
+      if (member == SeoDomFirstApplicationRuntimeKind.collection ||
+          member == SeoDomFirstApplicationRuntimeKind.configurator) {
         throw ArgumentError.value(
           ordered,
           'members',
-          'collection runtimes must use a standalone artifact',
+          '${member.value} runtimes must use a standalone artifact',
         );
       }
       if (!exactKinds.add(member) || !families.add(member._ownershipFamily)) {
@@ -168,6 +174,19 @@ final class SeoDomFirstCollectionApplicationRuntime
   @override
   List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
       const [SeoDomFirstApplicationRuntimeKind.collection];
+}
+
+/// An application-authored transition and fixed-slot view projection.
+final class SeoDomFirstConfiguratorApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstConfiguratorApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'configurator';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.configurator];
 }
 
 /// An application-authored transition executed by the stepper adapter.
