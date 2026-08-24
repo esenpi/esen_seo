@@ -458,6 +458,7 @@ void main() {
   test('bundle snapshots Stepper effect ids before its first await', () async {
     await write('lib/tabs.dart', 'const tabs = 1;');
     await write('lib/stepper.dart', 'const stepper = 1;');
+    await File('${root.path}/.dart_tool/package_config.json').delete();
     final interactionIds = _TrackingSet<String>({'fixture-stepper'});
 
     final build = buildSeoApplicationRuntimeBundle(
@@ -481,8 +482,6 @@ void main() {
     interactionIds
       ..clear()
       ..add('invalid id');
-    await File('${root.path}/.dart_tool/package_config.json')
-        .writeAsString('{}');
 
     await expectLater(build, throwsStateError);
     expect(readBeforeFirstAwait, isTrue);
