@@ -231,7 +231,7 @@ void main() {
     );
   });
 
-  testWidgets('choice controls expose selected button semantics',
+  testWidgets('choice controls expose mutually exclusive semantics',
       (tester) async {
     final semantics = tester.ensureSemantics();
     await _pump(tester, _widget());
@@ -244,8 +244,23 @@ void main() {
         .getSemanticsData();
     expect(_hasFlag(solo, SemanticsFlag.isButton), isTrue);
     expect(_hasFlag(solo, SemanticsFlag.isSelected), isTrue);
+    expect(_hasFlag(solo, SemanticsFlag.hasCheckedState), isTrue);
+    expect(_hasFlag(solo, SemanticsFlag.isChecked), isTrue);
+    expect(_hasFlag(solo, SemanticsFlag.isInMutuallyExclusiveGroup), isTrue);
     expect(_hasFlag(team, SemanticsFlag.isButton), isTrue);
     expect(_hasFlag(team, SemanticsFlag.isSelected), isFalse);
+    expect(_hasFlag(team, SemanticsFlag.hasCheckedState), isTrue);
+    expect(_hasFlag(team, SemanticsFlag.isChecked), isFalse);
+    expect(_hasFlag(team, SemanticsFlag.isInMutuallyExclusiveGroup), isTrue);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Team'));
+    await tester.pump();
+
+    final selectedTeam = tester
+        .getSemantics(find.widgetWithText(OutlinedButton, 'Team'))
+        .getSemanticsData();
+    expect(_hasFlag(selectedTeam, SemanticsFlag.isSelected), isTrue);
+    expect(_hasFlag(selectedTeam, SemanticsFlag.isChecked), isTrue);
     semantics.dispose();
   });
 

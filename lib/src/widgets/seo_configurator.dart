@@ -236,6 +236,8 @@ class _SeoConfiguratorState extends State<SeoConfigurator>
       button: true,
       enabled: true,
       selected: selected,
+      checked: selected,
+      inMutuallyExclusiveGroup: true,
       label: plan.choices[index].label,
       excludeSemantics: true,
       onTap: () => _dispatch(SeoConfiguratorSelectChoice(index)),
