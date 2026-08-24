@@ -21,6 +21,9 @@ const _roots = [
   'lib/core.dart',
   'lib/server.dart',
   'lib/audit.dart',
+  // Internal until the configurator slice passes its admission gates.
+  'lib/src/components/seo_configurator_component.dart',
+  'lib/src/components/seo_configurator_transition.dart',
 ];
 
 /// Imports that disqualify a file from being pure Dart.
