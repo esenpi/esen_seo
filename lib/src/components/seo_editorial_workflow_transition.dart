@@ -1,6 +1,7 @@
 /// Pure editorial workflow state shared by native and browser presentations.
 library;
 
+import 'seo_application_evaluation.dart';
 import 'seo_configurator_transition.dart' show canonicalizeSeoConfiguratorText;
 
 typedef SeoEditorialWorkflowTransition = SeoEditorialWorkflowState Function(
@@ -162,14 +163,17 @@ SeoEditorialWorkflowEvaluation? evaluateInitialSeoEditorialWorkflowView(
   SeoEditorialWorkflowViewProjection project,
   SeoEditorialWorkflowState state,
 ) {
-  final canonicalState = _canonicalSeoEditorialWorkflowState(state);
-  if (canonicalState == null) return null;
-  final view = _projectSeoEditorialWorkflowView(project, canonicalState);
-  if (view == null) return null;
+  final result = evaluateInitialSeoApplication(
+    state: state,
+    canonicalizeState: _canonicalSeoEditorialWorkflowState,
+    project: project,
+    validateView: _validateSeoEditorialWorkflowView,
+  );
+  if (result == null) return null;
   return SeoEditorialWorkflowEvaluation(
-    state: canonicalState,
-    view: view,
-    accepted: false,
+    state: result.state,
+    view: result.view,
+    accepted: result.accepted,
   );
 }
 
@@ -179,50 +183,34 @@ SeoEditorialWorkflowEvaluation? evaluateSeoEditorialWorkflowAction({
   required SeoEditorialWorkflowEvaluation current,
   required SeoEditorialWorkflowAction action,
 }) {
-  final state = _canonicalSeoEditorialWorkflowState(current.state);
-  if (state == null) return null;
-  final currentView = _validateSeoEditorialWorkflowView(current.view, state);
-  if (currentView == null || currentView != current.view) return null;
-  final retained = SeoEditorialWorkflowEvaluation(
-    state: state,
-    view: currentView,
-    accepted: false,
+  final result = evaluateSeoApplicationAction(
+    currentState: current.state,
+    currentView: current.view,
+    action: action,
+    canonicalizeState: _canonicalSeoEditorialWorkflowState,
+    validateView: _validateSeoEditorialWorkflowView,
+    isActionAdmitted: isSeoEditorialWorkflowActionEnabled,
+    transition: transition,
+    validateCandidate: (state, candidateAction, candidate) {
+      final target = _targetSeoEditorialWorkflowStage(
+        state.stage,
+        candidateAction,
+      );
+      if (target == null) return null;
+      final expected = SeoEditorialWorkflowState(
+        stage: target,
+        history: List.unmodifiable([...state.history, target]),
+      );
+      return candidate == expected ? expected : null;
+    },
+    project: project,
   );
-  if (!isSeoEditorialWorkflowActionEnabled(state, action)) return retained;
-
-  final target = _targetSeoEditorialWorkflowStage(state.stage, action)!;
-  final expected = SeoEditorialWorkflowState(
-    stage: target,
-    history: List.unmodifiable([...state.history, target]),
-  );
-  final SeoEditorialWorkflowState candidate;
-  try {
-    candidate = transition(state, action);
-  } catch (_) {
-    return retained;
-  }
-  if (candidate != expected) return retained;
-
-  final view = _projectSeoEditorialWorkflowView(project, expected);
-  if (view == null) return retained;
+  if (result == null) return null;
   return SeoEditorialWorkflowEvaluation(
-    state: expected,
-    view: view,
-    accepted: true,
+    state: result.state,
+    view: result.view,
+    accepted: result.accepted,
   );
-}
-
-SeoEditorialWorkflowView? _projectSeoEditorialWorkflowView(
-  SeoEditorialWorkflowViewProjection project,
-  SeoEditorialWorkflowState state,
-) {
-  final SeoEditorialWorkflowView raw;
-  try {
-    raw = project(state);
-  } catch (_) {
-    return null;
-  }
-  return _validateSeoEditorialWorkflowView(raw, state);
 }
 
 SeoEditorialWorkflowView? _validateSeoEditorialWorkflowView(

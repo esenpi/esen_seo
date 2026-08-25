@@ -1,6 +1,8 @@
 /// Pure configurator state and view projection shared by platform adapters.
 library;
 
+import 'seo_application_evaluation.dart';
+
 /// Application-authored, state-free configurator transition.
 typedef SeoConfiguratorTransition = SeoConfiguratorState Function(
   SeoConfiguratorState state,
@@ -260,13 +262,19 @@ SeoConfiguratorEvaluation? evaluateInitialSeoConfiguratorView(
   SeoConfiguratorState state,
   SeoConfiguratorConstraints constraints,
 ) {
-  if (!isValidSeoConfiguratorState(state, constraints)) return null;
-  final view = _projectSeoConfiguratorView(project, state, constraints);
-  if (view == null) return null;
-  return SeoConfiguratorEvaluation(
+  final result = evaluateInitialSeoApplication(
     state: state,
-    view: view,
-    accepted: false,
+    canonicalizeState: (candidate) =>
+        isValidSeoConfiguratorState(candidate, constraints) ? candidate : null,
+    project: project,
+    validateView: (view, candidate) =>
+        _validateSeoConfiguratorView(view, candidate, constraints),
+  );
+  if (result == null) return null;
+  return SeoConfiguratorEvaluation(
+    state: result.state,
+    view: result.view,
+    accepted: result.accepted,
   );
 }
 
@@ -284,42 +292,34 @@ SeoConfiguratorEvaluation? evaluateSeoConfiguratorAction({
   required SeoConfiguratorAction action,
   required SeoConfiguratorConstraints constraints,
 }) {
-  final state = current.state;
-  if (!isValidSeoConfiguratorState(state, constraints)) return null;
-  final canonicalCurrentView = _validateSeoConfiguratorView(
-    current.view,
-    state,
-    constraints,
+  final result = evaluateSeoApplicationAction(
+    currentState: current.state,
+    currentView: current.view,
+    action: action,
+    canonicalizeState: (candidate) =>
+        isValidSeoConfiguratorState(candidate, constraints) ? candidate : null,
+    validateView: (view, candidate) =>
+        _validateSeoConfiguratorView(view, candidate, constraints),
+    isActionAdmitted: (candidate, candidateAction) =>
+        _isAdmittedSeoConfiguratorAction(
+      candidate,
+      candidateAction,
+      constraints,
+    ),
+    transition: (candidate, candidateAction) =>
+        transition(candidate, candidateAction, constraints),
+    validateCandidate: (previous, _, candidate) =>
+        isValidSeoConfiguratorState(candidate, constraints) &&
+                candidate != previous
+            ? candidate
+            : null,
+    project: project,
   );
-  if (canonicalCurrentView == null || canonicalCurrentView != current.view) {
-    return null;
-  }
-  final retained = SeoConfiguratorEvaluation(
-    state: state,
-    view: canonicalCurrentView,
-    accepted: false,
-  );
-  if (!_isAdmittedSeoConfiguratorAction(state, action, constraints)) {
-    return retained;
-  }
-
-  final SeoConfiguratorState candidate;
-  try {
-    candidate = transition(state, action, constraints);
-  } catch (_) {
-    return retained;
-  }
-  if (!isValidSeoConfiguratorState(candidate, constraints) ||
-      candidate == state) {
-    return retained;
-  }
-
-  final view = _projectSeoConfiguratorView(project, candidate, constraints);
-  if (view == null) return retained;
+  if (result == null) return null;
   return SeoConfiguratorEvaluation(
-    state: candidate,
-    view: view,
-    accepted: true,
+    state: result.state,
+    view: result.view,
+    accepted: result.accepted,
   );
 }
 
@@ -349,20 +349,6 @@ String? canonicalizeSeoConfiguratorText(
   }
   final value = sanitizeSeoConfiguratorText(input);
   return value.trim().isEmpty ? null : value;
-}
-
-SeoConfiguratorView? _projectSeoConfiguratorView(
-  SeoConfiguratorViewProjection project,
-  SeoConfiguratorState state,
-  SeoConfiguratorConstraints constraints,
-) {
-  final SeoConfiguratorView raw;
-  try {
-    raw = project(state);
-  } catch (_) {
-    return null;
-  }
-  return _validateSeoConfiguratorView(raw, state, constraints);
 }
 
 SeoConfiguratorView? _validateSeoConfiguratorView(
