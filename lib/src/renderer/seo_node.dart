@@ -1,3 +1,5 @@
+import 'seo_action_form_markup.dart';
+
 /// A node in the semantic HTML tree that mirrors the Flutter widget tree.
 ///
 /// The [SeoController] builds a list of these while walking the element tree.
@@ -11,7 +13,18 @@ class SeoNode {
     Map<String, String>? attributes,
     List<SeoNode>? children,
   })  : attributes = attributes ?? <String, String>{},
-        children = children ?? <SeoNode>[];
+        children = children ?? <SeoNode>[],
+        _actionFormMarkup = null;
+
+  SeoNode._actionForm({
+    required SeoNode fallback,
+    required SeoActionFormMarkup markup,
+  })  : tag = fallback.tag,
+        text = fallback.text,
+        rawText = fallback.rawText,
+        attributes = fallback.attributes,
+        children = fallback.children,
+        _actionFormMarkup = markup;
 
   /// A raw text node without any surrounding tag, e.g. the label inside
   /// an `<a>` element.
@@ -37,6 +50,8 @@ class SeoNode {
   /// Nested child nodes.
   final List<SeoNode> children;
 
+  final SeoActionFormMarkup? _actionFormMarkup;
+
   /// Whether this node is a raw text node without a tag.
   bool get isTextOnly => tag.isEmpty;
 
@@ -61,3 +76,12 @@ class SeoNode {
   /// Whether this tag renders as a self-closing element.
   bool get isSelfClosing => voidElements.contains(tag);
 }
+
+SeoNode buildInternalSeoActionFormNode({
+  required SeoNode fallback,
+  required SeoActionFormMarkup markup,
+}) =>
+    SeoNode._actionForm(fallback: fallback, markup: markup);
+
+SeoActionFormMarkup? internalSeoActionFormMarkup(SeoNode node) =>
+    node._actionFormMarkup;

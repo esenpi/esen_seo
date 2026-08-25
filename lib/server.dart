@@ -30,11 +30,13 @@ library;
 
 export 'audit.dart';
 export 'core.dart';
+export 'form.dart';
 export 'src/server/bot_detector.dart';
 export 'src/server/indexnow.dart';
 export 'src/server/llms_txt.dart';
 export 'src/server/prerender.dart';
 export 'src/server/redirects.dart';
+export 'src/server/seo_action_form_middleware.dart';
 export 'src/server/seo_middleware.dart';
 export 'src/server/seo_page.dart';
 export 'src/server/seo_runtime_store.dart';

@@ -7,6 +7,7 @@ import '../routing/seo_route_delivery.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_carousel_runtime.g.dart';
+import 'seo_dom_first_action_form_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
@@ -160,6 +161,27 @@ html[data-esen-theme="dark"]{color-scheme:dark}
 @media (max-width:${seoThemeToggleCompactBreakpoint}px){#$seoContainerId [data-esen-component="theme-toggle"][data-esen-compact="true"] .esen-seo-theme-toggle-button{min-width:3rem;width:3rem;min-height:3rem;padding:.4375rem;gap:0;font-size:0}#$seoContainerId [data-esen-component="theme-toggle"][data-esen-compact="true"] .esen-seo-theme-toggle-button::before{font-size:var(--esen-type-label-large-size,.875rem)}}
 ''';
 
+/// Structural styling for the curated DOM-first action form.
+const String seoDomFirstActionFormStylesheet = '''
+#$seoContainerId [data-esen-component="action-form"]>form{display:grid;gap:1rem;margin-top:1.25rem}
+#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-field{display:grid;gap:.375rem}
+#$seoContainerId [data-esen-component="action-form"] label{font-weight:600}
+#$seoContainerId [data-esen-component="action-form"] input:not([type="checkbox"]),#$seoContainerId [data-esen-component="action-form"] textarea{box-sizing:border-box;width:100%;min-height:2.75rem;padding:.625rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface,#f5fbf8);color:var(--esen-color-on-surface,#171d1b);font:inherit}
+#$seoContainerId [data-esen-component="action-form"] textarea{min-height:8rem;resize:vertical}
+#$seoContainerId [data-esen-component="action-form"] input[type="checkbox"]{width:1.25rem;height:1.25rem;margin:0}
+#$seoContainerId [data-esen-component="action-form"] [data-esen-action-form-kind="consent"]{grid-template-columns:1.25rem minmax(0,1fr);align-items:start}
+#$seoContainerId [data-esen-component="action-form"] [data-esen-action-form-kind="consent"]>label{grid-column:2;grid-row:1}
+#$seoContainerId [data-esen-component="action-form"] [data-esen-action-form-kind="consent"]>input{grid-column:1;grid-row:1}
+#$seoContainerId [data-esen-component="action-form"] [data-esen-action-form-kind="consent"]>.esen-seo-action-form-hint,#$seoContainerId [data-esen-component="action-form"] [data-esen-action-form-kind="consent"]>.esen-seo-action-form-error{grid-column:2}
+#$seoContainerId [data-esen-component="action-form"] button[type="submit"]{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;padding:.625rem 1rem;border:1px solid var(--esen-color-primary,#006b5f);border-radius:6px;background:var(--esen-color-primary,#006b5f);color:var(--esen-color-on-primary,#fff);font:inherit;font-weight:700;cursor:pointer}
+#$seoContainerId [data-esen-component="action-form"] button[disabled]{opacity:.55;cursor:wait}
+#$seoContainerId [data-esen-component="action-form"] input:focus-visible,#$seoContainerId [data-esen-component="action-form"] textarea:focus-visible,#$seoContainerId [data-esen-component="action-form"] button:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-description,#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-hint{margin:.25rem 0;color:var(--esen-color-on-surface-variant,#3f4946)}
+#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-error{color:var(--esen-color-error,#ba1a1a);font-weight:600}
+#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-error[hidden]{display:none}
+#$seoContainerId [data-esen-component="action-form"] .esen-seo-action-form-status:empty{display:none}
+''';
+
 /// Marks the pre-paint theme restoration script in a generated document.
 const String seoDomFirstBootstrapScriptAttribute =
     'data-esen-seo-dom-first-bootstrap';
@@ -234,6 +256,9 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.approvalChecklist)) {
     css.write(seoDomFirstApprovalChecklistStylesheet);
   }
+  if (features.contains(SeoDomFirstFeature.actionForm)) {
+    css.write(seoDomFirstActionFormStylesheet);
+  }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
     css.write(seoDomFirstThemeToggleStylesheet);
   }
@@ -267,6 +292,9 @@ String seoDomFirstFeatureScriptHtml(
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
     addRuntime(seoDomFirstCollectionRuntime);
+  }
+  if (features.contains(SeoDomFirstFeature.actionForm)) {
+    addRuntime(seoDomFirstActionFormRuntime);
   }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
     addRuntime(seoDomFirstThemeToggleRuntime);

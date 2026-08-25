@@ -1,3 +1,4 @@
+import 'seo_action_form_markup.dart';
 import 'seo_node.dart';
 import 'tag_policy.dart';
 
@@ -25,14 +26,25 @@ enum SeoRenderTarget {
 /// path it took to get here.
 class HtmlRenderer {
   /// A renderer for body content.
-  const HtmlRenderer() : target = SeoRenderTarget.body;
+  const HtmlRenderer()
+      : target = SeoRenderTarget.body,
+        _domFirst = false;
+
+  /// A renderer for a permanent DOM-first body.
+  const HtmlRenderer.domFirst()
+      : target = SeoRenderTarget.body,
+        _domFirst = true;
 
   /// A renderer for the document head — used by `SeoMeta`, whose tags
   /// (`title`, `meta`, `link`, …) the body policy deliberately blocks.
-  const HtmlRenderer.head() : target = SeoRenderTarget.head;
+  const HtmlRenderer.head()
+      : target = SeoRenderTarget.head,
+        _domFirst = false;
 
   /// Which policy this renderer applies.
   final SeoRenderTarget target;
+
+  final bool _domFirst;
 
   /// Renders a list of top-level nodes into one HTML fragment.
   String render(List<SeoNode> nodes) {
@@ -123,6 +135,13 @@ class HtmlRenderer {
         'than overflowing the stack mid-request.',
       );
     }
+    final actionForm = internalSeoActionFormMarkup(node);
+    if (_domFirst &&
+        actionForm != null &&
+        isValidInternalSeoActionFormMarkup(actionForm)) {
+      _writeActionForm(buffer, actionForm);
+      return;
+    }
     if (node.isTextOnly && node.children.isEmpty) {
       buffer.write(escapeText(node.text ?? ''));
       return;
@@ -202,6 +221,141 @@ class HtmlRenderer {
       ..write('</')
       ..write(tag)
       ..write('>');
+  }
+
+  void _writeActionForm(
+    StringBuffer buffer,
+    SeoActionFormMarkup form,
+  ) {
+    final actionId = form.actionId;
+    final rootId = 'esen-action-form-$actionId';
+    buffer
+      ..write('<section id="')
+      ..write(rootId)
+      ..write('" class="esen-seo-action-form" ')
+      ..write('data-esen-component="action-form" ')
+      ..write('data-esen-action-form-root="')
+      ..write(actionId)
+      ..write('"><h')
+      ..write(form.headingLevel)
+      ..write('>')
+      ..write(escapeText(form.heading))
+      ..write('</h')
+      ..write(form.headingLevel)
+      ..write('><p class="esen-seo-action-form-description">')
+      ..write(escapeText(form.description))
+      ..write('</p><form method="post" accept-charset="UTF-8" action="')
+      ..write(internalSeoActionFormEndpointPrefix)
+      ..write(actionId)
+      ..write('" data-esen-action-form="')
+      ..write(actionId)
+      ..write('" data-esen-failure-label="')
+      ..write(escapeAttribute(form.failureLabel))
+      ..write('">');
+
+    for (final (index, field) in form.fields.indexed) {
+      final controlId = '$rootId-field-$index';
+      final descriptionId = '$controlId-description';
+      final errorId = '$controlId-error';
+      final describedBy =
+          field.description == null ? errorId : '$descriptionId $errorId';
+      final kind = switch (field.kind) {
+        SeoActionFormMarkupFieldKind.text => 'text',
+        SeoActionFormMarkupFieldKind.email => 'email',
+        SeoActionFormMarkupFieldKind.multiline => 'multiline',
+        SeoActionFormMarkupFieldKind.consent => 'consent',
+      };
+      buffer
+        ..write('<div class="esen-seo-action-form-field" ')
+        ..write('data-esen-action-form-field="')
+        ..write(index)
+        ..write('" data-esen-action-form-kind="')
+        ..write(kind)
+        ..write('"><label for="')
+        ..write(controlId)
+        ..write('">')
+        ..write(escapeText(field.label))
+        ..write('</label>');
+      if (field.description case final description?) {
+        buffer
+          ..write('<p id="')
+          ..write(descriptionId)
+          ..write('" class="esen-seo-action-form-hint">')
+          ..write(escapeText(description))
+          ..write('</p>');
+      }
+      if (field.kind == SeoActionFormMarkupFieldKind.multiline) {
+        buffer
+          ..write('<textarea id="')
+          ..write(controlId)
+          ..write('" name="')
+          ..write(field.name)
+          ..write('" data-esen-action-form-control="')
+          ..write(index)
+          ..write('" aria-describedby="')
+          ..write(describedBy)
+          ..write('" minlength="')
+          ..write(field.minLength)
+          ..write('" maxlength="')
+          ..write(field.maxLength)
+          ..write('" autocomplete="off"')
+          ..write(field.required ? ' required' : '')
+          ..write('></textarea>');
+      } else {
+        final type = switch (field.kind) {
+          SeoActionFormMarkupFieldKind.email => 'email',
+          SeoActionFormMarkupFieldKind.consent => 'checkbox',
+          SeoActionFormMarkupFieldKind.text => 'text',
+          SeoActionFormMarkupFieldKind.multiline => 'text',
+        };
+        buffer
+          ..write('<input id="')
+          ..write(controlId)
+          ..write('" type="')
+          ..write(type)
+          ..write('" name="')
+          ..write(field.name)
+          ..write('" data-esen-action-form-control="')
+          ..write(index)
+          ..write('" aria-describedby="')
+          ..write(describedBy)
+          ..write('"');
+        if (field.kind == SeoActionFormMarkupFieldKind.consent) {
+          buffer.write(' value="accepted"');
+        } else {
+          buffer
+            ..write(' minlength="')
+            ..write(field.minLength)
+            ..write('" maxlength="')
+            ..write(field.maxLength)
+            ..write('" autocomplete="')
+            ..write(field.autocomplete)
+            ..write('"');
+        }
+        buffer
+          ..write(field.required ? ' required' : '')
+          ..write('/>');
+      }
+      buffer
+        ..write('<span id="')
+        ..write(errorId)
+        ..write('" class="esen-seo-action-form-error" ')
+        ..write('data-esen-action-form-error="')
+        ..write(index)
+        ..write('" hidden></span></div>');
+    }
+
+    buffer
+      ..write('<button type="submit" data-esen-action-form-submit ')
+      ..write('data-esen-pending-label="')
+      ..write(escapeAttribute(form.pendingLabel))
+      ..write('">')
+      ..write(escapeText(form.submitLabel))
+      ..write('</button><p class="esen-seo-action-form-status" ')
+      ..write('data-esen-action-form-status role="status" ')
+      ..write('aria-live="polite" aria-atomic="true" aria-label="')
+      ..write(escapeAttribute(form.statusLabel))
+      ..write('"></p></form></section>');
   }
 
   /// The tag this node may carry in the head, or `null` when it must

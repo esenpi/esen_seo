@@ -1,3 +1,16 @@
+## Unreleased
+
+* Added a curated cross-platform action-form slice for text, email, multiline
+  and consent fields. One bounded pure definition drives the native Flutter
+  widget, the non-interactive mirror fallback and the permanent DOM-first
+  form. Generic form tags remain blocked by the renderer.
+* Added an opt-in DOM-first form runtime and Shelf middleware. Native POST works
+  without JavaScript; the enhancement applies only closed JSON outcomes and
+  declared field errors through text and ARIA slots. The server boundary
+  enforces exact Origin, media type, strict UTF-8, encoded and decoded size
+  limits, unique declared fields and fail-closed application results before
+  invoking an application handler.
+
 ## 0.14.0
 
 * Added `SeoConfigurator`, a curated cross-platform choice, quantity and option

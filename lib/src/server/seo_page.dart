@@ -85,7 +85,7 @@ class SeoPage {
     this.applicationRuntime,
   })  : meta = meta ?? const SeoMeta(),
         bodyHtml = seoDomFirstContainerHtml(
-          const HtmlRenderer().render(body),
+          const HtmlRenderer.domFirst().render(body),
         ),
         enableInteractions = false,
         domFirstFeatures = Set.unmodifiable(features) {

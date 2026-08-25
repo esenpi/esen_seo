@@ -35,6 +35,9 @@ enum SeoDomFirstFeature {
   /// Style a guarded approval checklist enhanced by a scoped application.
   approvalChecklist,
 
+  /// Enhance one validated package-owned POST form without owning its state.
+  actionForm,
+
   /// Apply and persist a validated light/dark presentation preference.
   themeToggle,
 

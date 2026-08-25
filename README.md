@@ -167,6 +167,9 @@ document or collect input (`script`, `style`, `iframe`, `form`,
 `plaintext`, `svg`, head-only tags, custom elements, invalid names) is
 refused at render time and falls
 back to `span`/`div` — in `SeoMode.strict` you get a debug warning.
+This remains true for free `SeoNode` trees. The curated DOM-first action form
+described below is an opaque package-owned control plan, not an expansion of
+the generic tag allow list.
 
 ## Attributes
 
@@ -867,10 +870,107 @@ Each presentation owns its current state.
 `SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
 markers produced by the pure component builders. General forms,
-application-authored inputs, content effects and client-side routing remain
-separate, deliberately unsupported capabilities. `SeoCollection` owns one
+application-authored controls, content effects and client-side routing remain
+separate, deliberately unsupported capabilities. The curated action form below
+is the only remote-input exception. `SeoCollection` owns one
 bounded local-search input: it submits nothing, performs no remote I/O and is
 created only after the complete collection structure has been validated.
+
+### Curated action forms
+
+`SeoActionFormDefinition` is one bounded source for a native Flutter form, a
+non-interactive mirror summary and a real DOM-first POST form. It admits one to
+eight fields from a closed set: text, email, multiline text and consent. The
+renderer still refuses arbitrary `form`, `input`, `textarea` and `button`
+nodes.
+
+```dart
+// lib/contact_form.dart — pure Dart, shared by app, route and server
+import 'package:esen_seo/form.dart';
+
+const contactForm = SeoActionFormDefinition(
+  actionId: 'contact',
+  returnPath: '/contact/',
+  heading: 'Contact us',
+  description: 'We usually reply within one business day.',
+  submitLabel: 'Send message',
+  pendingLabel: 'Sending',
+  failureLabel: 'The message could not be sent.',
+  statusLabel: 'Submission status',
+  fields: [
+    SeoActionFormField(
+      name: 'email',
+      label: 'Email',
+      kind: SeoActionFormFieldKind.email,
+      required: true,
+      autocomplete: SeoActionFormAutocomplete.email,
+    ),
+    SeoActionFormField(
+      name: 'message',
+      label: 'Message',
+      kind: SeoActionFormFieldKind.multiline,
+      required: true,
+    ),
+    SeoActionFormField(
+      name: 'consent',
+      label: 'I agree to the privacy notice',
+      kind: SeoActionFormFieldKind.consent,
+      required: true,
+    ),
+  ],
+);
+```
+
+Use the same definition in the route and Flutter presentation:
+
+```dart
+SeoRoute(
+  path: '/contact',
+  delivery: SeoRouteDelivery.domFirst,
+  domFirstFeatures: const {SeoDomFirstFeature.actionForm},
+  meta: (_) => const SeoMeta(title: 'Contact'),
+  body: (_) => buildSeoActionFormNodes(contactForm),
+);
+
+// Import package:esen_seo/form_flutter.dart in Flutter code.
+SeoActionForm(
+  definition: contactForm,
+  onSubmit: sendContactFromApp,
+);
+```
+
+Register the fixed POST endpoint before the page middleware:
+
+```dart
+final handler = const Pipeline()
+    .addMiddleware(seoActionFormMiddleware(
+      publicOrigin: siteBase,
+      registrations: [
+        SeoActionFormRegistration(
+          definition: contactForm,
+          handler: (values) async {
+            await deliverMessage(
+              values.text('email'),
+              values.text('message'),
+            );
+            return const SeoActionFormResult.success('Message sent.');
+          },
+        ),
+      ],
+    ))
+    .addMiddleware(seoBotMiddleware(routes: seoRoutes, siteBase: siteBase))
+    .addHandler(flutterAppHandler);
+```
+
+Without JavaScript the browser performs the same native POST and receives a
+fixed `noindex`, `no-store` result document. With
+`SeoDomFirstFeature.actionForm`, the package runtime submits once with `fetch`,
+keeps stale responses out and writes only a bounded status message and errors
+for declared fields. It never inserts HTML, retries automatically or moves
+focus. The application or deployment still owns authentication, authorization,
+rate limiting, abuse protection, durable idempotency and the actual side
+effect. Exact-Origin checking is a browser CSRF boundary, not caller
+authentication.
 
 ### Application-owned state
 
@@ -1447,7 +1547,8 @@ ink effects — the shell is a document, not a widget tree.
 Flutter renders to canvas, so it can never adopt the DOM. The shell
 will resemble your app, not match it pixel for pixel (we know the
 semantic tree, not the widget geometry). Before the engine is up, real
-`<a href>` links work but buttons and forms do not. And the mode only
+`<a href>` links work but generic buttons and forms do not. The curated action
+form is available only on a permanent DOM-first route. And the mode only
 applies to prerendered pages — `flutter run` has no prerendered HTML to
 show, and `EsenSeo.init()` must run in the app so the handoff happens.
 

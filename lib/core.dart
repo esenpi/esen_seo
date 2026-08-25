@@ -42,6 +42,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstConfiguratorStylesheet,
         seoDomFirstEditorialWorkflowStylesheet,
         seoDomFirstApprovalChecklistStylesheet,
+        seoDomFirstActionFormStylesheet,
         seoDomFirstScriptAttribute,
         seoDomFirstCollectionStylesheet,
         seoDomFirstStepperStylesheet,
@@ -49,7 +50,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstThemeToggleStylesheet;
 export 'src/renderer/seo_interactions.dart';
 export 'src/renderer/seo_motion_stylesheet.dart' show seoMotionStylesheet;
-export 'src/renderer/seo_node.dart';
+export 'src/renderer/seo_node.dart' show SeoNode;
 export 'src/renderer/seo_stylesheet.dart' show seoDefaultStylesheet;
 export 'src/routing/seo_resolution.dart';
 export 'src/routing/seo_resolved_page.dart';
