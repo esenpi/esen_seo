@@ -1,3 +1,28 @@
+## 0.14.0
+
+* Added `SeoConfigurator`, a curated cross-platform choice, quantity and option
+  slice. Its semantic builder and native Flutter widget share one bounded pure
+  state model, transition and text projection. A separately compiled,
+  route-scoped DOM-first runtime validates the complete package-owned structure
+  before applying fixed controls, text slots and reserved regions; application
+  values cannot name DOM targets, attributes, classes or focus destinations.
+* Added `SeoEditorialWorkflow`, with bounded stages and append-only history in
+  the permanent document. Flutter and the standalone DOM-first runtime execute
+  the same application transition and projection, keep every stage readable
+  without JavaScript, validate state and history atomically and preserve focus
+  when an accepted action disables its source control.
+* Added `SeoApprovalChecklist`, a bounded one-bit-at-a-time approval model for
+  up to 32 items. Native Flutter checkbox controls and a separately compiled
+  DOM-first adapter share the same transition and validated status projection;
+  every item remains semantic HTML without JavaScript, while package-owned
+  checkbox semantics, progress and one polite announcement region are added
+  only after the complete initial structure passes validation.
+* Shared the closed application evaluation pipeline across the new component
+  families, including canonical state and projection validation, atomic
+  accepted/no-op results and fail-closed handling of application exceptions.
+  Configurator choices now expose radio semantics consistently in Flutter and
+  the DOM-first presentation.
+
 ## 0.13.0
 
 * Prevented Tabs, Carousel and Stepper enhancement from collapsing the complete

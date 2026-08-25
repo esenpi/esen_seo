@@ -69,6 +69,9 @@ jobs:
           test/dom_first_carousel_web_test.dart
           test/dom_first_stepper_web_test.dart
           test/dom_first_collection_web_test.dart
+          test/dom_first_configurator_web_test.dart
+          test/dom_first_editorial_workflow_web_test.dart
+          test/dom_first_approval_checklist_web_test.dart
           test/dom_first_theme_toggle_web_test.dart
 
   analyzer-minimum:
