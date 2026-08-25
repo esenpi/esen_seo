@@ -108,6 +108,27 @@ html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="confi
 #$seoContainerId [data-esen-component="configurator"][data-esen-configurator-changed="true"]>section[hidden]{display:none}
 ''';
 
+/// Structural styling for the closed editorial workflow controls.
+const String seoDomFirstEditorialWorkflowStylesheet = '''
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-block:1.25rem;padding:1rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:8px;background:var(--esen-color-surface-container-low,#eff5f2)}
+#$seoContainerId [data-esen-component="editorial-workflow"] .esen-seo-editorial-workflow-controls>button,#$seoContainerId [data-esen-component="editorial-workflow"] .esen-seo-editorial-workflow-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;min-height:2.75rem;padding:.5rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface,#f5fbf8);color:var(--esen-color-on-surface,#171d1b);font:inherit;font-weight:600;text-align:center;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="editorial-workflow"] .esen-seo-editorial-workflow-controls>button{cursor:pointer}
+#$seoContainerId [data-esen-component="editorial-workflow"] .esen-seo-editorial-workflow-controls>button[disabled],#$seoContainerId [data-esen-component="editorial-workflow"] [data-esen-placeholder-disabled="true"]{opacity:.45;cursor:default}
+#$seoContainerId [data-esen-component="editorial-workflow"] button:focus-visible,#$seoContainerId [data-esen-component="editorial-workflow"]:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-status{font-size:1.375rem}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;padding:0;list-style:none}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-progress>li{padding:.5rem;border-bottom:2px solid var(--esen-color-outline-variant,#bec9c6);text-align:center;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-progress>[aria-current="step"]{border-color:var(--esen-color-primary,#006b5f);color:var(--esen-color-primary,#006b5f);font-weight:700}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-history{padding-inline-start:1.5rem}
+#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-announcement{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#$seoContainerId [data-esen-component="editorial-workflow"]>[data-esen-prepaint-placeholder="editorial-workflow"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="editorial-workflow"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="editorial-workflow"][hidden]{display:grid!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="editorial-workflow"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>section[data-esen-workflow-stage-region]:not([data-esen-initial-active="true"]){display:none}
+#$seoContainerId [data-esen-component="editorial-workflow"][data-esen-enhanced="true"]:not([data-esen-workflow-changed="true"])>section[data-esen-workflow-stage-region]:not([data-esen-initial-active="true"]){display:none}
+#$seoContainerId [data-esen-component="editorial-workflow"][data-esen-workflow-changed="true"]>section[hidden]{display:none}
+@media (max-width:600px){#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-progress{grid-template-columns:repeat(2,minmax(0,1fr))}}
+''';
+
 /// Self-contained styling for the package-owned theme toggle control.
 const String seoDomFirstThemeToggleStylesheet = '''
 html{color-scheme:light}
@@ -137,7 +158,8 @@ String seoDomFirstFeatureBootstrapScriptHtml(
   final interaction = features.contains(SeoDomFirstFeature.tabs) ||
       features.contains(SeoDomFirstFeature.carousel) ||
       features.contains(SeoDomFirstFeature.stepper) ||
-      features.contains(SeoDomFirstFeature.configurator);
+      features.contains(SeoDomFirstFeature.configurator) ||
+      features.contains(SeoDomFirstFeature.editorialWorkflow);
   if (!theme && !collection && !interaction) return '';
   final nonceAttribute = _nonceAttribute(nonce);
   final javascript = StringBuffer();
@@ -189,6 +211,9 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.configurator)) {
     css.write(seoDomFirstConfiguratorStylesheet);
   }
+  if (features.contains(SeoDomFirstFeature.editorialWorkflow)) {
+    css.write(seoDomFirstEditorialWorkflowStylesheet);
+  }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
     css.write(seoDomFirstThemeToggleStylesheet);
   }
@@ -235,7 +260,8 @@ String seoDomFirstFeatureScriptHtml(
   if (features.contains(SeoDomFirstFeature.tabs) ||
       features.contains(SeoDomFirstFeature.carousel) ||
       features.contains(SeoDomFirstFeature.stepper) ||
-      features.contains(SeoDomFirstFeature.configurator)) {
+      features.contains(SeoDomFirstFeature.configurator) ||
+      features.contains(SeoDomFirstFeature.editorialWorkflow)) {
     runtime.write(
       ';delete document.documentElement.dataset.esenInteractionPending',
     );

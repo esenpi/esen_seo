@@ -29,6 +29,9 @@ enum SeoDomFirstFeature {
   /// Style a validated configurator enhanced by a route-scoped application.
   configurator,
 
+  /// Style a guarded editorial workflow enhanced by a scoped application.
+  editorialWorkflow,
+
   /// Apply and persist a validated light/dark presentation preference.
   themeToggle,
 

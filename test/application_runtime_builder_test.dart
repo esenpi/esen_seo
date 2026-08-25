@@ -388,6 +388,43 @@ void main() {
     }
   });
 
+  test('workflow validates both symbols and admission before compilation',
+      () async {
+    await write('lib/workflow.dart', 'const value = 1;');
+
+    for (final request in const [
+      SeoEditorialWorkflowRuntimeBuildRequest(
+        id: 'fixture-workflow',
+        library: 'package:fixture_app/workflow.dart',
+        transitionSymbol: 'transitionWorkflow',
+        projectionSymbol: 'break',
+        interactionIds: {'fixture-workflow'},
+      ),
+      SeoEditorialWorkflowRuntimeBuildRequest(
+        id: 'fixture-workflow',
+        library: 'package:fixture_app/workflow.dart',
+        transitionSymbol: 'transitionWorkflow',
+        projectionSymbol: 'projectWorkflow',
+        interactionIds: {},
+      ),
+      SeoEditorialWorkflowRuntimeBuildRequest(
+        id: 'fixture-workflow',
+        library: 'package:fixture_app/workflow.dart',
+        transitionSymbol: 'transitionWorkflow',
+        projectionSymbol: 'projectWorkflow',
+        interactionIds: {'invalid id'},
+      ),
+    ]) {
+      await expectLater(
+        buildSeoEditorialWorkflowApplicationRuntime(
+          request,
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
+  });
+
   test('bundle rejects invalid ownership before compilation', () async {
     const tabs = SeoRuntimeBundleEntry.tabs(
       library: 'package:fixture_app/tabs.dart',

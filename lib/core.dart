@@ -40,6 +40,7 @@ export 'src/renderer/seo_dom_first.dart'
         seoDomFirstBootstrapScriptAttribute,
         seoDomFirstCarouselStylesheet,
         seoDomFirstConfiguratorStylesheet,
+        seoDomFirstEditorialWorkflowStylesheet,
         seoDomFirstScriptAttribute,
         seoDomFirstCollectionStylesheet,
         seoDomFirstStepperStylesheet,

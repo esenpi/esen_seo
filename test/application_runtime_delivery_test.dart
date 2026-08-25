@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/workflow.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
 
@@ -11,6 +12,9 @@ const _collectionReference =
     SeoDomFirstApplicationRuntime.collection('application-collection');
 const _configuratorReference =
     SeoDomFirstApplicationRuntime.configurator('application-configurator');
+const _workflowReference = SeoDomFirstApplicationRuntime.editorialWorkflow(
+  'application-workflow',
+);
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
 const _stepperEffectsReference =
@@ -107,6 +111,24 @@ List<SeoNode> _configuratorNodes() => [
       ),
     ];
 
+List<SeoNode> _workflowNodes() => buildSeoEditorialWorkflowNodes(
+      stages: [
+        for (final stage in SeoEditorialWorkflowStage.values)
+          (
+            label: stage.name,
+            nodes: [SeoNode(tag: 'p', text: '${stage.name} content')],
+          ),
+      ],
+      initialState: initialSeoEditorialWorkflowState,
+      project: (state) => SeoEditorialWorkflowView(
+        statusText: state.stage.name,
+        summaryText: '${state.history.length} entries',
+        announcementText: state.stage.name,
+        activeStageRegion: state.stage.index,
+      ),
+      interactionId: 'application-workflow-control',
+    );
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -123,6 +145,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.editorialWorkflow},
+          applicationRuntime: _workflowReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -231,10 +263,17 @@ void main() {
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.configurator('same-id')),
       );
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(
+          const SeoDomFirstApplicationRuntime.editorialWorkflow('same-id'),
+        ),
+      );
       expect(_reference.kind, 'tabs');
       expect(_carouselReference.kind, 'carousel');
       expect(_collectionReference.kind, 'collection');
       expect(_configuratorReference.kind, 'configurator');
+      expect(_workflowReference.kind, 'editorial-workflow');
       expect(_stepperReference.kind, 'stepper');
       expect(_stepperEffectsReference.kind, 'stepper-effects');
       expect(_bundleReference.kind, 'bundle');
@@ -278,6 +317,16 @@ void main() {
         () => SeoDomFirstApplicationRuntime.bundle(
           'same-bundle',
           members: const {SeoDomFirstApplicationRuntimeKind.tabs},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {
+            SeoDomFirstApplicationRuntimeKind.tabs,
+            SeoDomFirstApplicationRuntimeKind.editorialWorkflow,
+          },
         ),
         throwsArgumentError,
       );
@@ -482,6 +531,29 @@ void main() {
         contains(
           'data-esen-seo-dom-first-application-runtime='
           '"application-configurator"',
+        ),
+      );
+      expect(html, contains('esenInteractionPending'));
+    });
+
+    test('workflow runtime selects only its structural stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _workflowNodes(),
+        applicationRuntime: _artifact(_workflowReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="editorial-workflow"'));
+      expect(html, contains(seoDomFirstEditorialWorkflowStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
+      expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+      expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-workflow"',
         ),
       );
       expect(html, contains('esenInteractionPending'));

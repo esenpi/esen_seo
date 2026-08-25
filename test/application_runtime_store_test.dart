@@ -54,6 +54,14 @@ void main() {
       );
       expect(
         seoApplicationRuntimeArtifactStem(
+          const SeoDomFirstApplicationRuntime.editorialWorkflow(
+            'application-tabs',
+          ),
+        ),
+        'editorial-workflow-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(
           const SeoDomFirstApplicationRuntime.stepper('application-tabs'),
         ),
         'stepper-application-tabs',

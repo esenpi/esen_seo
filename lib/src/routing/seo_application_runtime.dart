@@ -7,6 +7,7 @@ enum SeoDomFirstApplicationRuntimeKind {
   carousel('carousel'),
   collection('collection'),
   configurator('configurator'),
+  editorialWorkflow('editorial-workflow'),
   stepper('stepper'),
   stepperEffects('stepper-effects');
 
@@ -54,6 +55,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.configurator(String id) =
       SeoDomFirstConfiguratorApplicationRuntime;
 
+  /// Uses a guarded editorial transition and fixed package workflow controls.
+  const factory SeoDomFirstApplicationRuntime.editorialWorkflow(String id) =
+      SeoDomFirstEditorialWorkflowApplicationRuntime;
+
   /// Uses an application-authored transition with the package stepper adapter.
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
@@ -64,9 +69,9 @@ sealed class SeoDomFirstApplicationRuntime {
 
   /// Uses one artifact containing two or three bundle-capable families.
   ///
-  /// Collection runtimes remain standalone because their measured JavaScript
-  /// floor leaves no room for a second adapter inside the fixed artifact
-  /// budget.
+  /// Collection, configurator and editorial workflow runtimes remain
+  /// standalone. Each must independently earn admission under the fixed
+  /// artifact budget before any future bundle support is considered.
   factory SeoDomFirstApplicationRuntime.bundle(
     String id, {
     required Iterable<SeoDomFirstApplicationRuntimeKind> members,
@@ -91,7 +96,8 @@ sealed class SeoDomFirstApplicationRuntime {
     final families = <String>{};
     for (final member in ordered) {
       if (member == SeoDomFirstApplicationRuntimeKind.collection ||
-          member == SeoDomFirstApplicationRuntimeKind.configurator) {
+          member == SeoDomFirstApplicationRuntimeKind.configurator ||
+          member == SeoDomFirstApplicationRuntimeKind.editorialWorkflow) {
         throw ArgumentError.value(
           ordered,
           'members',
@@ -187,6 +193,19 @@ final class SeoDomFirstConfiguratorApplicationRuntime
   @override
   List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
       const [SeoDomFirstApplicationRuntimeKind.configurator];
+}
+
+/// An application transition and projection for the editorial workflow.
+final class SeoDomFirstEditorialWorkflowApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstEditorialWorkflowApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'editorial-workflow';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.editorialWorkflow];
 }
 
 /// An application-authored transition executed by the stepper adapter.

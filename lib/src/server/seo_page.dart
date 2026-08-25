@@ -214,6 +214,8 @@ SeoDomFirstFeature _applicationRuntimeFeature(
         SeoDomFirstFeature.collection,
       SeoDomFirstApplicationRuntimeKind.configurator =>
         SeoDomFirstFeature.configurator,
+      SeoDomFirstApplicationRuntimeKind.editorialWorkflow =>
+        SeoDomFirstFeature.editorialWorkflow,
       SeoDomFirstApplicationRuntimeKind.stepper ||
       SeoDomFirstApplicationRuntimeKind.stepperEffects =>
         SeoDomFirstFeature.stepper,
