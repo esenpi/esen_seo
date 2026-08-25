@@ -77,23 +77,25 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
   final Set<String> interactionIds;
   if (kind == 'stepper-effects' ||
       kind == 'configurator' ||
-      kind == 'editorial-workflow') {
+      kind == 'editorial-workflow' ||
+      kind == 'approval-checklist') {
     interactionIds = _interactionIds(_required(values, 'interaction-ids'));
   } else {
     if (values.containsKey('interaction-ids')) {
       throw const FormatException(
         'Option "--interaction-ids" is only valid for "stepper-effects", '
-        '"configurator" or "editorial-workflow".',
+        '"configurator", "editorial-workflow" or "approval-checklist".',
       );
     }
     interactionIds = const {};
   }
   if (kind != 'configurator' &&
       kind != 'editorial-workflow' &&
+      kind != 'approval-checklist' &&
       values.containsKey('projection-symbol')) {
     throw const FormatException(
-      'Option "--projection-symbol" is only valid for "configurator" or '
-      '"editorial-workflow".',
+      'Option "--projection-symbol" is only valid for "configurator", '
+      '"editorial-workflow" or "approval-checklist".',
     );
   }
   return switch (kind) {
@@ -146,6 +148,17 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
         ),
         write: !check,
       ),
+    'approval-checklist' => await buildSeoApprovalChecklistApplicationRuntime(
+        SeoApprovalChecklistRuntimeBuildRequest(
+          id: id,
+          library: library,
+          transitionSymbol: symbol,
+          projectionSymbol: _required(values, 'projection-symbol'),
+          interactionIds: interactionIds,
+          outputDirectory: output,
+        ),
+        write: !check,
+      ),
     'stepper' => await buildSeoStepperApplicationRuntime(
         SeoStepperRuntimeBuildRequest(
           id: id,
@@ -167,8 +180,8 @@ Future<SeoDomFirstRuntimeArtifact> _buildSingle(
       ),
     _ => throw FormatException(
         'Unknown runtime kind "$kind"; expected "tabs", "carousel", '
-        '"collection", "configurator", "editorial-workflow", "stepper" or '
-        '"stepper-effects".',
+        '"collection", "configurator", "editorial-workflow", '
+        '"approval-checklist", "stepper" or "stepper-effects".',
       ),
   };
 }
@@ -229,15 +242,15 @@ Usage: dart run esen_seo:esen_seo_runtime \\
   --id <runtime-id> \\
   --library package:<app>/<file.dart> \\
   --symbol <top-level-transition> \\
-  [--kind tabs|carousel|collection|configurator|editorial-workflow|stepper|stepper-effects] \\
+  [--kind tabs|carousel|collection|configurator|editorial-workflow|approval-checklist|stepper|stepper-effects] \\
   [--projection-symbol <top-level-view-projection>] \\
   [--interaction-ids <id[,id...]>] \\
   [--output build/esen_seo/runtimes] [--check]
 
---interaction-ids is required for stepper-effects, configurator and
-editorial-workflow.
---projection-symbol is required for configurator and editorial-workflow and
-rejected for other kinds.
+--interaction-ids is required for stepper-effects, configurator,
+editorial-workflow and approval-checklist.
+--projection-symbol is required for configurator, editorial-workflow and
+approval-checklist and rejected for other kinds.
 
 Bundle mode:
   dart run esen_seo:esen_seo_runtime \\

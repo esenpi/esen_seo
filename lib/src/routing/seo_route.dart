@@ -294,6 +294,8 @@ SeoDomFirstFeature _applicationRuntimeFeature(
         SeoDomFirstFeature.configurator,
       SeoDomFirstApplicationRuntimeKind.editorialWorkflow =>
         SeoDomFirstFeature.editorialWorkflow,
+      SeoDomFirstApplicationRuntimeKind.approvalChecklist =>
+        SeoDomFirstFeature.approvalChecklist,
       SeoDomFirstApplicationRuntimeKind.stepper ||
       SeoDomFirstApplicationRuntimeKind.stepperEffects =>
         SeoDomFirstFeature.stepper,

@@ -98,6 +98,27 @@ final class SeoEditorialWorkflowRuntimeBuildRequest {
   final String outputDirectory;
 }
 
+/// Inputs for one closed application-authored approval checklist runtime.
+final class SeoApprovalChecklistRuntimeBuildRequest {
+  const SeoApprovalChecklistRuntimeBuildRequest({
+    required this.id,
+    required this.library,
+    required this.transitionSymbol,
+    required this.projectionSymbol,
+    required this.interactionIds,
+    this.outputDirectory = 'build/esen_seo/runtimes',
+  });
+
+  final String id;
+  final String library;
+  final String transitionSymbol;
+  final String projectionSymbol;
+
+  /// Stable checklist ids this runtime may enhance.
+  final Set<String> interactionIds;
+  final String outputDirectory;
+}
+
 /// Inputs for one application-authored stepper runtime build.
 final class SeoStepperRuntimeBuildRequest {
   const SeoStepperRuntimeBuildRequest({
@@ -135,7 +156,8 @@ final class SeoStepperEffectsRuntimeBuildRequest {
 /// One checked transition included in an application runtime bundle.
 ///
 /// Bundles admit Tabs, Carousel and one Stepper ownership family. Collection,
-/// configurator and editorial workflow use standalone application runtimes.
+/// configurator, editorial workflow and approval checklist use standalone
+/// application runtimes.
 sealed class SeoRuntimeBundleEntry {
   const SeoRuntimeBundleEntry._({
     required this.library,
@@ -340,6 +362,11 @@ Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
           'Runtime bundle entry $index uses editorial-workflow, which requires '
           'a standalone artifact.',
         ),
+      SeoDomFirstApplicationRuntimeKind.approvalChecklist =>
+        throw FormatException(
+          'Runtime bundle entry $index uses approval-checklist, which requires '
+          'a standalone artifact.',
+        ),
       SeoDomFirstApplicationRuntimeKind.stepper =>
         SeoRuntimeBundleEntry.stepper(
           library: library,
@@ -442,6 +469,25 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoEditorialWorkflowApplicationRuntime(
     _buildApplicationRuntime(
       _ApplicationRuntimeBuildRequest(
         reference: SeoDomFirstApplicationRuntime.editorialWorkflow(request.id),
+        library: request.library,
+        symbol: request.transitionSymbol,
+        projectionSymbol: request.projectionSymbol,
+        interactionIds: request.interactionIds,
+        outputDirectory: request.outputDirectory,
+      ),
+      packageRoot: packageRoot,
+      write: write,
+    );
+
+/// Compiles one checked approval checklist transition and view projection.
+Future<SeoDomFirstRuntimeArtifact> buildSeoApprovalChecklistApplicationRuntime(
+  SeoApprovalChecklistRuntimeBuildRequest request, {
+  String? packageRoot,
+  bool write = true,
+}) =>
+    _buildApplicationRuntime(
+      _ApplicationRuntimeBuildRequest(
+        reference: SeoDomFirstApplicationRuntime.approvalChecklist(request.id),
         library: request.library,
         symbol: request.transitionSymbol,
         projectionSymbol: request.projectionSymbol,
@@ -678,7 +724,8 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
   final interactionIds =
       reference is SeoDomFirstStepperEffectsApplicationRuntime ||
               reference is SeoDomFirstConfiguratorApplicationRuntime ||
-              reference is SeoDomFirstEditorialWorkflowApplicationRuntime
+              reference is SeoDomFirstEditorialWorkflowApplicationRuntime ||
+              reference is SeoDomFirstApprovalChecklistApplicationRuntime
           ? _validatedStepperEffectInteractionIds(request.interactionIds)
           : const <String>[];
   final output = _checkedOutputDirectory(root, request.outputDirectory);
@@ -714,6 +761,13 @@ Future<SeoDomFirstRuntimeArtifact> _buildApplicationRuntime(
       ),
     SeoDomFirstEditorialWorkflowApplicationRuntime() =>
       _editorialWorkflowEntrypointSource(
+        libraryUri,
+        request.symbol,
+        request.projectionSymbol!,
+        interactionIds,
+      ),
+    SeoDomFirstApprovalChecklistApplicationRuntime() =>
+      _approvalChecklistEntrypointSource(
         libraryUri,
         request.symbol,
         request.projectionSymbol!,
@@ -926,6 +980,37 @@ void main() => enhanceSeoDomFirstEditorialWorkflows(
 ''';
 }
 
+String _approvalChecklistEntrypointSource(
+  Uri library,
+  String transitionSymbol,
+  String projectionSymbol,
+  List<String> interactionIds,
+) {
+  final encodedIds = interactionIds.map(jsonEncode).join(', ');
+  return '''
+import 'package:esen_seo/src/components/seo_approval_checklist_transition.dart';
+import 'package:esen_seo/src/renderer/dom_first_approval_checklist_adapter_web.dart';
+import ${jsonEncode(library.toString())} as application;
+
+const _interactionIds = <String>{$encodedIds};
+
+SeoApprovalChecklistState _applicationTransition(
+  SeoApprovalChecklistState state,
+  SeoApprovalChecklistAction action,
+) => application.$transitionSymbol(state, action);
+
+SeoApprovalChecklistView _applicationProjection(
+  SeoApprovalChecklistState state,
+) => application.$projectionSymbol(state);
+
+void main() => enhanceSeoDomFirstApprovalChecklists(
+  interactionIds: _interactionIds,
+  transition: _applicationTransition,
+  project: _applicationProjection,
+);
+''';
+}
+
 String _stepperEntrypointSource(Uri library, String symbol) => '''
 import 'package:esen_seo/src/components/seo_stepper_transition.dart';
 import 'package:esen_seo/src/renderer/dom_first_stepper_adapter_web.dart';
@@ -1006,6 +1091,10 @@ String _bundleEntrypointSource(List<_CheckedRuntimeBundleEntry> entries) {
         throw StateError(
           'Editorial workflow runtimes must use a standalone artifact.',
         );
+      case SeoDomFirstApplicationRuntimeKind.approvalChecklist:
+        throw StateError(
+          'Approval checklist runtimes must use a standalone artifact.',
+        );
       case SeoDomFirstApplicationRuntimeKind.stepper ||
             SeoDomFirstApplicationRuntimeKind.stepperEffects:
         addPackageImport(
@@ -1053,6 +1142,10 @@ SeoCarouselState _transition$index(
       case SeoDomFirstApplicationRuntimeKind.editorialWorkflow:
         throw StateError(
           'Editorial workflow runtimes must use a standalone artifact.',
+        );
+      case SeoDomFirstApplicationRuntimeKind.approvalChecklist:
+        throw StateError(
+          'Approval checklist runtimes must use a standalone artifact.',
         );
       case SeoDomFirstApplicationRuntimeKind.stepper:
         declarations.writeln('''
@@ -1276,6 +1369,7 @@ final class _PackageGraph {
           (rawUri == 'package:esen_seo/core.dart' ||
               rawUri == 'package:esen_seo/configurator.dart' ||
               rawUri == 'package:esen_seo/workflow.dart' ||
+              rawUri == 'package:esen_seo/checklist.dart' ||
               rawUri ==
                   'package:esen_seo/src/components/seo_tabs_transition.dart' ||
               rawUri ==
@@ -1287,7 +1381,9 @@ final class _PackageGraph {
               rawUri ==
                   'package:esen_seo/src/components/seo_configurator_transition.dart' ||
               rawUri ==
-                  'package:esen_seo/src/components/seo_editorial_workflow_transition.dart')) {
+                  'package:esen_seo/src/components/seo_editorial_workflow_transition.dart' ||
+              rawUri ==
+                  'package:esen_seo/src/components/seo_approval_checklist_transition.dart')) {
         return File('');
       }
       if (segments.first != applicationPackage) {

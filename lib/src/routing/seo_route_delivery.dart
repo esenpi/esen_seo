@@ -32,6 +32,9 @@ enum SeoDomFirstFeature {
   /// Style a guarded editorial workflow enhanced by a scoped application.
   editorialWorkflow,
 
+  /// Style a guarded approval checklist enhanced by a scoped application.
+  approvalChecklist,
+
   /// Apply and persist a validated light/dark presentation preference.
   themeToggle,
 

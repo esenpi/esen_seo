@@ -62,6 +62,14 @@ void main() {
       );
       expect(
         seoApplicationRuntimeArtifactStem(
+          const SeoDomFirstApplicationRuntime.approvalChecklist(
+            'application-tabs',
+          ),
+        ),
+        'approval-checklist-application-tabs',
+      );
+      expect(
+        seoApplicationRuntimeArtifactStem(
           const SeoDomFirstApplicationRuntime.stepper('application-tabs'),
         ),
         'stepper-application-tabs',

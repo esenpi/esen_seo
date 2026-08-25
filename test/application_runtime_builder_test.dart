@@ -425,6 +425,43 @@ void main() {
     }
   });
 
+  test('checklist validates both symbols and admission before compilation',
+      () async {
+    await write('lib/checklist.dart', 'const value = 1;');
+
+    for (final request in const [
+      SeoApprovalChecklistRuntimeBuildRequest(
+        id: 'fixture-checklist',
+        library: 'package:fixture_app/checklist.dart',
+        transitionSymbol: 'transitionChecklist',
+        projectionSymbol: 'break',
+        interactionIds: {'fixture-checklist'},
+      ),
+      SeoApprovalChecklistRuntimeBuildRequest(
+        id: 'fixture-checklist',
+        library: 'package:fixture_app/checklist.dart',
+        transitionSymbol: 'transitionChecklist',
+        projectionSymbol: 'projectChecklist',
+        interactionIds: {},
+      ),
+      SeoApprovalChecklistRuntimeBuildRequest(
+        id: 'fixture-checklist',
+        library: 'package:fixture_app/checklist.dart',
+        transitionSymbol: 'transitionChecklist',
+        projectionSymbol: 'projectChecklist',
+        interactionIds: {'invalid id'},
+      ),
+    ]) {
+      await expectLater(
+        buildSeoApprovalChecklistApplicationRuntime(
+          request,
+          packageRoot: root.path,
+        ),
+        throwsArgumentError,
+      );
+    }
+  });
+
   test('bundle rejects invalid ownership before compilation', () async {
     const tabs = SeoRuntimeBundleEntry.tabs(
       library: 'package:fixture_app/tabs.dart',

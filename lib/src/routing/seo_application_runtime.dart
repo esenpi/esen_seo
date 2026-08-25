@@ -8,6 +8,7 @@ enum SeoDomFirstApplicationRuntimeKind {
   collection('collection'),
   configurator('configurator'),
   editorialWorkflow('editorial-workflow'),
+  approvalChecklist('approval-checklist'),
   stepper('stepper'),
   stepperEffects('stepper-effects');
 
@@ -59,6 +60,10 @@ sealed class SeoDomFirstApplicationRuntime {
   const factory SeoDomFirstApplicationRuntime.editorialWorkflow(String id) =
       SeoDomFirstEditorialWorkflowApplicationRuntime;
 
+  /// Uses a guarded approval transition and fixed package checklist controls.
+  const factory SeoDomFirstApplicationRuntime.approvalChecklist(String id) =
+      SeoDomFirstApprovalChecklistApplicationRuntime;
+
   /// Uses an application-authored transition with the package stepper adapter.
   const factory SeoDomFirstApplicationRuntime.stepper(String id) =
       SeoDomFirstStepperApplicationRuntime;
@@ -69,7 +74,8 @@ sealed class SeoDomFirstApplicationRuntime {
 
   /// Uses one artifact containing two or three bundle-capable families.
   ///
-  /// Collection, configurator and editorial workflow runtimes remain
+  /// Collection, configurator, editorial workflow and approval checklist
+  /// runtimes remain
   /// standalone. Each must independently earn admission under the fixed
   /// artifact budget before any future bundle support is considered.
   factory SeoDomFirstApplicationRuntime.bundle(
@@ -97,7 +103,8 @@ sealed class SeoDomFirstApplicationRuntime {
     for (final member in ordered) {
       if (member == SeoDomFirstApplicationRuntimeKind.collection ||
           member == SeoDomFirstApplicationRuntimeKind.configurator ||
-          member == SeoDomFirstApplicationRuntimeKind.editorialWorkflow) {
+          member == SeoDomFirstApplicationRuntimeKind.editorialWorkflow ||
+          member == SeoDomFirstApplicationRuntimeKind.approvalChecklist) {
         throw ArgumentError.value(
           ordered,
           'members',
@@ -206,6 +213,19 @@ final class SeoDomFirstEditorialWorkflowApplicationRuntime
   @override
   List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
       const [SeoDomFirstApplicationRuntimeKind.editorialWorkflow];
+}
+
+/// An application transition and projection for an approval checklist.
+final class SeoDomFirstApprovalChecklistApplicationRuntime
+    extends SeoDomFirstApplicationRuntime {
+  const SeoDomFirstApprovalChecklistApplicationRuntime(super.id) : super._();
+
+  @override
+  String get kind => 'approval-checklist';
+
+  @override
+  List<SeoDomFirstApplicationRuntimeKind> get memberKinds =>
+      const [SeoDomFirstApplicationRuntimeKind.approvalChecklist];
 }
 
 /// An application-authored transition executed by the stepper adapter.

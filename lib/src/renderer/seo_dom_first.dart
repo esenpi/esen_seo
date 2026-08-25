@@ -129,6 +129,22 @@ html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="edito
 @media (max-width:600px){#$seoContainerId [data-esen-component="editorial-workflow"]>.esen-seo-editorial-workflow-progress{grid-template-columns:repeat(2,minmax(0,1fr))}}
 ''';
 
+/// Structural styling for the closed approval checklist controls.
+const String seoDomFirstApprovalChecklistStylesheet = '''
+#$seoContainerId [data-esen-component="approval-checklist"]>.esen-seo-approval-checklist-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(12rem,100%),1fr));gap:.5rem;margin-block:1.25rem}
+#$seoContainerId [data-esen-component="approval-checklist"] .esen-seo-approval-checklist-controls>button,#$seoContainerId [data-esen-component="approval-checklist"] .esen-seo-approval-checklist-control-placeholder{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:flex-start;min-height:2.75rem;padding:.5rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface,#f5fbf8);color:var(--esen-color-on-surface,#171d1b);font:inherit;font-weight:600;text-align:left;overflow-wrap:anywhere}
+#$seoContainerId [data-esen-component="approval-checklist"] .esen-seo-approval-checklist-controls>button{cursor:pointer}
+#$seoContainerId [data-esen-component="approval-checklist"] [role="checkbox"]::before,#$seoContainerId [data-esen-component="approval-checklist"] [data-esen-placeholder-checked]::before{content:"";box-sizing:border-box;width:1rem;height:1rem;flex:0 0 1rem;margin-inline-end:.625rem;border:2px solid currentColor;border-radius:3px}
+#$seoContainerId [data-esen-component="approval-checklist"] [role="checkbox"][aria-checked="true"]::before,#$seoContainerId [data-esen-component="approval-checklist"] [data-esen-placeholder-checked="true"]::before{background:var(--esen-color-primary,#006b5f);box-shadow:inset 0 0 0 2px var(--esen-color-surface,#f5fbf8)}
+#$seoContainerId [data-esen-component="approval-checklist"] button:focus-visible{outline:2px solid var(--esen-color-primary,#006b5f);outline-offset:2px}
+#$seoContainerId [data-esen-component="approval-checklist"]>.esen-seo-approval-checklist-progress{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:2.75rem;margin-block:.75rem;padding:.5rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;font-weight:700;font-variant-numeric:tabular-nums}
+#$seoContainerId [data-esen-component="approval-checklist"]>.esen-seo-approval-checklist-items{display:grid;gap:.75rem;padding:0;list-style:none}
+#$seoContainerId [data-esen-component="approval-checklist"]>.esen-seo-approval-checklist-items>li{padding:1rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:8px}
+#$seoContainerId [data-esen-component="approval-checklist"]>.esen-seo-approval-checklist-announcement{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#$seoContainerId [data-esen-component="approval-checklist"]>[data-esen-prepaint-placeholder="approval-checklist"][hidden]{display:none!important}
+html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="approval-checklist"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>[data-esen-prepaint-placeholder="approval-checklist"][hidden]{display:grid!important}
+''';
+
 /// Self-contained styling for the package-owned theme toggle control.
 const String seoDomFirstThemeToggleStylesheet = '''
 html{color-scheme:light}
@@ -159,7 +175,8 @@ String seoDomFirstFeatureBootstrapScriptHtml(
       features.contains(SeoDomFirstFeature.carousel) ||
       features.contains(SeoDomFirstFeature.stepper) ||
       features.contains(SeoDomFirstFeature.configurator) ||
-      features.contains(SeoDomFirstFeature.editorialWorkflow);
+      features.contains(SeoDomFirstFeature.editorialWorkflow) ||
+      features.contains(SeoDomFirstFeature.approvalChecklist);
   if (!theme && !collection && !interaction) return '';
   final nonceAttribute = _nonceAttribute(nonce);
   final javascript = StringBuffer();
@@ -213,6 +230,9 @@ String seoDomFirstFeatureStyleHtml(
   }
   if (features.contains(SeoDomFirstFeature.editorialWorkflow)) {
     css.write(seoDomFirstEditorialWorkflowStylesheet);
+  }
+  if (features.contains(SeoDomFirstFeature.approvalChecklist)) {
+    css.write(seoDomFirstApprovalChecklistStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.themeToggle)) {
     css.write(seoDomFirstThemeToggleStylesheet);

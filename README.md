@@ -874,10 +874,11 @@ created only after the complete collection structure has been validated.
 
 ### Application-owned state
 
-A DOM-first route can instead execute a tabs, carousel, collection or stepper
-transition authored in the application. A separately selected stepper variant
-may also emit one closed focus effect. Write the logic as a state-free
-top-level Dart function under `lib/` and pass the same function to Flutter:
+A DOM-first route can instead execute a tabs, carousel, collection, stepper,
+configurator, editorial workflow or approval checklist transition authored in
+the application. A separately selected stepper variant may also emit one
+closed focus effect. Write the logic as a state-free top-level Dart function
+under `lib/` and pass the same function to Flutter:
 
 ```dart
 // lib/product_tabs_transition.dart — pure Dart, no Flutter import
@@ -1025,9 +1026,41 @@ visible state or replace the canonical URL. Delegate unhandled restore actions t
 `transitionSeoCollection` as above. Search still replaces the current History
 entry, while category, sort and page actions push only changed URLs.
 
+The approval checklist is a closed multi-flag slice rather than a generic DOM
+mutation API. Import `package:esen_seo/checklist.dart` for its pure state,
+projection and semantic builder, and
+`package:esen_seo/checklist_flutter.dart` for the native widget. Each accepted
+action changes exactly one of at most 32 flags. Flutter renders native checkbox
+controls; the DOM-first adapter creates only package-owned checkbox controls
+and writes validated projection text into fixed status slots. Application
+values cannot select elements, attributes, classes or focus targets.
+
+```dart
+SeoApprovalChecklistState transitionReleaseChecklist(
+  SeoApprovalChecklistState state,
+  SeoApprovalChecklistAction action,
+) => transitionSeoApprovalChecklist(state, action);
+
+SeoApprovalChecklistView projectReleaseChecklist(
+  SeoApprovalChecklistState state,
+) {
+  final complete = seoApprovalChecklistCheckedCount(state);
+  return SeoApprovalChecklistView(
+    statusText: complete == state.checked.length ? 'Ready' : 'Open',
+    summaryText: '$complete of ${state.checked.length} complete',
+    announcementText: '$complete checklist items complete',
+  );
+}
+```
+
+Build the permanent HTML from `buildSeoApprovalChecklistNodes` and use the
+same transition and projection with `SeoApprovalChecklist` on Flutter. Initial
+status, summary and progress must match the delivered document exactly;
+rejected or missing JavaScript leaves every checklist item readable.
+
 Compile only the selected transition and its package-owned adapter. Tabs is
-the default kind for backward compatibility; select carousel, collection,
-stepper or stepper-effects explicitly:
+the default kind for backward compatibility; select every other kind
+explicitly:
 
 ```shell
 dart run esen_seo:esen_seo_runtime \
@@ -1059,6 +1092,14 @@ dart run esen_seo:esen_seo_runtime \
   --library package:my_app/product_stepper_transition.dart \
   --symbol transitionProductStepperEffects \
   --interaction-ids product-stepper
+
+dart run esen_seo:esen_seo_runtime \
+  --kind approval-checklist \
+  --id release-checklist \
+  --library package:my_app/release_checklist.dart \
+  --symbol transitionReleaseChecklist \
+  --projection-symbol projectReleaseChecklist \
+  --interaction-ids release-checklist-control
 ```
 
 The `stepper-effects` symbol is one stateless dispatcher. Its package-owned
@@ -1097,9 +1138,11 @@ dart run esen_seo:esen_seo_runtime \
 ```
 
 `stepper` and `stepper-effects` are the same ownership family and cannot both
-appear in one bundle. Collection uses its standalone application runtime: all
-measured two-member Collection combinations exceeded the unchanged 25 KiB
-artifact ceiling, so bundle configuration rejects it before compilation.
+appear in one bundle. Collection, configurator, editorial workflow and approval
+checklist use standalone application runtimes. Measured Collection combinations
+exceeded the unchanged 25 KiB artifact ceiling; the approval checklist itself
+uses 23.5 KiB gzip and therefore also keeps its measured standalone boundary.
+Bundle configuration rejects these kinds before compilation.
 Unknown fields and kinds, duplicate families, invalid symbols, files outside
 the application root and configurations above 32 KiB are also rejected before
 compilation. Every admitted member independently passes the same complete
@@ -1189,9 +1232,11 @@ For a carousel route use
 `SeoDomFirstApplicationRuntime.stepper('product-stepper')` together with
 `buildSeoStepperNodes`. Select
 `SeoDomFirstApplicationRuntime.stepperEffects('product-stepper-effects')` for
-the closed effect variant. Runtime kind is part of the artifact filename, so
-tabs, carousel, collection, stepper and stepper-effects transitions with the
-same logical id cannot overwrite each other.
+the closed effect variant. For a checklist route use
+`SeoDomFirstApplicationRuntime.approvalChecklist('release-checklist')` with
+`buildSeoApprovalChecklistNodes`. Runtime kind is part of the artifact
+filename, so different transition families with the same logical id cannot
+overwrite each other.
 
 Finally give the server or prerenderer the build-owned directory:
 

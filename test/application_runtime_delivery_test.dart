@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/checklist.dart';
 import 'package:esen_seo/workflow.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
@@ -14,6 +15,9 @@ const _configuratorReference =
     SeoDomFirstApplicationRuntime.configurator('application-configurator');
 const _workflowReference = SeoDomFirstApplicationRuntime.editorialWorkflow(
   'application-workflow',
+);
+const _checklistReference = SeoDomFirstApplicationRuntime.approvalChecklist(
+  'application-checklist',
 );
 const _stepperReference =
     SeoDomFirstApplicationRuntime.stepper('application-stepper');
@@ -129,6 +133,31 @@ List<SeoNode> _workflowNodes() => buildSeoEditorialWorkflowNodes(
       interactionId: 'application-workflow-control',
     );
 
+List<SeoNode> _checklistNodes() => buildSeoApprovalChecklistNodes(
+      items: [
+        (
+          label: 'Content',
+          nodes: [SeoNode(tag: 'p', text: 'Review the content')],
+        ),
+        (
+          label: 'Metadata',
+          nodes: [SeoNode(tag: 'p', text: 'Review the metadata')],
+        ),
+      ],
+      initialState: const SeoApprovalChecklistState(
+        checked: [false, true],
+      ),
+      project: (state) {
+        final count = seoApprovalChecklistCheckedCount(state);
+        return SeoApprovalChecklistView(
+          statusText: count == state.checked.length ? 'Ready' : 'Open',
+          summaryText: '$count of ${state.checked.length}',
+          announcementText: '$count items complete',
+        );
+      },
+      interactionId: 'application-checklist-control',
+    );
+
 SeoRoute _route({String path = '/application'}) => SeoRoute(
       path: path,
       delivery: SeoRouteDelivery.domFirst,
@@ -145,6 +174,16 @@ void main() {
           path: '/',
           meta: (_) => const SeoMeta(),
           applicationRuntime: _reference,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: const {SeoDomFirstFeature.approvalChecklist},
+          applicationRuntime: _checklistReference,
+          meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,
       );
@@ -253,6 +292,12 @@ void main() {
       );
       expect(
         const SeoDomFirstApplicationRuntime.tabs('same-id'),
+        isNot(
+          const SeoDomFirstApplicationRuntime.approvalChecklist('same-id'),
+        ),
+      );
+      expect(
+        const SeoDomFirstApplicationRuntime.tabs('same-id'),
         isNot(const SeoDomFirstApplicationRuntime.carousel('same-id')),
       );
       expect(
@@ -274,6 +319,7 @@ void main() {
       expect(_collectionReference.kind, 'collection');
       expect(_configuratorReference.kind, 'configurator');
       expect(_workflowReference.kind, 'editorial-workflow');
+      expect(_checklistReference.kind, 'approval-checklist');
       expect(_stepperReference.kind, 'stepper');
       expect(_stepperEffectsReference.kind, 'stepper-effects');
       expect(_bundleReference.kind, 'bundle');
@@ -317,6 +363,16 @@ void main() {
         () => SeoDomFirstApplicationRuntime.bundle(
           'same-bundle',
           members: const {SeoDomFirstApplicationRuntimeKind.tabs},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoDomFirstApplicationRuntime.bundle(
+          'same-bundle',
+          members: const {
+            SeoDomFirstApplicationRuntimeKind.tabs,
+            SeoDomFirstApplicationRuntimeKind.approvalChecklist,
+          },
         ),
         throwsArgumentError,
       );
@@ -554,6 +610,30 @@ void main() {
         contains(
           'data-esen-seo-dom-first-application-runtime='
           '"application-workflow"',
+        ),
+      );
+      expect(html, contains('esenInteractionPending'));
+    });
+
+    test('checklist runtime selects only its structural stylesheet', () {
+      final html = SeoPage.domFirstFromNodes(
+        body: _checklistNodes(),
+        applicationRuntime: _artifact(_checklistReference),
+      ).toHtmlDocument();
+
+      expect(html, contains('data-esen-component="approval-checklist"'));
+      expect(html, contains(seoDomFirstApprovalChecklistStylesheet));
+      expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+      expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
+      expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+      expect(html, isNot(contains(seoDomFirstEditorialWorkflowStylesheet)));
+      expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+      expect(
+        html,
+        contains(
+          'data-esen-seo-dom-first-application-runtime='
+          '"application-checklist"',
         ),
       );
       expect(html, contains('esenInteractionPending'));
