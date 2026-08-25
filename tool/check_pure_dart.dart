@@ -24,6 +24,9 @@ const _roots = [
   // Internal until the configurator slice passes its admission gates.
   'lib/src/components/seo_configurator_component.dart',
   'lib/src/components/seo_configurator_transition.dart',
+  // Internal until the editorial workflow slice passes the same gates.
+  'lib/src/components/seo_editorial_workflow_component.dart',
+  'lib/src/components/seo_editorial_workflow_transition.dart',
 ];
 
 /// Imports that disqualify a file from being pure Dart.
