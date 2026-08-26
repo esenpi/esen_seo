@@ -10,6 +10,12 @@
   enforces exact Origin, media type, strict UTF-8, encoded and decoded size
   limits, unique declared fields and fail-closed application results before
   invoking an application handler.
+* Added `SeoActionFlow`, a closed two-to-six-step composition of the same form
+  plan, plus fixed single-choice fields. Flutter owns a native step
+  presentation while the optional DOM-first runtime validates the complete
+  package structure before applying linear navigation, progress semantics and
+  current-step validation. Without JavaScript every field and the final POST
+  remain visible and usable.
 
 ## 0.14.0
 

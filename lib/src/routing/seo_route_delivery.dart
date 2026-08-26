@@ -38,6 +38,9 @@ enum SeoDomFirstFeature {
   /// Enhance one validated package-owned POST form without owning its state.
   actionForm,
 
+  /// Enhance a validated linear, multi-step package-owned POST form.
+  actionFlow,
+
   /// Apply and persist a validated light/dark presentation preference.
   themeToggle,
 

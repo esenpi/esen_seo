@@ -105,6 +105,31 @@ void main() {
     expect(find.text('The submission could not be completed.'), findsOneWidget);
     expect(find.textContaining('private'), findsNothing);
   });
+
+  testWidgets('submits a closed choice from the native single-step widget',
+      (tester) async {
+    String? selected;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SeoActionForm(
+          definition: _choiceDefinition,
+          onSubmit: (values) {
+            selected = values.choice('service');
+            return const SeoActionFormResult.success('Sent.');
+          },
+        ),
+      ),
+    ));
+
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Website').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+    await tester.pump();
+
+    expect(selected, 'website');
+  });
 }
 
 Future<void> _fillValidForm(WidgetTester tester) async {
@@ -153,6 +178,30 @@ const _definition = SeoActionFormDefinition(
       label: 'Consent',
       kind: SeoActionFormFieldKind.consent,
       required: true,
+    ),
+  ],
+);
+
+const _choiceDefinition = SeoActionFormDefinition(
+  actionId: 'project',
+  returnPath: '/project/',
+  heading: 'Project',
+  description: 'Choose a service.',
+  submitLabel: 'Send',
+  pendingLabel: 'Sending',
+  failureLabel: 'Try again later',
+  statusLabel: 'Submission status',
+  fields: [
+    SeoActionFormField(
+      name: 'service',
+      label: 'Service',
+      kind: SeoActionFormFieldKind.choice,
+      required: true,
+      choicePrompt: 'Choose a service',
+      options: [
+        SeoActionFormOption(value: 'website', label: 'Website'),
+        SeoActionFormOption(value: 'shop', label: 'Online shop'),
+      ],
     ),
   ],
 );

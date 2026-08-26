@@ -881,8 +881,9 @@ created only after the complete collection structure has been validated.
 `SeoActionFormDefinition` is one bounded source for a native Flutter form, a
 non-interactive mirror summary and a real DOM-first POST form. It admits one to
 eight fields from a closed set: text, email, multiline text and consent. The
-renderer still refuses arbitrary `form`, `input`, `textarea` and `button`
-nodes.
+same definition can also use a single-choice field with two to twelve fixed
+options. The renderer still refuses arbitrary `form`, `input`, `select`,
+`textarea` and `button` nodes.
 
 ```dart
 // lib/contact_form.dart — pure Dart, shared by app, route and server
@@ -971,6 +972,49 @@ focus. The application or deployment still owns authentication, authorization,
 rate limiting, abuse protection, durable idempotency and the actual side
 effect. Exact-Origin checking is a browser CSRF boundary, not caller
 authentication.
+
+For a linear multi-step enquiry, partition the same flat form definition with
+`SeoActionFlowDefinition`. Every field must occur exactly once and in the same
+order as the form plan:
+
+```dart
+const projectFlow = SeoActionFlowDefinition(
+  form: projectForm,
+  steps: [
+    SeoActionFlowStep(
+      label: 'About you',
+      description: 'Your contact details.',
+      fieldNames: ['name', 'email'],
+    ),
+    SeoActionFlowStep(
+      label: 'Project',
+      description: 'What you want to build.',
+      fieldNames: ['service', 'message', 'consent'],
+    ),
+  ],
+  previousLabel: 'Previous',
+  nextLabel: 'Next',
+  progressLabel: 'Project enquiry progress',
+);
+
+SeoRoute(
+  path: '/project',
+  delivery: SeoRouteDelivery.domFirst,
+  domFirstFeatures: const {SeoDomFirstFeature.actionFlow},
+  meta: (_) => const SeoMeta(title: 'Start a project'),
+  body: (_) => buildSeoActionFlowNodes(projectFlow),
+);
+
+// Import package:esen_seo/form_flutter.dart in Flutter code.
+SeoActionFlow(definition: projectFlow, onSubmit: sendProjectEnquiry);
+```
+
+Without JavaScript all steps and the final submit control remain visible in one
+ordinary POST form. The optional runtime validates the complete package-owned
+structure before it adds linear navigation, current-step validation and
+progress semantics. It does not admit branching, direct step jumps,
+application-selected DOM targets or conditional fields. Register
+`projectFlow.form` with the same `seoActionFormMiddleware` shown above.
 
 ### Application-owned state
 

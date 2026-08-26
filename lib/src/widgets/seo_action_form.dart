@@ -39,6 +39,7 @@ class _SeoActionFormState extends State<SeoActionForm>
   final _formKey = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   final _consents = <String, bool>{};
+  final _choices = <String, String>{};
   SeoActionFormPlan? _plan;
   Map<String, String> _fieldErrors = const {};
   String? _status;
@@ -78,14 +79,23 @@ class _SeoActionFormState extends State<SeoActionForm>
   }) {
     final oldControllers = Map<String, TextEditingController>.of(_controllers);
     final oldConsents = Map<String, bool>.of(_consents);
+    final oldChoices = Map<String, String>.of(_choices);
     _controllers.clear();
     _consents.clear();
+    _choices.clear();
     _plan = next;
     if (next != null) {
       for (final field in next.fields) {
         if (field.kind == SeoActionFormFieldKind.consent) {
           _consents[field.name] =
               preserveValues ? oldConsents[field.name] ?? false : false;
+        } else if (field.kind == SeoActionFormFieldKind.choice) {
+          final previous = preserveValues ? oldChoices[field.name] ?? '' : '';
+          _choices[field.name] = field.options.any(
+            (option) => option.value == previous,
+          )
+              ? previous
+              : '';
         } else {
           final old = oldControllers.remove(field.name);
           _controllers[field.name] =
@@ -116,6 +126,8 @@ class _SeoActionFormState extends State<SeoActionForm>
           for (final field in plan.fields) ...[
             if (field.kind == SeoActionFormFieldKind.consent)
               _consentField(context, field)
+            else if (field.kind == SeoActionFormFieldKind.choice)
+              _choiceField(field)
             else
               _textField(field),
             const SizedBox(height: 14),
@@ -147,7 +159,8 @@ class _SeoActionFormState extends State<SeoActionForm>
         SeoActionFormFieldKind.email => TextInputType.emailAddress,
         SeoActionFormFieldKind.multiline => TextInputType.multiline,
         SeoActionFormFieldKind.text ||
-        SeoActionFormFieldKind.consent =>
+        SeoActionFormFieldKind.consent ||
+        SeoActionFormFieldKind.choice =>
           TextInputType.text,
       },
       minLines: field.kind == SeoActionFormFieldKind.multiline ? 4 : 1,
@@ -167,6 +180,46 @@ class _SeoActionFormState extends State<SeoActionForm>
       ),
       validator: (_) => _fieldErrors[field.name],
       onChanged: (_) => _clearFieldError(field.name),
+    );
+  }
+
+  Widget _choiceField(SeoActionFormPlanField field) {
+    return FormField<String>(
+      key: ValueKey((field.name, _choices[field.name])),
+      initialValue: _choices[field.name],
+      validator: (_) => _fieldErrors[field.name],
+      builder: (state) => InputDecorator(
+        decoration: InputDecoration(
+          labelText: field.label,
+          helperText: field.description,
+          errorText: state.errorText,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: (_choices[field.name] ?? '').isEmpty
+                ? null
+                : _choices[field.name],
+            isExpanded: true,
+            hint: Text(field.choicePrompt!),
+            items: [
+              for (final option in field.options)
+                DropdownMenuItem(
+                  value: option.value,
+                  child: Text(option.label),
+                ),
+            ],
+            onChanged: _submitting
+                ? null
+                : (value) {
+                    setState(() {
+                      _choices[field.name] = value ?? '';
+                      _fieldErrors = Map<String, String>.of(_fieldErrors)
+                        ..remove(field.name);
+                    });
+                  },
+          ),
+        ),
+      ),
     );
   }
 
@@ -215,7 +268,9 @@ class _SeoActionFormState extends State<SeoActionForm>
       for (final field in plan.fields)
         field.name: field.kind == SeoActionFormFieldKind.consent
             ? ((_consents[field.name] ?? false) ? 'accepted' : '')
-            : _controllers[field.name]!.text,
+            : field.kind == SeoActionFormFieldKind.choice
+                ? _choices[field.name] ?? ''
+                : _controllers[field.name]!.text,
     };
     final validation = validateSeoActionFormValues(plan, rawValues);
     if (!validation.isValid) {
@@ -260,6 +315,9 @@ class _SeoActionFormState extends State<SeoActionForm>
         }
         for (final name in _consents.keys) {
           _consents[name] = false;
+        }
+        for (final name in _choices.keys) {
+          _choices[name] = '';
         }
       }
     });
@@ -318,7 +376,9 @@ bool _samePlan(SeoActionFormPlan? left, SeoActionFormPlan? right) {
         a.required != b.required ||
         a.minLength != b.minLength ||
         a.maxLength != b.maxLength ||
-        a.autocomplete != b.autocomplete) {
+        a.autocomplete != b.autocomplete ||
+        a.choicePrompt != b.choicePrompt ||
+        !_sameOptions(a.options, b.options)) {
       return false;
     }
   }
@@ -327,4 +387,18 @@ bool _samePlan(SeoActionFormPlan? left, SeoActionFormPlan? right) {
       left.messages.tooShort == right.messages.tooShort &&
       left.messages.tooLong == right.messages.tooLong &&
       left.messages.consentRequired == right.messages.consentRequired;
+}
+
+bool _sameOptions(
+  List<SeoActionFormPlanOption> left,
+  List<SeoActionFormPlanOption> right,
+) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    if (left[index].value != right[index].value ||
+        left[index].label != right[index].label) {
+      return false;
+    }
+  }
+  return true;
 }

@@ -227,6 +227,10 @@ class HtmlRenderer {
     StringBuffer buffer,
     SeoActionFormMarkup form,
   ) {
+    if (form.flow case final flow?) {
+      _writeActionFlow(buffer, form, flow);
+      return;
+    }
     final actionId = form.actionId;
     final rootId = 'esen-action-form-$actionId';
     buffer
@@ -254,95 +258,7 @@ class HtmlRenderer {
       ..write('">');
 
     for (final (index, field) in form.fields.indexed) {
-      final controlId = '$rootId-field-$index';
-      final descriptionId = '$controlId-description';
-      final errorId = '$controlId-error';
-      final describedBy =
-          field.description == null ? errorId : '$descriptionId $errorId';
-      final kind = switch (field.kind) {
-        SeoActionFormMarkupFieldKind.text => 'text',
-        SeoActionFormMarkupFieldKind.email => 'email',
-        SeoActionFormMarkupFieldKind.multiline => 'multiline',
-        SeoActionFormMarkupFieldKind.consent => 'consent',
-      };
-      buffer
-        ..write('<div class="esen-seo-action-form-field" ')
-        ..write('data-esen-action-form-field="')
-        ..write(index)
-        ..write('" data-esen-action-form-kind="')
-        ..write(kind)
-        ..write('"><label for="')
-        ..write(controlId)
-        ..write('">')
-        ..write(escapeText(field.label))
-        ..write('</label>');
-      if (field.description case final description?) {
-        buffer
-          ..write('<p id="')
-          ..write(descriptionId)
-          ..write('" class="esen-seo-action-form-hint">')
-          ..write(escapeText(description))
-          ..write('</p>');
-      }
-      if (field.kind == SeoActionFormMarkupFieldKind.multiline) {
-        buffer
-          ..write('<textarea id="')
-          ..write(controlId)
-          ..write('" name="')
-          ..write(field.name)
-          ..write('" data-esen-action-form-control="')
-          ..write(index)
-          ..write('" aria-describedby="')
-          ..write(describedBy)
-          ..write('" minlength="')
-          ..write(field.minLength)
-          ..write('" maxlength="')
-          ..write(field.maxLength)
-          ..write('" autocomplete="off"')
-          ..write(field.required ? ' required' : '')
-          ..write('></textarea>');
-      } else {
-        final type = switch (field.kind) {
-          SeoActionFormMarkupFieldKind.email => 'email',
-          SeoActionFormMarkupFieldKind.consent => 'checkbox',
-          SeoActionFormMarkupFieldKind.text => 'text',
-          SeoActionFormMarkupFieldKind.multiline => 'text',
-        };
-        buffer
-          ..write('<input id="')
-          ..write(controlId)
-          ..write('" type="')
-          ..write(type)
-          ..write('" name="')
-          ..write(field.name)
-          ..write('" data-esen-action-form-control="')
-          ..write(index)
-          ..write('" aria-describedby="')
-          ..write(describedBy)
-          ..write('"');
-        if (field.kind == SeoActionFormMarkupFieldKind.consent) {
-          buffer.write(' value="accepted"');
-        } else {
-          buffer
-            ..write(' minlength="')
-            ..write(field.minLength)
-            ..write('" maxlength="')
-            ..write(field.maxLength)
-            ..write('" autocomplete="')
-            ..write(field.autocomplete)
-            ..write('"');
-        }
-        buffer
-          ..write(field.required ? ' required' : '')
-          ..write('/>');
-      }
-      buffer
-        ..write('<span id="')
-        ..write(errorId)
-        ..write('" class="esen-seo-action-form-error" ')
-        ..write('data-esen-action-form-error="')
-        ..write(index)
-        ..write('" hidden></span></div>');
+      _writeActionFormField(buffer, rootId, index, field);
     }
 
     buffer
@@ -356,6 +272,223 @@ class HtmlRenderer {
       ..write('aria-live="polite" aria-atomic="true" aria-label="')
       ..write(escapeAttribute(form.statusLabel))
       ..write('"></p></form></section>');
+  }
+
+  void _writeActionFlow(
+    StringBuffer buffer,
+    SeoActionFormMarkup form,
+    SeoActionFlowMarkup flow,
+  ) {
+    final actionId = form.actionId;
+    final rootId = 'esen-action-flow-$actionId';
+    final stepHeadingLevel = form.headingLevel < 6 ? form.headingLevel + 1 : 6;
+    buffer
+      ..write('<section id="')
+      ..write(rootId)
+      ..write('" class="esen-seo-action-flow" ')
+      ..write('data-esen-component="action-flow" ')
+      ..write('data-esen-layout-stable="true" ')
+      ..write('data-esen-action-flow-root="')
+      ..write(actionId)
+      ..write('"><h')
+      ..write(form.headingLevel)
+      ..write('>')
+      ..write(escapeText(form.heading))
+      ..write('</h')
+      ..write(form.headingLevel)
+      ..write('><p class="esen-seo-action-form-description">')
+      ..write(escapeText(form.description))
+      ..write('</p><ol class="esen-seo-action-flow-progress" aria-label="')
+      ..write(escapeAttribute(flow.progressLabel))
+      ..write('">');
+    for (final (index, step) in flow.steps.indexed) {
+      buffer
+        ..write('<li data-esen-action-flow-progress="')
+        ..write(index)
+        ..write('">')
+        ..write(escapeText(step.label))
+        ..write('</li>');
+    }
+    buffer
+      ..write('</ol><form method="post" accept-charset="UTF-8" action="')
+      ..write(internalSeoActionFormEndpointPrefix)
+      ..write(actionId)
+      ..write('" data-esen-action-flow="')
+      ..write(actionId)
+      ..write('" data-esen-failure-label="')
+      ..write(escapeAttribute(form.failureLabel))
+      ..write('">');
+    for (final (stepIndex, step) in flow.steps.indexed) {
+      final headingId = '$rootId-step-$stepIndex-heading';
+      buffer
+        ..write('<section class="esen-seo-action-flow-step" ')
+        ..write('data-esen-action-flow-step="')
+        ..write(stepIndex)
+        ..write('" aria-labelledby="')
+        ..write(headingId)
+        ..write('"><h')
+        ..write(stepHeadingLevel)
+        ..write(' id="')
+        ..write(headingId)
+        ..write('" tabindex="-1">')
+        ..write(escapeText(step.label))
+        ..write('</h')
+        ..write(stepHeadingLevel)
+        ..write('><p>')
+        ..write(escapeText(step.description))
+        ..write('</p>');
+      for (var offset = 0; offset < step.fieldCount; offset++) {
+        final fieldIndex = step.firstFieldIndex + offset;
+        _writeActionFormField(
+          buffer,
+          rootId,
+          fieldIndex,
+          form.fields[fieldIndex],
+        );
+      }
+      buffer.write('</section>');
+    }
+    buffer
+      ..write('<div class="esen-seo-action-flow-navigation" ')
+      ..write('data-esen-action-flow-navigation hidden>')
+      ..write('<button type="button" data-esen-action-flow-previous>')
+      ..write(escapeText(flow.previousLabel))
+      ..write('</button><button type="button" data-esen-action-flow-next>')
+      ..write(escapeText(flow.nextLabel))
+      ..write('</button></div><button type="submit" ')
+      ..write('data-esen-action-form-submit data-esen-pending-label="')
+      ..write(escapeAttribute(form.pendingLabel))
+      ..write('">')
+      ..write(escapeText(form.submitLabel))
+      ..write('</button><p class="esen-seo-action-form-status" ')
+      ..write('data-esen-action-form-status role="status" ')
+      ..write('aria-live="polite" aria-atomic="true" aria-label="')
+      ..write(escapeAttribute(form.statusLabel))
+      ..write('"></p></form></section>');
+  }
+
+  void _writeActionFormField(
+    StringBuffer buffer,
+    String rootId,
+    int index,
+    SeoActionFormMarkupField field,
+  ) {
+    final controlId = '$rootId-field-$index';
+    final descriptionId = '$controlId-description';
+    final errorId = '$controlId-error';
+    final describedBy =
+        field.description == null ? errorId : '$descriptionId $errorId';
+    final kind = switch (field.kind) {
+      SeoActionFormMarkupFieldKind.text => 'text',
+      SeoActionFormMarkupFieldKind.email => 'email',
+      SeoActionFormMarkupFieldKind.multiline => 'multiline',
+      SeoActionFormMarkupFieldKind.consent => 'consent',
+      SeoActionFormMarkupFieldKind.choice => 'choice',
+    };
+    buffer
+      ..write('<div class="esen-seo-action-form-field" ')
+      ..write('data-esen-action-form-field="')
+      ..write(index)
+      ..write('" data-esen-action-form-kind="')
+      ..write(kind)
+      ..write('"><label for="')
+      ..write(controlId)
+      ..write('">')
+      ..write(escapeText(field.label))
+      ..write('</label>');
+    if (field.description case final description?) {
+      buffer
+        ..write('<p id="')
+        ..write(descriptionId)
+        ..write('" class="esen-seo-action-form-hint">')
+        ..write(escapeText(description))
+        ..write('</p>');
+    }
+    if (field.kind == SeoActionFormMarkupFieldKind.multiline) {
+      buffer
+        ..write('<textarea id="')
+        ..write(controlId)
+        ..write('" name="')
+        ..write(field.name)
+        ..write('" data-esen-action-form-control="')
+        ..write(index)
+        ..write('" aria-describedby="')
+        ..write(describedBy)
+        ..write('" minlength="')
+        ..write(field.minLength)
+        ..write('" maxlength="')
+        ..write(field.maxLength)
+        ..write('" autocomplete="off"')
+        ..write(field.required ? ' required' : '')
+        ..write('></textarea>');
+    } else if (field.kind == SeoActionFormMarkupFieldKind.choice) {
+      buffer
+        ..write('<select id="')
+        ..write(controlId)
+        ..write('" name="')
+        ..write(field.name)
+        ..write('" data-esen-action-form-control="')
+        ..write(index)
+        ..write('" aria-describedby="')
+        ..write(describedBy)
+        ..write('"')
+        ..write(field.required ? ' required' : '')
+        ..write('><option value="">')
+        ..write(escapeText(field.choicePrompt!))
+        ..write('</option>');
+      for (final option in field.options) {
+        buffer
+          ..write('<option value="')
+          ..write(escapeAttribute(option.value))
+          ..write('">')
+          ..write(escapeText(option.label))
+          ..write('</option>');
+      }
+      buffer.write('</select>');
+    } else {
+      final type = switch (field.kind) {
+        SeoActionFormMarkupFieldKind.email => 'email',
+        SeoActionFormMarkupFieldKind.consent => 'checkbox',
+        SeoActionFormMarkupFieldKind.text => 'text',
+        SeoActionFormMarkupFieldKind.multiline ||
+        SeoActionFormMarkupFieldKind.choice =>
+          'text',
+      };
+      buffer
+        ..write('<input id="')
+        ..write(controlId)
+        ..write('" type="')
+        ..write(type)
+        ..write('" name="')
+        ..write(field.name)
+        ..write('" data-esen-action-form-control="')
+        ..write(index)
+        ..write('" aria-describedby="')
+        ..write(describedBy)
+        ..write('"');
+      if (field.kind == SeoActionFormMarkupFieldKind.consent) {
+        buffer.write(' value="accepted"');
+      } else {
+        buffer
+          ..write(' minlength="')
+          ..write(field.minLength)
+          ..write('" maxlength="')
+          ..write(field.maxLength)
+          ..write('" autocomplete="')
+          ..write(field.autocomplete)
+          ..write('"');
+      }
+      buffer
+        ..write(field.required ? ' required' : '')
+        ..write('/>');
+    }
+    buffer
+      ..write('<span id="')
+      ..write(errorId)
+      ..write('" class="esen-seo-action-form-error" ')
+      ..write('data-esen-action-form-error="')
+      ..write(index)
+      ..write('" hidden></span></div>');
   }
 
   /// The tag this node may carry in the head, or `null` when it must

@@ -4,3 +4,4 @@ library;
 export 'form.dart';
 export 'src/widgets/seo_action_form.dart'
     show SeoActionForm, SeoActionFormSubmit;
+export 'src/widgets/seo_action_flow.dart' show SeoActionFlow;

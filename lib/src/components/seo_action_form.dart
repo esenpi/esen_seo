@@ -17,10 +17,13 @@ const int seoActionFormMaxAggregateResultLength = 2048;
 const int seoActionFormMaxTextLength = 512;
 const int seoActionFormMaxEmailLength = 254;
 const int seoActionFormMaxMultilineLength = 4096;
+const int seoActionFormMaxOptions = 12;
+const int seoActionFlowMaxSteps = 6;
 
 final RegExp _fieldName = RegExp(r'^[a-z][a-z0-9_]{0,31}$');
+final RegExp _optionValue = RegExp(r'^[a-z][a-z0-9_-]{0,31}$');
 
-enum SeoActionFormFieldKind { text, email, multiline, consent }
+enum SeoActionFormFieldKind { text, email, multiline, consent, choice }
 
 enum SeoActionFormAutocomplete {
   off('off'),
@@ -48,6 +51,13 @@ final class SeoActionFormMessages {
   final String consentRequired;
 }
 
+final class SeoActionFormOption {
+  const SeoActionFormOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
 final class SeoActionFormField {
   const SeoActionFormField({
     required this.name,
@@ -58,6 +68,8 @@ final class SeoActionFormField {
     this.minLength = 0,
     this.maxLength,
     this.autocomplete = SeoActionFormAutocomplete.off,
+    this.choicePrompt,
+    this.options = const [],
   });
 
   final String name;
@@ -68,6 +80,15 @@ final class SeoActionFormField {
   final int minLength;
   final int? maxLength;
   final SeoActionFormAutocomplete autocomplete;
+  final String? choicePrompt;
+  final List<SeoActionFormOption> options;
+}
+
+final class SeoActionFormPlanOption {
+  const SeoActionFormPlanOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
 }
 
 final class SeoActionFormPlanField {
@@ -80,6 +101,8 @@ final class SeoActionFormPlanField {
     required this.maxLength,
     required this.autocomplete,
     this.description,
+    this.choicePrompt,
+    this.options = const [],
   });
 
   final String name;
@@ -90,6 +113,8 @@ final class SeoActionFormPlanField {
   final int minLength;
   final int maxLength;
   final SeoActionFormAutocomplete autocomplete;
+  final String? choicePrompt;
+  final List<SeoActionFormPlanOption> options;
 }
 
 final class SeoActionFormDefinition {
@@ -150,6 +175,117 @@ final class SeoActionFormPlan {
   String get endpointPath => '$internalSeoActionFormEndpointPrefix$actionId';
 }
 
+final class SeoActionFlowStep {
+  const SeoActionFlowStep({
+    required this.label,
+    required this.description,
+    required this.fieldNames,
+  });
+
+  final String label;
+  final String description;
+  final List<String> fieldNames;
+}
+
+final class SeoActionFlowDefinition {
+  const SeoActionFlowDefinition({
+    required this.form,
+    required this.steps,
+    required this.previousLabel,
+    required this.nextLabel,
+    required this.progressLabel,
+  });
+
+  final SeoActionFormDefinition form;
+  final List<SeoActionFlowStep> steps;
+  final String previousLabel;
+  final String nextLabel;
+  final String progressLabel;
+}
+
+final class SeoActionFlowPlanStep {
+  const SeoActionFlowPlanStep({
+    required this.label,
+    required this.description,
+    required this.firstFieldIndex,
+    required this.fields,
+  });
+
+  final String label;
+  final String description;
+  final int firstFieldIndex;
+  final List<SeoActionFormPlanField> fields;
+}
+
+final class SeoActionFlowPlan {
+  const SeoActionFlowPlan._({
+    required this.form,
+    required this.steps,
+    required this.previousLabel,
+    required this.nextLabel,
+    required this.progressLabel,
+  });
+
+  final SeoActionFormPlan form;
+  final List<SeoActionFlowPlanStep> steps;
+  final String previousLabel;
+  final String nextLabel;
+  final String progressLabel;
+}
+
+/// Pure navigation state shared by native and DOM-first action flows.
+final class SeoActionFlowState {
+  const SeoActionFlowState({required this.index, required this.count});
+
+  final int index;
+  final int count;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SeoActionFlowState &&
+      other.index == index &&
+      other.count == count;
+
+  @override
+  int get hashCode => Object.hash(index, count);
+}
+
+/// A user navigation intent admitted by the linear action flow.
+sealed class SeoActionFlowAction {
+  const SeoActionFlowAction();
+}
+
+/// Moves to the next step without wrapping at the final step.
+final class SeoActionFlowNext extends SeoActionFlowAction {
+  const SeoActionFlowNext();
+}
+
+/// Moves to the previous step without wrapping at the first step.
+final class SeoActionFlowPrevious extends SeoActionFlowAction {
+  const SeoActionFlowPrevious();
+}
+
+/// Returns a normalized initial state for an action flow.
+SeoActionFlowState initialSeoActionFlowState({required int count}) {
+  final normalizedCount = count < 0 ? 0 : count;
+  return SeoActionFlowState(index: 0, count: normalizedCount);
+}
+
+/// Computes the next linear action-flow state without retaining state.
+SeoActionFlowState transitionSeoActionFlow(
+  SeoActionFlowState state,
+  SeoActionFlowAction action,
+) {
+  final count = state.count < 0 ? 0 : state.count;
+  if (count == 0) return const SeoActionFlowState(index: 0, count: 0);
+  final current = state.index.clamp(0, count - 1);
+  final next = switch (action) {
+    SeoActionFlowNext() => (current + 1).clamp(0, count - 1),
+    SeoActionFlowPrevious() => (current - 1).clamp(0, count - 1),
+  };
+  return SeoActionFlowState(index: next, count: count);
+}
+
 final class SeoActionFormValues {
   SeoActionFormValues._(Map<String, Object> values)
       : values = Map.unmodifiable(values);
@@ -158,6 +294,8 @@ final class SeoActionFormValues {
 
   String text(String name) =>
       values[name] is String ? values[name]! as String : '';
+
+  String choice(String name) => text(name);
 
   bool consent(String name) => values[name] == true;
 }
@@ -250,15 +388,39 @@ SeoActionFormPlan? prepareSeoActionForm(SeoActionFormDefinition definition) {
             seoActionFormMaxDescriptionLength,
           );
     final maxLength = raw.maxLength ?? _defaultMaxLength(raw.kind);
+    final choicePrompt = raw.choicePrompt == null
+        ? null
+        : _canonicalText(raw.choicePrompt!, seoActionFormMaxLabelLength);
+    final options = <SeoActionFormPlanOption>[];
+    final optionValues = <String>{};
+    for (final option in raw.options) {
+      final value = option.value.trim();
+      final optionLabel =
+          _canonicalText(option.label, seoActionFormMaxLabelLength);
+      if (!_optionValue.hasMatch(value) ||
+          !optionValues.add(value) ||
+          optionLabel == null) {
+        return null;
+      }
+      options.add(SeoActionFormPlanOption(value: value, label: optionLabel));
+    }
     if (!_fieldName.hasMatch(name) ||
         !names.add(name) ||
         label == null ||
         (raw.description != null && fieldDescription == null) ||
+        !_validChoice(raw.kind, choicePrompt, options) ||
         !_validFieldBounds(raw.kind, raw.minLength, maxLength) ||
         !_validAutocomplete(raw.kind, raw.autocomplete)) {
       return null;
     }
-    aggregate += name.length + label.length + (fieldDescription?.length ?? 0);
+    aggregate += name.length +
+        label.length +
+        (fieldDescription?.length ?? 0) +
+        (choicePrompt?.length ?? 0) +
+        options.fold<int>(
+          0,
+          (sum, option) => sum + option.value.length + option.label.length,
+        );
     if (aggregate > seoActionFormMaxAggregateResultLength) return null;
     fields.add(SeoActionFormPlanField(
       name: name,
@@ -269,6 +431,8 @@ SeoActionFormPlan? prepareSeoActionForm(SeoActionFormDefinition definition) {
       minLength: raw.minLength,
       maxLength: maxLength,
       autocomplete: raw.autocomplete,
+      choicePrompt: choicePrompt,
+      options: List.unmodifiable(options),
     ));
   }
 
@@ -309,6 +473,14 @@ List<SeoNode> buildSeoActionFormPlanNodes(SeoActionFormPlan plan) {
                 SeoNode(tag: 'strong', text: field.label),
                 if (field.description case final description?)
                   SeoNode(tag: 'p', text: description),
+                if (field.kind == SeoActionFormFieldKind.choice)
+                  SeoNode(
+                    tag: 'ul',
+                    children: [
+                      for (final option in field.options)
+                        SeoNode(tag: 'li', text: option.label),
+                    ],
+                  ),
               ],
             ),
         ],
@@ -328,27 +500,143 @@ List<SeoNode> buildSeoActionFormPlanNodes(SeoActionFormPlan plan) {
         failureLabel: plan.failureLabel,
         statusLabel: plan.statusLabel,
         fields: List.unmodifiable([
-          for (final field in plan.fields)
-            SeoActionFormMarkupField(
-              name: field.name,
-              label: field.label,
-              kind: switch (field.kind) {
-                SeoActionFormFieldKind.text =>
-                  SeoActionFormMarkupFieldKind.text,
-                SeoActionFormFieldKind.email =>
-                  SeoActionFormMarkupFieldKind.email,
-                SeoActionFormFieldKind.multiline =>
-                  SeoActionFormMarkupFieldKind.multiline,
-                SeoActionFormFieldKind.consent =>
-                  SeoActionFormMarkupFieldKind.consent,
-              },
-              required: field.required,
-              minLength: field.minLength,
-              maxLength: field.maxLength,
-              autocomplete: field.autocomplete.value,
-              description: field.description,
-            ),
+          for (final field in plan.fields) _actionFormMarkupField(field),
         ]),
+      ),
+    ),
+  ];
+}
+
+SeoActionFlowPlan? prepareSeoActionFlow(SeoActionFlowDefinition definition) {
+  final form = prepareSeoActionForm(definition.form);
+  if (form == null ||
+      definition.steps.length < 2 ||
+      definition.steps.length > seoActionFlowMaxSteps) {
+    return null;
+  }
+  final previousLabel = canonicalizeSeoActionFormText(
+    definition.previousLabel,
+    maxLength: seoActionFormMaxLabelLength,
+  );
+  final nextLabel = canonicalizeSeoActionFormText(
+    definition.nextLabel,
+    maxLength: seoActionFormMaxLabelLength,
+  );
+  final progressLabel = canonicalizeSeoActionFormText(
+    definition.progressLabel,
+    maxLength: seoActionFormMaxLabelLength,
+  );
+  if (previousLabel == null || nextLabel == null || progressLabel == null) {
+    return null;
+  }
+
+  final steps = <SeoActionFlowPlanStep>[];
+  var fieldIndex = 0;
+  for (final rawStep in definition.steps) {
+    final label = canonicalizeSeoActionFormText(
+      rawStep.label,
+      maxLength: seoActionFormMaxLabelLength,
+    );
+    final description = canonicalizeSeoActionFormText(
+      rawStep.description,
+      maxLength: seoActionFormMaxDescriptionLength,
+    );
+    if (label == null ||
+        description == null ||
+        rawStep.fieldNames.isEmpty ||
+        fieldIndex + rawStep.fieldNames.length > form.fields.length) {
+      return null;
+    }
+    final fields = <SeoActionFormPlanField>[];
+    for (final rawName in rawStep.fieldNames) {
+      final name = rawName.trim();
+      final expected = form.fields[fieldIndex];
+      if (name != expected.name) return null;
+      fields.add(expected);
+      fieldIndex++;
+    }
+    steps.add(SeoActionFlowPlanStep(
+      label: label,
+      description: description,
+      firstFieldIndex: fieldIndex - fields.length,
+      fields: List.unmodifiable(fields),
+    ));
+  }
+  if (fieldIndex != form.fields.length) return null;
+  return SeoActionFlowPlan._(
+    form: form,
+    steps: List.unmodifiable(steps),
+    previousLabel: previousLabel,
+    nextLabel: nextLabel,
+    progressLabel: progressLabel,
+  );
+}
+
+List<SeoNode> buildSeoActionFlowNodes(SeoActionFlowDefinition definition) {
+  final plan = prepareSeoActionFlow(definition);
+  return plan == null ? const [] : buildSeoActionFlowPlanNodes(plan);
+}
+
+List<SeoNode> buildSeoActionFlowPlanNodes(SeoActionFlowPlan plan) {
+  final form = plan.form;
+  final stepHeadingLevel = form.headingLevel < 6 ? form.headingLevel + 1 : 6;
+  final fallback = SeoNode(
+    tag: 'section',
+    attributes: const {'class': 'esen-seo-action-flow-summary'},
+    children: [
+      SeoNode(tag: 'h${form.headingLevel}', text: form.heading),
+      SeoNode(tag: 'p', text: form.description),
+      SeoNode(
+        tag: 'ol',
+        children: [
+          for (final step in plan.steps)
+            SeoNode(
+              tag: 'li',
+              children: [
+                SeoNode(tag: 'h$stepHeadingLevel', text: step.label),
+                SeoNode(tag: 'p', text: step.description),
+                SeoNode(
+                  tag: 'ul',
+                  children: [
+                    for (final field in step.fields)
+                      _actionFormFieldSummaryNode(field),
+                  ],
+                ),
+              ],
+            ),
+        ],
+      ),
+    ],
+  );
+  return [
+    buildInternalSeoActionFormNode(
+      fallback: fallback,
+      markup: SeoActionFormMarkup(
+        actionId: form.actionId,
+        headingLevel: form.headingLevel,
+        heading: form.heading,
+        description: form.description,
+        submitLabel: form.submitLabel,
+        pendingLabel: form.pendingLabel,
+        failureLabel: form.failureLabel,
+        statusLabel: form.statusLabel,
+        fields: List.unmodifiable([
+          for (final field in form.fields) _actionFormMarkupField(field),
+        ]),
+        flow: SeoActionFlowMarkup(
+          steps: List.unmodifiable([
+            for (final step in plan.steps)
+              SeoActionFlowMarkupStep(
+                label: step.label,
+                description: step.description,
+                firstFieldIndex: step.firstFieldIndex,
+                fieldCount: step.fields.length,
+              ),
+          ]),
+          previousLabel: plan.previousLabel,
+          nextLabel: plan.nextLabel,
+          progressLabel: plan.progressLabel,
+        ),
       ),
     ),
   ];
@@ -394,6 +682,21 @@ SeoActionFormValidation validateSeoActionFormValues(
       normalized[field.name] = accepted;
       if (field.required && !accepted) {
         errors[field.name] = plan.messages.consentRequired;
+      }
+      continue;
+    }
+
+    if (field.kind == SeoActionFormFieldKind.choice) {
+      if (raw.isNotEmpty &&
+          !field.options.any((option) => option.value == raw)) {
+        return const SeoActionFormValidation._(
+          malformed: true,
+          errors: {},
+        );
+      }
+      normalized[field.name] = raw;
+      if (field.required && raw.isEmpty) {
+        errors[field.name] = plan.messages.required;
       }
       continue;
     }
@@ -457,12 +760,72 @@ String? canonicalizeSeoActionFormText(
 }) =>
     _canonicalText(raw, maxLength);
 
+SeoNode _actionFormFieldSummaryNode(SeoActionFormPlanField field) => SeoNode(
+      tag: 'li',
+      children: [
+        SeoNode(tag: 'strong', text: field.label),
+        if (field.description case final description?)
+          SeoNode(tag: 'p', text: description),
+        if (field.kind == SeoActionFormFieldKind.choice)
+          SeoNode(
+            tag: 'ul',
+            children: [
+              for (final option in field.options)
+                SeoNode(tag: 'li', text: option.label),
+            ],
+          ),
+      ],
+    );
+
+SeoActionFormMarkupField _actionFormMarkupField(
+  SeoActionFormPlanField field,
+) =>
+    SeoActionFormMarkupField(
+      name: field.name,
+      label: field.label,
+      kind: switch (field.kind) {
+        SeoActionFormFieldKind.text => SeoActionFormMarkupFieldKind.text,
+        SeoActionFormFieldKind.email => SeoActionFormMarkupFieldKind.email,
+        SeoActionFormFieldKind.multiline =>
+          SeoActionFormMarkupFieldKind.multiline,
+        SeoActionFormFieldKind.consent => SeoActionFormMarkupFieldKind.consent,
+        SeoActionFormFieldKind.choice => SeoActionFormMarkupFieldKind.choice,
+      },
+      required: field.required,
+      minLength: field.minLength,
+      maxLength: field.maxLength,
+      autocomplete: field.autocomplete.value,
+      description: field.description,
+      choicePrompt: field.choicePrompt,
+      options: List.unmodifiable([
+        for (final option in field.options)
+          SeoActionFormMarkupOption(
+            value: option.value,
+            label: option.label,
+          ),
+      ]),
+    );
+
+bool _validChoice(
+  SeoActionFormFieldKind kind,
+  String? prompt,
+  List<SeoActionFormPlanOption> options,
+) {
+  if (kind != SeoActionFormFieldKind.choice) {
+    return prompt == null && options.isEmpty;
+  }
+  return prompt != null &&
+      options.length >= 2 &&
+      options.length <= seoActionFormMaxOptions;
+}
+
 bool _validFieldBounds(
   SeoActionFormFieldKind kind,
   int minLength,
   int maxLength,
 ) {
-  if (kind == SeoActionFormFieldKind.consent) {
+  if (kind == SeoActionFormFieldKind.consent ||
+      kind == SeoActionFormFieldKind.choice) {
     return minLength == 0 && maxLength == 0;
   }
   final maximum = _defaultMaxLength(kind);
@@ -476,7 +839,7 @@ int _defaultMaxLength(SeoActionFormFieldKind kind) => switch (kind) {
       SeoActionFormFieldKind.text => seoActionFormMaxTextLength,
       SeoActionFormFieldKind.email => seoActionFormMaxEmailLength,
       SeoActionFormFieldKind.multiline => seoActionFormMaxMultilineLength,
-      SeoActionFormFieldKind.consent => 0,
+      SeoActionFormFieldKind.consent || SeoActionFormFieldKind.choice => 0,
     };
 
 bool _validAutocomplete(
@@ -490,7 +853,8 @@ bool _validAutocomplete(
         autocomplete == SeoActionFormAutocomplete.off ||
             autocomplete == SeoActionFormAutocomplete.email,
       SeoActionFormFieldKind.multiline ||
-      SeoActionFormFieldKind.consent =>
+      SeoActionFormFieldKind.consent ||
+      SeoActionFormFieldKind.choice =>
         autocomplete == SeoActionFormAutocomplete.off,
     };
 
@@ -514,7 +878,10 @@ SeoActionFormMessages? _canonicalMessages(SeoActionFormMessages raw) {
 
 String? _canonicalText(String raw, int maxLength) {
   final value = canonicalizeSeoConfiguratorText(raw, maxLength: maxLength);
-  if (value == null || _hasForbiddenControl(value, multiline: false)) {
+  if (value == null ||
+      _hasUnpairedSurrogate(value) ||
+      _hasBidiControl(value) ||
+      _hasForbiddenControl(value, multiline: false)) {
     return null;
   }
   return value;

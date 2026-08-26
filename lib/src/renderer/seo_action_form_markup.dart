@@ -10,8 +10,17 @@ const int internalSeoActionFormMaxFieldNameLength = 32;
 const int internalSeoActionFormMaxTextLength = 512;
 const int internalSeoActionFormMaxEmailLength = 254;
 const int internalSeoActionFormMaxMultilineLength = 4096;
+const int internalSeoActionFormMaxOptions = 12;
+const int internalSeoActionFlowMaxSteps = 6;
 
-enum SeoActionFormMarkupFieldKind { text, email, multiline, consent }
+enum SeoActionFormMarkupFieldKind { text, email, multiline, consent, choice }
+
+final class SeoActionFormMarkupOption {
+  const SeoActionFormMarkupOption({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
 
 final class SeoActionFormMarkupField {
   const SeoActionFormMarkupField({
@@ -23,6 +32,8 @@ final class SeoActionFormMarkupField {
     required this.maxLength,
     required this.autocomplete,
     this.description,
+    this.choicePrompt,
+    this.options = const [],
   });
 
   final String name;
@@ -33,6 +44,36 @@ final class SeoActionFormMarkupField {
   final int maxLength;
   final String autocomplete;
   final String? description;
+  final String? choicePrompt;
+  final List<SeoActionFormMarkupOption> options;
+}
+
+final class SeoActionFlowMarkupStep {
+  const SeoActionFlowMarkupStep({
+    required this.label,
+    required this.description,
+    required this.firstFieldIndex,
+    required this.fieldCount,
+  });
+
+  final String label;
+  final String description;
+  final int firstFieldIndex;
+  final int fieldCount;
+}
+
+final class SeoActionFlowMarkup {
+  const SeoActionFlowMarkup({
+    required this.steps,
+    required this.previousLabel,
+    required this.nextLabel,
+    required this.progressLabel,
+  });
+
+  final List<SeoActionFlowMarkupStep> steps;
+  final String previousLabel;
+  final String nextLabel;
+  final String progressLabel;
 }
 
 final class SeoActionFormMarkup {
@@ -46,6 +87,7 @@ final class SeoActionFormMarkup {
     required this.failureLabel,
     required this.statusLabel,
     required this.fields,
+    this.flow,
   });
 
   final String actionId;
@@ -57,6 +99,7 @@ final class SeoActionFormMarkup {
   final String failureLabel;
   final String statusLabel;
   final List<SeoActionFormMarkupField> fields;
+  final SeoActionFlowMarkup? flow;
 }
 
 bool isValidInternalSeoActionFormMarkup(SeoActionFormMarkup markup) {
@@ -87,7 +130,8 @@ bool isValidInternalSeoActionFormMarkup(SeoActionFormMarkup markup) {
               field.description!,
               internalSeoActionFormMaxDescriptionLength,
             )) ||
-        !_autocompletes.contains(field.autocomplete)) {
+        !_autocompletes.contains(field.autocomplete) ||
+        !_validOptions(field)) {
       return false;
     }
     final maximum = switch (field.kind) {
@@ -95,9 +139,12 @@ bool isValidInternalSeoActionFormMarkup(SeoActionFormMarkup markup) {
       SeoActionFormMarkupFieldKind.email => internalSeoActionFormMaxEmailLength,
       SeoActionFormMarkupFieldKind.multiline =>
         internalSeoActionFormMaxMultilineLength,
-      SeoActionFormMarkupFieldKind.consent => 0,
+      SeoActionFormMarkupFieldKind.consent ||
+      SeoActionFormMarkupFieldKind.choice =>
+        0,
     };
-    if (field.kind == SeoActionFormMarkupFieldKind.consent) {
+    if (field.kind == SeoActionFormMarkupFieldKind.consent ||
+        field.kind == SeoActionFormMarkupFieldKind.choice) {
       if (field.minLength != 0 ||
           field.maxLength != 0 ||
           field.autocomplete != 'off') {
@@ -114,12 +161,62 @@ bool isValidInternalSeoActionFormMarkup(SeoActionFormMarkup markup) {
         field.autocomplete != 'email') {
       return false;
     }
-    if (field.kind == SeoActionFormMarkupFieldKind.multiline &&
+    if ((field.kind == SeoActionFormMarkupFieldKind.multiline ||
+            field.kind == SeoActionFormMarkupFieldKind.choice ||
+            field.kind == SeoActionFormMarkupFieldKind.consent) &&
         field.autocomplete != 'off') {
       return false;
     }
   }
+  return _validFlow(markup);
+}
+
+bool _validOptions(SeoActionFormMarkupField field) {
+  if (field.kind != SeoActionFormMarkupFieldKind.choice) {
+    return field.options.isEmpty && field.choicePrompt == null;
+  }
+  if (field.choicePrompt == null ||
+      !_validText(field.choicePrompt!, internalSeoActionFormMaxLabelLength) ||
+      field.options.length < 2 ||
+      field.options.length > internalSeoActionFormMaxOptions) {
+    return false;
+  }
+  final values = <String>{};
+  for (final option in field.options) {
+    if (!_optionValue.hasMatch(option.value) ||
+        !values.add(option.value) ||
+        !_validText(option.label, internalSeoActionFormMaxLabelLength)) {
+      return false;
+    }
+  }
   return true;
+}
+
+bool _validFlow(SeoActionFormMarkup markup) {
+  final flow = markup.flow;
+  if (flow == null) return true;
+  if (flow.steps.length < 2 ||
+      flow.steps.length > internalSeoActionFlowMaxSteps ||
+      !_validText(flow.previousLabel, internalSeoActionFormMaxLabelLength) ||
+      !_validText(flow.nextLabel, internalSeoActionFormMaxLabelLength) ||
+      !_validText(flow.progressLabel, internalSeoActionFormMaxLabelLength)) {
+    return false;
+  }
+  var expectedField = 0;
+  for (final step in flow.steps) {
+    if (!_validText(step.label, internalSeoActionFormMaxLabelLength) ||
+        !_validText(
+          step.description,
+          internalSeoActionFormMaxDescriptionLength,
+        ) ||
+        step.firstFieldIndex != expectedField ||
+        step.fieldCount < 1 ||
+        step.firstFieldIndex + step.fieldCount > markup.fields.length) {
+      return false;
+    }
+    expectedField += step.fieldCount;
+  }
+  return expectedField == markup.fields.length;
 }
 
 bool _validText(String value, int maxLength) =>
@@ -155,6 +252,7 @@ bool _hasForbiddenCodeUnit(String value) {
 
 final RegExp _interactionId = RegExp(r'^[a-z][a-z0-9_-]{0,63}$');
 final RegExp _fieldName = RegExp(r'^[a-z][a-z0-9_]{0,31}$');
+final RegExp _optionValue = RegExp(r'^[a-z][a-z0-9_-]{0,31}$');
 const Set<String> _autocompletes = {
   'off',
   'name',
