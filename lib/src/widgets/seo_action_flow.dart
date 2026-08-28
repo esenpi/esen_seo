@@ -38,10 +38,12 @@ class _SeoActionFlowState extends State<SeoActionFlow>
   final _consents = <String, bool>{};
   final _choices = <String, String>{};
   final _stepFocusNodes = <FocusNode>[];
+  final _reviewFocusNode = FocusNode();
   SeoActionFlowPlan? _plan;
   Map<String, String> _fieldErrors = const {};
   String? _status;
   int _currentStep = 0;
+  bool _showingReview = false;
   int _generation = 0;
   bool _submitting = false;
 
@@ -62,6 +64,7 @@ class _SeoActionFlowState extends State<SeoActionFlow>
     _fieldErrors = const {};
     _status = null;
     _currentStep = 0;
+    _showingReview = false;
     _replacePlan(next, preserveValues: _sameFlowControls(_plan, next));
   }
 
@@ -73,6 +76,7 @@ class _SeoActionFlowState extends State<SeoActionFlow>
     for (final node in _stepFocusNodes) {
       node.dispose();
     }
+    _reviewFocusNode.dispose();
     super.dispose();
   }
 
@@ -123,7 +127,15 @@ class _SeoActionFlowState extends State<SeoActionFlow>
     final plan = _plan;
     if (plan == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final step = plan.steps[_currentStep];
+    final rawValues = _rawValues(plan.form);
+    final activeSteps = activeSeoActionFlowStepIndexes(plan, rawValues);
+    final currentPosition = _showingReview
+        ? activeSteps.length
+        : activeSteps.indexOf(_currentStep).clamp(0, activeSteps.length - 1);
+    final stageCount = activeSteps.length + (plan.review == null ? 0 : 1);
+    final stageLabel = _showingReview
+        ? plan.review!.label
+        : plan.steps[activeSteps[currentPosition]].label;
     return Form(
       key: _formKey,
       child: Column(
@@ -137,32 +149,30 @@ class _SeoActionFlowState extends State<SeoActionFlow>
           Semantics(
             container: true,
             label: plan.progressLabel,
-            value: '${_currentStep + 1} / ${plan.steps.length}: ${step.label}',
+            value: '${currentPosition + 1} / $stageCount: $stageLabel',
             child: Text(
-              '${_currentStep + 1} / ${plan.steps.length}',
+              '${currentPosition + 1} / $stageCount',
               style: theme.textTheme.labelLarge,
             ),
           ),
           const SizedBox(height: 12),
-          IndexedStack(
-            index: _currentStep,
-            sizing: StackFit.loose,
-            children: [
-              for (final (index, candidate) in plan.steps.indexed)
-                _step(context, index, candidate),
-            ],
-          ),
+          if (_showingReview)
+            _review(context, plan, rawValues)
+          else
+            _step(context, _currentStep, plan.steps[_currentStep]),
           const SizedBox(height: 20),
           Row(
             children: [
               OutlinedButton(
-                onPressed: _submitting || _currentStep == 0
+                onPressed: _submitting || currentPosition == 0
                     ? null
                     : () => _navigate(const SeoActionFlowPrevious()),
                 child: Text(plan.previousLabel),
               ),
               const Spacer(),
-              if (_currentStep < plan.steps.length - 1)
+              if (!_showingReview &&
+                  (currentPosition < activeSteps.length - 1 ||
+                      plan.review != null))
                 FilledButton(
                   onPressed: _submitting ? null : _next,
                   child: Text(plan.nextLabel),
@@ -187,6 +197,36 @@ class _SeoActionFlowState extends State<SeoActionFlow>
               value: status,
               child: Text(status),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _review(
+    BuildContext context,
+    SeoActionFlowPlan plan,
+    Map<String, String> rawValues,
+  ) {
+    final validation = validateSeoActionFlowValues(plan, rawValues);
+    final entries = validation.isValid
+        ? buildSeoActionFlowReviewEntries(plan, validation.values!)
+        : const <SeoActionFlowReviewEntry>[];
+    final theme = Theme.of(context);
+    return Focus(
+      focusNode: _reviewFocusNode,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(plan.review!.label, style: theme.textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(plan.review!.description),
+          const SizedBox(height: 16),
+          for (final entry in entries) ...[
+            Text(entry.label, style: theme.textTheme.labelLarge),
+            const SizedBox(height: 2),
+            Text(entry.value),
+            const SizedBox(height: 12),
           ],
         ],
       ),
@@ -247,6 +287,7 @@ class _SeoActionFlowState extends State<SeoActionFlow>
         decoration: InputDecoration(
           labelText: field.label,
           helperText: field.description,
+          errorText: _fieldErrors[field.name],
         ),
         validator: (_) => _fieldErrors[field.name],
         onChanged: (_) => _clearFieldError(field.name),
@@ -260,7 +301,7 @@ class _SeoActionFlowState extends State<SeoActionFlow>
           decoration: InputDecoration(
             labelText: field.label,
             helperText: field.description,
-            errorText: state.errorText,
+            errorText: _fieldErrors[field.name] ?? state.errorText,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -281,8 +322,16 @@ class _SeoActionFlowState extends State<SeoActionFlow>
                   : (value) {
                       setState(() {
                         _choices[field.name] = value ?? '';
-                        _fieldErrors = Map<String, String>.of(_fieldErrors)
-                          ..remove(field.name);
+                        final active = activeSeoActionFlowFieldNames(
+                          _plan!,
+                          _rawValues(_plan!.form),
+                        );
+                        _fieldErrors = Map.unmodifiable({
+                          for (final entry in _fieldErrors.entries)
+                            if (entry.key != field.name &&
+                                active.contains(entry.key))
+                              entry.key: entry.value,
+                        });
                       });
                     },
             ),
@@ -345,22 +394,31 @@ class _SeoActionFlowState extends State<SeoActionFlow>
   void _next() {
     final plan = _plan;
     if (plan == null || _submitting) return;
-    final validation = validateSeoActionFormValues(
-      plan.form,
-      _rawValues(plan.form),
-    );
+    final rawValues = _rawValues(plan.form);
+    final activeSteps = activeSeoActionFlowStepIndexes(plan, rawValues);
+    final currentPosition = activeSteps.indexOf(_currentStep);
+    if (currentPosition < 0) return;
+    final enteringReview =
+        plan.review != null && currentPosition == activeSteps.length - 1;
+    final validation = validateSeoActionFlowValues(plan, rawValues);
     final names = {
       for (final field in plan.steps[_currentStep].fields) field.name
     };
     final errors = {
       for (final entry in validation.errors.entries)
-        if (names.contains(entry.key)) entry.key: entry.value,
+        if (enteringReview || names.contains(entry.key)) entry.key: entry.value,
     };
     if (validation.malformed || errors.isNotEmpty) {
+      final firstInvalidStep =
+          enteringReview ? _firstStepForFields(plan, errors.keys) : null;
       setState(() {
         _fieldErrors = Map.unmodifiable(errors);
         _status = _canonicalMessage(widget.invalidMessage) ??
             'Please correct the highlighted fields.';
+        if (firstInvalidStep != null) {
+          _currentStep = firstInvalidStep;
+          _showingReview = false;
+        }
       });
       _formKey.currentState?.validate();
       return;
@@ -375,17 +433,42 @@ class _SeoActionFlowState extends State<SeoActionFlow>
   void _navigate(SeoActionFlowAction action) {
     final plan = _plan;
     if (plan == null) return;
+    final activeSteps = activeSeoActionFlowStepIndexes(
+      plan,
+      _rawValues(plan.form),
+    );
+    final currentPosition =
+        _showingReview ? activeSteps.length : activeSteps.indexOf(_currentStep);
+    if (currentPosition < 0) return;
+    final count = activeSteps.length + (plan.review == null ? 0 : 1);
     final next = transitionSeoActionFlow(
-      SeoActionFlowState(index: _currentStep, count: plan.steps.length),
+      SeoActionFlowState(index: currentPosition, count: count),
       action,
     );
-    _showStep(next.index);
+    _showPosition(next.index, activeSteps);
+  }
+
+  void _showPosition(int position, List<int> activeSteps) {
+    final plan = _plan;
+    if (plan == null || position < 0) return;
+    if (position == activeSteps.length && plan.review != null) {
+      setState(() => _showingReview = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _reviewFocusNode.requestFocus();
+      });
+      return;
+    }
+    if (position >= activeSteps.length) return;
+    _showStep(activeSteps[position]);
   }
 
   void _showStep(int index) {
     final plan = _plan;
     if (plan == null || index < 0 || index >= plan.steps.length) return;
-    setState(() => _currentStep = index);
+    setState(() {
+      _currentStep = index;
+      _showingReview = false;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && index < _stepFocusNodes.length) {
         _stepFocusNodes[index].requestFocus();
@@ -396,8 +479,8 @@ class _SeoActionFlowState extends State<SeoActionFlow>
   Future<void> _submit() async {
     final plan = _plan;
     if (plan == null || _submitting) return;
-    final validation = validateSeoActionFormValues(
-      plan.form,
+    final validation = validateSeoActionFlowValues(
+      plan,
       _rawValues(plan.form),
     );
     if (!validation.isValid) {
@@ -409,7 +492,10 @@ class _SeoActionFlowState extends State<SeoActionFlow>
         _fieldErrors = validation.errors;
         _status = _canonicalMessage(widget.invalidMessage) ??
             'Please correct the highlighted fields.';
-        if (firstInvalidStep != null) _currentStep = firstInvalidStep;
+        if (firstInvalidStep != null) {
+          _currentStep = firstInvalidStep;
+          _showingReview = false;
+        }
       });
       _formKey.currentState?.validate();
       return;
@@ -426,7 +512,11 @@ class _SeoActionFlowState extends State<SeoActionFlow>
       final raw = await Future<SeoActionFormResult>.sync(
         () => widget.onSubmit(validation.values!),
       );
-      result = canonicalizeSeoActionFormResult(plan.form, raw);
+      result = canonicalizeSeoActionFormResult(
+        plan.form,
+        raw,
+        allowedFieldNames: validation.values!.values.keys.toSet(),
+      );
     } catch (_) {
       result = null;
     }
@@ -443,7 +533,10 @@ class _SeoActionFlowState extends State<SeoActionFlow>
       }
       _status = result.message;
       _fieldErrors = result.fieldErrors;
-      if (firstErrorStep != null) _currentStep = firstErrorStep;
+      if (firstErrorStep != null) {
+        _currentStep = firstErrorStep;
+        _showingReview = false;
+      }
       if (result.outcome == SeoActionFormOutcome.success &&
           widget.resetOnSuccess) {
         for (final controller in _controllers.values) {
@@ -456,6 +549,7 @@ class _SeoActionFlowState extends State<SeoActionFlow>
           _choices[name] = '';
         }
         _currentStep = 0;
+        _showingReview = false;
       }
     });
     _formKey.currentState?.validate();
@@ -502,6 +596,7 @@ bool _sameFlowPlan(SeoActionFlowPlan? left, SeoActionFlowPlan? right) {
       left.previousLabel != right.previousLabel ||
       left.nextLabel != right.nextLabel ||
       left.progressLabel != right.progressLabel ||
+      !_sameReview(left.review, right.review) ||
       left.steps.length != right.steps.length ||
       !_sameFormPlan(left.form, right.form)) {
     return false;
@@ -512,12 +607,28 @@ bool _sameFlowPlan(SeoActionFlowPlan? left, SeoActionFlowPlan? right) {
     if (a.label != b.label ||
         a.description != b.description ||
         a.firstFieldIndex != b.firstFieldIndex ||
+        a.condition?.fieldName != b.condition?.fieldName ||
+        a.condition?.fieldIndex != b.condition?.fieldIndex ||
+        a.condition?.value != b.condition?.value ||
         a.fields.length != b.fields.length) {
       return false;
     }
   }
   return true;
 }
+
+bool _sameReview(
+  SeoActionFlowPlanReview? left,
+  SeoActionFlowPlanReview? right,
+) =>
+    identical(left, right) ||
+    (left != null &&
+        right != null &&
+        left.label == right.label &&
+        left.description == right.description &&
+        left.emptyValueLabel == right.emptyValueLabel &&
+        left.consentAcceptedLabel == right.consentAcceptedLabel &&
+        left.consentDeclinedLabel == right.consentDeclinedLabel);
 
 bool _sameFormPlan(SeoActionFormPlan left, SeoActionFormPlan right) {
   if (left.actionId != right.actionId ||

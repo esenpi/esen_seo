@@ -305,8 +305,24 @@ class HtmlRenderer {
       buffer
         ..write('<li data-esen-action-flow-progress="')
         ..write(index)
-        ..write('">')
+        ..write('"');
+      if (step.condition case final condition?) {
+        buffer
+          ..write(' data-esen-action-flow-when-field="')
+          ..write(escapeAttribute(condition.fieldName))
+          ..write('" data-esen-action-flow-when-value="')
+          ..write(escapeAttribute(condition.value))
+          ..write('"');
+      }
+      buffer
+        ..write('>')
         ..write(escapeText(step.label))
+        ..write('</li>');
+    }
+    if (flow.review case final review?) {
+      buffer
+        ..write('<li data-esen-action-flow-progress="review" hidden>')
+        ..write(escapeText(review.label))
         ..write('</li>');
     }
     buffer
@@ -324,7 +340,17 @@ class HtmlRenderer {
         ..write('<section class="esen-seo-action-flow-step" ')
         ..write('data-esen-action-flow-step="')
         ..write(stepIndex)
-        ..write('" aria-labelledby="')
+        ..write('"');
+      if (step.condition case final condition?) {
+        buffer
+          ..write(' data-esen-action-flow-when-field="')
+          ..write(escapeAttribute(condition.fieldName))
+          ..write('" data-esen-action-flow-when-value="')
+          ..write(escapeAttribute(condition.value))
+          ..write('"');
+      }
+      buffer
+        ..write(' aria-labelledby="')
         ..write(headingId)
         ..write('"><h')
         ..write(stepHeadingLevel)
@@ -344,9 +370,46 @@ class HtmlRenderer {
           rootId,
           fieldIndex,
           form.fields[fieldIndex],
+          conditionallyRequired:
+              step.condition != null && form.fields[fieldIndex].required,
         );
       }
       buffer.write('</section>');
+    }
+    if (flow.review case final review?) {
+      final headingId = '$rootId-review-heading';
+      buffer
+        ..write('<section class="esen-seo-action-flow-review" ')
+        ..write('data-esen-action-flow-review hidden aria-labelledby="')
+        ..write(headingId)
+        ..write('" data-esen-empty-label="')
+        ..write(escapeAttribute(review.emptyValueLabel))
+        ..write('" data-esen-consent-accepted-label="')
+        ..write(escapeAttribute(review.consentAcceptedLabel))
+        ..write('" data-esen-consent-declined-label="')
+        ..write(escapeAttribute(review.consentDeclinedLabel))
+        ..write('"><h')
+        ..write(stepHeadingLevel)
+        ..write(' id="')
+        ..write(headingId)
+        ..write('" tabindex="-1">')
+        ..write(escapeText(review.label))
+        ..write('</h')
+        ..write(stepHeadingLevel)
+        ..write('><p>')
+        ..write(escapeText(review.description))
+        ..write('</p><dl>');
+      for (final (index, field) in form.fields.indexed) {
+        buffer
+          ..write('<div data-esen-action-flow-review-row="')
+          ..write(index)
+          ..write('" hidden><dt>')
+          ..write(escapeText(field.label))
+          ..write('</dt><dd data-esen-action-flow-review-value="')
+          ..write(index)
+          ..write('"></dd></div>');
+      }
+      buffer.write('</dl></section>');
     }
     buffer
       ..write('<div class="esen-seo-action-flow-navigation" ')
@@ -371,8 +434,9 @@ class HtmlRenderer {
     StringBuffer buffer,
     String rootId,
     int index,
-    SeoActionFormMarkupField field,
-  ) {
+    SeoActionFormMarkupField field, {
+    bool conditionallyRequired = false,
+  }) {
     final controlId = '$rootId-field-$index';
     final descriptionId = '$controlId-description';
     final errorId = '$controlId-error';
@@ -412,14 +476,18 @@ class HtmlRenderer {
         ..write(field.name)
         ..write('" data-esen-action-form-control="')
         ..write(index)
-        ..write('" aria-describedby="')
+        ..write('"')
+        ..write(conditionallyRequired
+            ? ' data-esen-action-flow-required="true"'
+            : '')
+        ..write(' aria-describedby="')
         ..write(describedBy)
         ..write('" minlength="')
         ..write(field.minLength)
         ..write('" maxlength="')
         ..write(field.maxLength)
         ..write('" autocomplete="off"')
-        ..write(field.required ? ' required' : '')
+        ..write(field.required && !conditionallyRequired ? ' required' : '')
         ..write('></textarea>');
     } else if (field.kind == SeoActionFormMarkupFieldKind.choice) {
       buffer
@@ -429,10 +497,14 @@ class HtmlRenderer {
         ..write(field.name)
         ..write('" data-esen-action-form-control="')
         ..write(index)
-        ..write('" aria-describedby="')
+        ..write('"')
+        ..write(conditionallyRequired
+            ? ' data-esen-action-flow-required="true"'
+            : '')
+        ..write(' aria-describedby="')
         ..write(describedBy)
         ..write('"')
-        ..write(field.required ? ' required' : '')
+        ..write(field.required && !conditionallyRequired ? ' required' : '')
         ..write('><option value="">')
         ..write(escapeText(field.choicePrompt!))
         ..write('</option>');
@@ -463,7 +535,11 @@ class HtmlRenderer {
         ..write(field.name)
         ..write('" data-esen-action-form-control="')
         ..write(index)
-        ..write('" aria-describedby="')
+        ..write('"')
+        ..write(conditionallyRequired
+            ? ' data-esen-action-flow-required="true"'
+            : '')
+        ..write(' aria-describedby="')
         ..write(describedBy)
         ..write('"');
       if (field.kind == SeoActionFormMarkupFieldKind.consent) {
@@ -479,7 +555,7 @@ class HtmlRenderer {
           ..write('"');
       }
       buffer
-        ..write(field.required ? ' required' : '')
+        ..write(field.required && !conditionallyRequired ? ' required' : '')
         ..write('/>');
     }
     buffer

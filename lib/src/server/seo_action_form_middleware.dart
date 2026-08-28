@@ -35,19 +35,50 @@ final class SeoActionFormServerMessages {
 }
 
 final class SeoActionFormRegistration {
-  SeoActionFormRegistration({
+  factory SeoActionFormRegistration({
     required SeoActionFormDefinition definition,
+    required SeoActionFormHandler handler,
+    SeoActionFormServerMessages messages = const SeoActionFormServerMessages(),
+    String lang = 'en',
+  }) =>
+      SeoActionFormRegistration._(
+        plan: _requirePlan(definition),
+        handler: handler,
+        messages: messages,
+        lang: lang,
+      );
+
+  /// Registers a flow so the server applies its active-branch projection.
+  factory SeoActionFormRegistration.flow({
+    required SeoActionFlowDefinition definition,
+    required SeoActionFormHandler handler,
+    SeoActionFormServerMessages messages = const SeoActionFormServerMessages(),
+    String lang = 'en',
+  }) {
+    final flowPlan = _requireFlowPlan(definition);
+    return SeoActionFormRegistration._(
+      plan: flowPlan.form,
+      flowPlan: flowPlan,
+      handler: handler,
+      messages: messages,
+      lang: lang,
+    );
+  }
+
+  SeoActionFormRegistration._({
+    required this.plan,
     required this.handler,
-    this.messages = const SeoActionFormServerMessages(),
-    this.lang = 'en',
-  })  : plan = _requirePlan(definition),
-        _preparedMessages = _requireMessages(messages) {
+    required this.messages,
+    required this.lang,
+    this.flowPlan,
+  }) : _preparedMessages = _requireMessages(messages) {
     if (!_languageTag.hasMatch(lang)) {
       throw ArgumentError.value(lang, 'lang', 'must be a simple language tag');
     }
   }
 
   final SeoActionFormPlan plan;
+  final SeoActionFlowPlan? flowPlan;
   final SeoActionFormHandler handler;
   final SeoActionFormServerMessages messages;
   final String lang;
@@ -178,10 +209,9 @@ Middleware seoActionFormMiddleware({
         );
       }
 
-      final validation = validateSeoActionFormValues(
-        registration.plan,
-        rawValues,
-      );
+      final validation = registration.flowPlan == null
+          ? validateSeoActionFormValues(registration.plan, rawValues)
+          : validateSeoActionFlowValues(registration.flowPlan!, rawValues);
       if (validation.malformed) {
         return _resultResponse(
           request,
@@ -205,6 +235,9 @@ Middleware seoActionFormMiddleware({
         final result = canonicalizeSeoActionFormResult(
           registration.plan,
           rawResult,
+          allowedFieldNames: registration.flowPlan == null
+              ? null
+              : validation.values!.values.keys.toSet(),
         );
         if (result == null) {
           throw const FormatException('Invalid action-form handler result');
@@ -370,6 +403,14 @@ SeoActionFormPlan _requirePlan(SeoActionFormDefinition definition) {
   final plan = prepareSeoActionForm(definition);
   if (plan == null) {
     throw ArgumentError.value(definition, 'definition', 'is not valid');
+  }
+  return plan;
+}
+
+SeoActionFlowPlan _requireFlowPlan(SeoActionFlowDefinition definition) {
+  final plan = prepareSeoActionFlow(definition);
+  if (plan == null) {
+    throw ArgumentError.value(definition, 'definition', 'is not a valid flow');
   }
   return plan;
 }

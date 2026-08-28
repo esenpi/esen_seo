@@ -190,6 +190,12 @@ const String seoDomFirstActionFlowStylesheet = '''
 #$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-progress>li{padding:.5rem;border-bottom:2px solid var(--esen-color-outline-variant,#bec9c6);text-align:center;overflow-wrap:anywhere}
 #$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-progress>[aria-current="step"]{border-color:var(--esen-color-primary,#006b5f);color:var(--esen-color-primary,#006b5f);font-weight:700}
 #$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-step{display:grid;gap:1rem}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review{display:grid;gap:1rem}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dl{display:grid;gap:.75rem;margin:0}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dl>div{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(0,2fr);gap:.75rem;padding:.75rem 0;border-bottom:1px solid var(--esen-color-outline-variant,#bec9c6)}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dl>div[hidden]{display:none}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dt{font-weight:700}
+#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 #$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-form-field{display:grid;gap:.375rem}
 #$seoContainerId [data-esen-component="action-flow"] label{font-weight:600}
 #$seoContainerId [data-esen-component="action-flow"] input:not([type="checkbox"]),#$seoContainerId [data-esen-component="action-flow"] textarea,#$seoContainerId [data-esen-component="action-flow"] select{box-sizing:border-box;width:100%;min-height:2.75rem;padding:.625rem .75rem;border:1px solid var(--esen-color-outline-variant,#bec9c6);border-radius:6px;background:var(--esen-color-surface,#f5fbf8);color:var(--esen-color-on-surface,#171d1b);font:inherit}
@@ -211,6 +217,7 @@ const String seoDomFirstActionFlowStylesheet = '''
 html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="action-flow"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>form>.esen-seo-action-flow-step:not([data-esen-action-flow-step="0"]){display:none}
 html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="action-flow"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>form>[data-esen-action-flow-navigation][hidden]{display:flex!important;visibility:hidden}
 html[data-esen-interaction-pending] #$seoContainerId [data-esen-component="action-flow"][data-esen-layout-stable="true"]:not([data-esen-enhanced="true"])>form>[data-esen-action-form-submit]{display:none}
+@media(max-width:36rem){#$seoContainerId [data-esen-component="action-flow"] .esen-seo-action-flow-review dl>div{grid-template-columns:1fr;gap:.25rem}}
 ''';
 
 /// Marks the pre-paint theme restoration script in a generated document.

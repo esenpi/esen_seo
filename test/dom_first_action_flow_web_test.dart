@@ -163,6 +163,119 @@ void main() {
     await _settle();
   });
 
+  test('activates only the selected branch and updates native constraints', () {
+    final root =
+        _renderFlow(fixture, definition: _branchedDefinition('branch'));
+    _runCandidate();
+    final service =
+        root.querySelector('[name="service"]')! as web.HTMLSelectElement;
+    final website =
+        root.querySelector('[name="website_goal"]')! as web.HTMLInputElement;
+    final shop =
+        root.querySelector('[name="shop_catalog"]')! as web.HTMLInputElement;
+
+    expect(website.disabled, isTrue);
+    expect(shop.disabled, isTrue);
+    _setChoice(service, 'website');
+    (root.querySelector('[name="name"]')! as web.HTMLInputElement).value =
+        'Ada';
+    (root.querySelector('[data-esen-action-flow-next]')!
+            as web.HTMLButtonElement)
+        .click();
+
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-step="1"]')
+          ?.hasAttribute('hidden'),
+      isFalse,
+    );
+    expect(website.disabled, isFalse);
+    expect(website.required, isTrue);
+    expect(shop.disabled, isTrue);
+
+    (root.querySelector('[data-esen-action-flow-previous]')!
+            as web.HTMLButtonElement)
+        .click();
+    _setChoice(service, 'shop');
+    (root.querySelector('[data-esen-action-flow-next]')!
+            as web.HTMLButtonElement)
+        .click();
+
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-step="2"]')
+          ?.hasAttribute('hidden'),
+      isFalse,
+    );
+    expect(website.disabled, isTrue);
+    expect(website.required, isFalse);
+    expect(shop.disabled, isFalse);
+    expect(shop.required, isTrue);
+  });
+
+  test('fills review text only for validated fields in the active branch', () {
+    final root =
+        _renderFlow(fixture, definition: _branchedDefinition('review'));
+    _runCandidate();
+    (root.querySelector('[name="name"]')! as web.HTMLInputElement).value =
+        '<b>Ada</b>';
+    _setChoice(
+      root.querySelector('[name="service"]')! as web.HTMLSelectElement,
+      'website',
+    );
+    final next = root.querySelector('[data-esen-action-flow-next]')!
+        as web.HTMLButtonElement;
+    next.click();
+    (root.querySelector('[name="website_goal"]')! as web.HTMLInputElement)
+        .value = 'Fast product site';
+    next.click();
+    (root.querySelector('[name="email"]')! as web.HTMLInputElement).value =
+        'ada@example.com';
+    (root.querySelector('[name="consent"]')! as web.HTMLInputElement).checked =
+        true;
+    next.click();
+
+    final review = root.querySelector('[data-esen-action-flow-review]')!;
+    expect(review.hasAttribute('hidden'), isFalse);
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-review-value="0"]')
+          ?.textContent,
+      '<b>Ada</b>',
+    );
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-review-value="1"]')
+          ?.textContent,
+      'Website',
+    );
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-review-row="3"]')
+          ?.hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(review.querySelectorAll('b').length, 0);
+  });
+
+  test('leaves forged branch metadata as complete static HTML', () {
+    final root =
+        _renderFlow(fixture, definition: _branchedDefinition('branch-forged'));
+    root
+        .querySelector('[data-esen-action-flow-step="1"]')!
+        .setAttribute('data-esen-action-flow-when-value', 'admin');
+
+    _runCandidate();
+
+    expect(root.hasAttribute('data-esen-enhanced'), isFalse);
+    expect(
+      root
+          .querySelector('[data-esen-action-flow-step="1"]')
+          ?.hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
   test('leaves altered, duplicate-id and forged choice structures native', () {
     final altered = _renderFlow(fixture, actionId: 'altered');
     altered.querySelector('form')!.setAttribute('action', '/elsewhere');
@@ -187,6 +300,7 @@ void main() {
 web.HTMLElement _renderFlow(
   web.HTMLElement fixture, {
   String actionId = 'project',
+  SeoActionFlowDefinition? definition,
 }) {
   var container = fixture.querySelector('#esen-seo-content');
   if (container == null) {
@@ -198,12 +312,20 @@ web.HTMLElement _renderFlow(
   final holder = web.document.createElement('div');
   holder.setHTMLUnsafe(
     const HtmlRenderer.domFirst()
-        .render(buildSeoActionFlowNodes(_definition(actionId)))
+        .render(buildSeoActionFlowNodes(definition ?? _definition(actionId)))
         .toJS,
   );
   final root = holder.firstElementChild! as web.HTMLElement;
   container.appendChild(root);
   return root;
+}
+
+void _setChoice(web.HTMLSelectElement select, String value) {
+  select.value = value;
+  select.dispatchEvent(web.Event(
+    'change',
+    web.EventInit(bubbles: true, cancelable: true),
+  ));
 }
 
 void _fillAndReachFinal(web.HTMLElement root) {
@@ -316,4 +438,101 @@ SeoActionFlowDefinition _definition(String actionId) => SeoActionFlowDefinition(
       previousLabel: 'Previous',
       nextLabel: 'Next',
       progressLabel: 'Project progress',
+    );
+
+SeoActionFlowDefinition _branchedDefinition(String actionId) =>
+    SeoActionFlowDefinition(
+      form: SeoActionFormDefinition(
+        actionId: actionId,
+        returnPath: '/contact/',
+        heading: 'Plan a project',
+        description: 'Follow the relevant branch.',
+        submitLabel: 'Send',
+        pendingLabel: 'Sending',
+        failureLabel: 'Try again later',
+        statusLabel: 'Submission status',
+        fields: const [
+          SeoActionFormField(
+            name: 'name',
+            label: 'Name',
+            kind: SeoActionFormFieldKind.text,
+            required: true,
+          ),
+          SeoActionFormField(
+            name: 'service',
+            label: 'Service',
+            kind: SeoActionFormFieldKind.choice,
+            required: true,
+            choicePrompt: 'Choose a service',
+            options: [
+              SeoActionFormOption(value: 'website', label: 'Website'),
+              SeoActionFormOption(value: 'shop', label: 'Online shop'),
+            ],
+          ),
+          SeoActionFormField(
+            name: 'website_goal',
+            label: 'Website goal',
+            kind: SeoActionFormFieldKind.text,
+            required: true,
+          ),
+          SeoActionFormField(
+            name: 'shop_catalog',
+            label: 'Catalog size',
+            kind: SeoActionFormFieldKind.text,
+            required: true,
+          ),
+          SeoActionFormField(
+            name: 'email',
+            label: 'Email',
+            kind: SeoActionFormFieldKind.email,
+            required: true,
+          ),
+          SeoActionFormField(
+            name: 'consent',
+            label: 'Consent',
+            kind: SeoActionFormFieldKind.consent,
+            required: true,
+          ),
+        ],
+      ),
+      steps: const [
+        SeoActionFlowStep(
+          label: 'Project',
+          description: 'Choose a project type.',
+          fieldNames: ['name', 'service'],
+        ),
+        SeoActionFlowStep(
+          label: 'Website details',
+          description: 'Describe the website.',
+          fieldNames: ['website_goal'],
+          condition: SeoActionFlowCondition.choiceEquals(
+            fieldName: 'service',
+            value: 'website',
+          ),
+        ),
+        SeoActionFlowStep(
+          label: 'Shop details',
+          description: 'Describe the catalog.',
+          fieldNames: ['shop_catalog'],
+          condition: SeoActionFlowCondition.choiceEquals(
+            fieldName: 'service',
+            value: 'shop',
+          ),
+        ),
+        SeoActionFlowStep(
+          label: 'Contact',
+          description: 'Where we can reply.',
+          fieldNames: ['email', 'consent'],
+        ),
+      ],
+      previousLabel: 'Previous',
+      nextLabel: 'Next',
+      progressLabel: 'Project progress',
+      review: const SeoActionFlowReview(
+        label: 'Review',
+        description: 'Check the active values.',
+        emptyValueLabel: 'Not provided',
+        consentAcceptedLabel: 'Confirmed',
+        consentDeclinedLabel: 'Not confirmed',
+      ),
     );

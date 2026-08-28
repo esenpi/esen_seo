@@ -147,6 +147,133 @@ void main() {
         1,
       );
     });
+
+    test('projects only branches selected by an earlier unconditional choice',
+        () {
+      final plan = prepareSeoActionFlow(_branchedFlow)!;
+
+      expect(
+        activeSeoActionFlowStepIndexes(plan, const {'service': 'website'}),
+        [0, 1, 3],
+      );
+      expect(
+        activeSeoActionFlowStepIndexes(plan, const {'service': 'shop'}),
+        [0, 2, 3],
+      );
+      expect(
+        activeSeoActionFlowStepIndexes(plan, const {'service': ''}),
+        [0, 3],
+      );
+    });
+
+    test('rejects later, conditional and undeclared branch controllers', () {
+      final cases = <SeoActionFlowDefinition>[
+        _branchedWithCondition(
+          1,
+          const SeoActionFlowCondition.choiceEquals(
+            fieldName: 'email',
+            value: 'website',
+          ),
+        ),
+        _branchedWithCondition(
+          2,
+          const SeoActionFlowCondition.choiceEquals(
+            fieldName: 'website_goal',
+            value: 'shop',
+          ),
+        ),
+        _branchedWithCondition(
+          1,
+          const SeoActionFlowCondition.choiceEquals(
+            fieldName: 'missing',
+            value: 'website',
+          ),
+        ),
+        _branchedWithCondition(
+          1,
+          const SeoActionFlowCondition.choiceEquals(
+            fieldName: 'service',
+            value: 'forged',
+          ),
+        ),
+      ];
+
+      for (final definition in cases) {
+        expect(prepareSeoActionFlow(definition), isNull);
+      }
+    });
+
+    test('validates active fields but drops inactive values from the handler',
+        () {
+      final plan = prepareSeoActionFlow(_branchedFlow)!;
+      final raw = <String, String>{
+        'name': 'Ada',
+        'service': 'website',
+        'website_goal': 'A fast product site',
+        'shop_catalog': 'This inactive value must not cross the boundary',
+        'email': 'ada@example.com',
+        'consent': 'accepted',
+      };
+
+      final valid = validateSeoActionFlowValues(plan, raw);
+      final missingActive = validateSeoActionFlowValues(plan, {
+        ...raw,
+        'website_goal': '',
+      });
+      final missingInactive = validateSeoActionFlowValues(plan, {
+        ...raw,
+        'shop_catalog': '',
+      });
+
+      expect(valid.isValid, isTrue);
+      expect(valid.values!.contains('website_goal'), isTrue);
+      expect(valid.values!.contains('shop_catalog'), isFalse);
+      expect(missingActive.errors, contains('website_goal'));
+      expect(missingInactive.isValid, isTrue);
+    });
+
+    test('still rejects malformed content supplied for an inactive field', () {
+      final plan = prepareSeoActionFlow(_branchedFlow)!;
+      final validation = validateSeoActionFlowValues(plan, const {
+        'name': 'Ada',
+        'service': 'website',
+        'website_goal': 'A fast product site',
+        'shop_catalog': 'hidden\u202evalue',
+        'email': 'ada@example.com',
+        'consent': 'accepted',
+      });
+
+      expect(validation.malformed, isTrue);
+      expect(validation.values, isNull);
+    });
+
+    test('builds review entries only from canonical active values', () {
+      final plan = prepareSeoActionFlow(_branchedFlow)!;
+      final validation = validateSeoActionFlowValues(plan, const {
+        'name': '  Ada  ',
+        'service': 'website',
+        'website_goal': '  A fast product site  ',
+        'shop_catalog': 'Inactive',
+        'email': 'ada@example.com',
+        'consent': 'accepted',
+      });
+
+      final entries = buildSeoActionFlowReviewEntries(
+        plan,
+        validation.values!,
+      );
+
+      expect(entries.map((entry) => entry.fieldName), [
+        'name',
+        'service',
+        'website_goal',
+        'email',
+        'consent',
+      ]);
+      expect(entries.first.value, 'Ada');
+      expect(entries[1].value, 'Website');
+      expect(entries.last.value, 'Confirmed');
+    });
   });
 
   group('action flow rendering and delivery', () {
@@ -180,6 +307,30 @@ void main() {
       expect(html, isNot(contains('<script')));
     });
 
+    test('conditional No-JS rendering stays complete and review starts empty',
+        () {
+      final html = const HtmlRenderer.domFirst().render(
+        buildSeoActionFlowNodes(_branchedFlow),
+      );
+
+      expect(html, contains('data-esen-action-flow-when-field="service"'));
+      expect(html, contains('data-esen-action-flow-when-value="website"'));
+      expect(html, contains('data-esen-action-flow-when-value="shop"'));
+      expect(html, contains('name="website_goal"'));
+      expect(html, contains('name="shop_catalog"'));
+      expect(
+        html,
+        contains('data-esen-action-flow-required="true"'),
+      );
+      expect(
+        RegExp(r'name="website_goal"[^>]* required').hasMatch(html),
+        isFalse,
+      );
+      expect(html, contains('data-esen-action-flow-review hidden'));
+      expect(html, contains('data-esen-action-flow-review-value="0"></dd>'));
+      expect(html, isNot(contains('A fast product site')));
+    });
+
     test('action flow assets are isolated behind their own route opt-in', () {
       expect(seoDomFirstFeatureScriptHtml(const {}), isEmpty);
       expect(
@@ -189,6 +340,12 @@ void main() {
       expect(
         seoDomFirstFeatureStyleHtml(const {SeoDomFirstFeature.actionFlow}),
         contains('[data-esen-component="action-flow"]'),
+      );
+      expect(
+        seoDomFirstFeatureStyleHtml(const {SeoDomFirstFeature.actionFlow}),
+        contains(
+          '.esen-seo-action-flow-review dl>div[hidden]{display:none}',
+        ),
       );
       expect(
         seoDomFirstFeatureBootstrapScriptHtml(
@@ -232,12 +389,72 @@ void main() {
         containsPair('message', isNotEmpty),
       );
     });
+
+    test('flow registration exposes only active values to its handler',
+        () async {
+      SeoActionFormValues? received;
+      final handler = seoActionFormMiddleware(
+        publicOrigin: 'https://example.com',
+        registrations: [
+          SeoActionFormRegistration.flow(
+            definition: _branchedFlow,
+            handler: (values) {
+              received = values;
+              return const SeoActionFormResult.success('Received.');
+            },
+          ),
+        ],
+      )((request) => Response.notFound('fallback'));
+
+      final response = await handler(_branchedRequest(
+        'name=Ada&service=website&website_goal=Fast&shop_catalog=Secret&'
+        'email=ada%40example.com&consent=accepted',
+      ));
+
+      expect(response.statusCode, 200);
+      expect(received!.text('website_goal'), 'Fast');
+      expect(received!.contains('shop_catalog'), isFalse);
+    });
+
+    test('flow registration rejects handler errors for inactive fields',
+        () async {
+      final handler = seoActionFormMiddleware(
+        publicOrigin: 'https://example.com',
+        registrations: [
+          SeoActionFormRegistration.flow(
+            definition: _branchedFlow,
+            handler: (_) => const SeoActionFormResult.rejected(
+              'Invalid result.',
+              fieldErrors: {'shop_catalog': 'Must not be addressed.'},
+            ),
+          ),
+        ],
+      )((request) => Response.notFound('fallback'));
+
+      final response = await handler(_branchedRequest(
+        'name=Ada&service=website&website_goal=Fast&shop_catalog=&'
+        'email=ada%40example.com&consent=accepted',
+      ));
+
+      expect(response.statusCode, 500);
+    });
   });
 }
 
 Request _request(String body) => Request(
       'POST',
       Uri.parse('https://example.com/_esen_seo/forms/project-enquiry'),
+      headers: const {
+        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'accept': 'application/json',
+        'origin': 'https://example.com',
+      },
+      body: body,
+    );
+
+Request _branchedRequest(String body) => Request(
+      'POST',
+      Uri.parse('https://example.com/_esen_seo/forms/branched-enquiry'),
       headers: const {
         'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'accept': 'application/json',
@@ -288,6 +505,124 @@ SeoActionFlowDefinition _withOptions(List<SeoActionFormOption> options) =>
       nextLabel: _flow.nextLabel,
       progressLabel: _flow.progressLabel,
     );
+
+SeoActionFlowDefinition _branchedWithCondition(
+  int stepIndex,
+  SeoActionFlowCondition condition,
+) {
+  final steps = [..._branchedFlow.steps];
+  final step = steps[stepIndex];
+  steps[stepIndex] = SeoActionFlowStep(
+    label: step.label,
+    description: step.description,
+    fieldNames: step.fieldNames,
+    condition: condition,
+  );
+  return SeoActionFlowDefinition(
+    form: _branchedFlow.form,
+    steps: steps,
+    previousLabel: _branchedFlow.previousLabel,
+    nextLabel: _branchedFlow.nextLabel,
+    progressLabel: _branchedFlow.progressLabel,
+    review: _branchedFlow.review,
+  );
+}
+
+const _branchedFlow = SeoActionFlowDefinition(
+  form: SeoActionFormDefinition(
+    actionId: 'branched-enquiry',
+    returnPath: '/contact/',
+    heading: 'Plan a project',
+    description: 'Follow the relevant project branch.',
+    submitLabel: 'Send enquiry',
+    pendingLabel: 'Sending enquiry',
+    failureLabel: 'Please try again later',
+    statusLabel: 'Enquiry status',
+    fields: [
+      SeoActionFormField(
+        name: 'name',
+        label: 'Name',
+        kind: SeoActionFormFieldKind.text,
+        required: true,
+      ),
+      SeoActionFormField(
+        name: 'service',
+        label: 'Service',
+        kind: SeoActionFormFieldKind.choice,
+        required: true,
+        choicePrompt: 'Choose a service',
+        options: [
+          SeoActionFormOption(value: 'website', label: 'Website'),
+          SeoActionFormOption(value: 'shop', label: 'Online shop'),
+        ],
+      ),
+      SeoActionFormField(
+        name: 'website_goal',
+        label: 'Website goal',
+        kind: SeoActionFormFieldKind.text,
+        required: true,
+      ),
+      SeoActionFormField(
+        name: 'shop_catalog',
+        label: 'Catalog size',
+        kind: SeoActionFormFieldKind.text,
+        required: true,
+      ),
+      SeoActionFormField(
+        name: 'email',
+        label: 'Email',
+        kind: SeoActionFormFieldKind.email,
+        required: true,
+      ),
+      SeoActionFormField(
+        name: 'consent',
+        label: 'I consent',
+        kind: SeoActionFormFieldKind.consent,
+        required: true,
+      ),
+    ],
+  ),
+  steps: [
+    SeoActionFlowStep(
+      label: 'Project',
+      description: 'Choose the project type.',
+      fieldNames: ['name', 'service'],
+    ),
+    SeoActionFlowStep(
+      label: 'Website',
+      description: 'Describe the website.',
+      fieldNames: ['website_goal'],
+      condition: SeoActionFlowCondition.choiceEquals(
+        fieldName: 'service',
+        value: 'website',
+      ),
+    ),
+    SeoActionFlowStep(
+      label: 'Shop',
+      description: 'Describe the catalog.',
+      fieldNames: ['shop_catalog'],
+      condition: SeoActionFlowCondition.choiceEquals(
+        fieldName: 'service',
+        value: 'shop',
+      ),
+    ),
+    SeoActionFlowStep(
+      label: 'Contact',
+      description: 'Where we can reply.',
+      fieldNames: ['email', 'consent'],
+    ),
+  ],
+  previousLabel: 'Previous',
+  nextLabel: 'Next',
+  progressLabel: 'Project enquiry progress',
+  review: SeoActionFlowReview(
+    label: 'Review',
+    description: 'Check the active project details.',
+    emptyValueLabel: 'Not provided',
+    consentAcceptedLabel: 'Confirmed',
+    consentDeclinedLabel: 'Not confirmed',
+  ),
+);
 
 const _flow = SeoActionFlowDefinition(
   form: SeoActionFormDefinition(

@@ -973,28 +973,55 @@ rate limiting, abuse protection, durable idempotency and the actual side
 effect. Exact-Origin checking is a browser CSRF boundary, not caller
 authentication.
 
-For a linear multi-step enquiry, partition the same flat form definition with
+For a multi-step enquiry, partition the same flat form definition with
 `SeoActionFlowDefinition`. Every field must occur exactly once and in the same
-order as the form plan:
+order as the form plan. A step may depend on one fixed option from an earlier
+single-choice field in an unconditional step, and an optional package-owned
+review stage can summarize only the active branch:
 
 ```dart
 const projectFlow = SeoActionFlowDefinition(
   form: projectForm,
   steps: [
     SeoActionFlowStep(
-      label: 'About you',
-      description: 'Your contact details.',
-      fieldNames: ['name', 'email'],
+      label: 'Project',
+      description: 'Choose what you want to build.',
+      fieldNames: ['name', 'service'],
     ),
     SeoActionFlowStep(
-      label: 'Project',
-      description: 'What you want to build.',
-      fieldNames: ['service', 'message', 'consent'],
+      label: 'Website',
+      description: 'Describe the website.',
+      fieldNames: ['website_goal'],
+      condition: SeoActionFlowCondition.choiceEquals(
+        fieldName: 'service',
+        value: 'website',
+      ),
+    ),
+    SeoActionFlowStep(
+      label: 'Shop',
+      description: 'Describe the catalog.',
+      fieldNames: ['shop_catalog'],
+      condition: SeoActionFlowCondition.choiceEquals(
+        fieldName: 'service',
+        value: 'shop',
+      ),
+    ),
+    SeoActionFlowStep(
+      label: 'Contact',
+      description: 'Where we can reply.',
+      fieldNames: ['email', 'consent'],
     ),
   ],
   previousLabel: 'Previous',
   nextLabel: 'Next',
   progressLabel: 'Project enquiry progress',
+  review: SeoActionFlowReview(
+    label: 'Review',
+    description: 'Check the active project details.',
+    emptyValueLabel: 'Not provided',
+    consentAcceptedLabel: 'Confirmed',
+    consentDeclinedLabel: 'Not confirmed',
+  ),
 );
 
 SeoRoute(
@@ -1011,10 +1038,18 @@ SeoActionFlow(definition: projectFlow, onSubmit: sendProjectEnquiry);
 
 Without JavaScript all steps and the final submit control remain visible in one
 ordinary POST form. The optional runtime validates the complete package-owned
-structure before it adds linear navigation, current-step validation and
-progress semantics. It does not admit branching, direct step jumps,
-application-selected DOM targets or conditional fields. Register
-`projectFlow.form` with the same `seoActionFormMiddleware` shown above.
+structure before it adds active-branch navigation, current-step validation,
+progress semantics and the fixed review stage. Branches admit no predicates,
+negation, chained conditions, direct step jumps or application-selected DOM
+targets. Register the flow itself so Shelf applies the same active-field
+projection and never passes inactive branch values to the handler:
+
+```dart
+SeoActionFormRegistration.flow(
+  definition: projectFlow,
+  handler: sendProjectEnquiry,
+)
+```
 
 ### Application-owned state
 

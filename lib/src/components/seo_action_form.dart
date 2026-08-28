@@ -180,11 +180,41 @@ final class SeoActionFlowStep {
     required this.label,
     required this.description,
     required this.fieldNames,
+    this.condition,
   });
 
   final String label;
   final String description;
   final List<String> fieldNames;
+  final SeoActionFlowCondition? condition;
+}
+
+/// A closed branch condition evaluated against an earlier choice field.
+final class SeoActionFlowCondition {
+  const SeoActionFlowCondition.choiceEquals({
+    required this.fieldName,
+    required this.value,
+  });
+
+  final String fieldName;
+  final String value;
+}
+
+/// Labels for the optional package-generated final review stage.
+final class SeoActionFlowReview {
+  const SeoActionFlowReview({
+    required this.label,
+    required this.description,
+    required this.emptyValueLabel,
+    required this.consentAcceptedLabel,
+    required this.consentDeclinedLabel,
+  });
+
+  final String label;
+  final String description;
+  final String emptyValueLabel;
+  final String consentAcceptedLabel;
+  final String consentDeclinedLabel;
 }
 
 final class SeoActionFlowDefinition {
@@ -194,6 +224,7 @@ final class SeoActionFlowDefinition {
     required this.previousLabel,
     required this.nextLabel,
     required this.progressLabel,
+    this.review,
   });
 
   final SeoActionFormDefinition form;
@@ -201,6 +232,19 @@ final class SeoActionFlowDefinition {
   final String previousLabel;
   final String nextLabel;
   final String progressLabel;
+  final SeoActionFlowReview? review;
+}
+
+final class SeoActionFlowPlanCondition {
+  const SeoActionFlowPlanCondition({
+    required this.fieldName,
+    required this.fieldIndex,
+    required this.value,
+  });
+
+  final String fieldName;
+  final int fieldIndex;
+  final String value;
 }
 
 final class SeoActionFlowPlanStep {
@@ -209,12 +253,30 @@ final class SeoActionFlowPlanStep {
     required this.description,
     required this.firstFieldIndex,
     required this.fields,
+    this.condition,
   });
 
   final String label;
   final String description;
   final int firstFieldIndex;
   final List<SeoActionFormPlanField> fields;
+  final SeoActionFlowPlanCondition? condition;
+}
+
+final class SeoActionFlowPlanReview {
+  const SeoActionFlowPlanReview({
+    required this.label,
+    required this.description,
+    required this.emptyValueLabel,
+    required this.consentAcceptedLabel,
+    required this.consentDeclinedLabel,
+  });
+
+  final String label;
+  final String description;
+  final String emptyValueLabel;
+  final String consentAcceptedLabel;
+  final String consentDeclinedLabel;
 }
 
 final class SeoActionFlowPlan {
@@ -224,6 +286,7 @@ final class SeoActionFlowPlan {
     required this.previousLabel,
     required this.nextLabel,
     required this.progressLabel,
+    required this.review,
   });
 
   final SeoActionFormPlan form;
@@ -231,6 +294,7 @@ final class SeoActionFlowPlan {
   final String previousLabel;
   final String nextLabel;
   final String progressLabel;
+  final SeoActionFlowPlanReview? review;
 }
 
 /// Pure navigation state shared by native and DOM-first action flows.
@@ -298,6 +362,8 @@ final class SeoActionFormValues {
   String choice(String name) => text(name);
 
   bool consent(String name) => values[name] == true;
+
+  bool contains(String name) => values.containsKey(name);
 }
 
 final class SeoActionFormValidation {
@@ -312,6 +378,18 @@ final class SeoActionFormValidation {
   final SeoActionFormValues? values;
 
   bool get isValid => !malformed && errors.isEmpty && values != null;
+}
+
+final class SeoActionFlowReviewEntry {
+  const SeoActionFlowReviewEntry({
+    required this.fieldName,
+    required this.label,
+    required this.value,
+  });
+
+  final String fieldName;
+  final String label;
+  final String value;
 }
 
 enum SeoActionFormOutcome { success, rejected }
@@ -530,6 +608,44 @@ SeoActionFlowPlan? prepareSeoActionFlow(SeoActionFlowDefinition definition) {
     return null;
   }
 
+  SeoActionFlowPlanReview? review;
+  if (definition.review case final rawReview?) {
+    final label = canonicalizeSeoActionFormText(
+      rawReview.label,
+      maxLength: seoActionFormMaxLabelLength,
+    );
+    final description = canonicalizeSeoActionFormText(
+      rawReview.description,
+      maxLength: seoActionFormMaxDescriptionLength,
+    );
+    final emptyValueLabel = canonicalizeSeoActionFormText(
+      rawReview.emptyValueLabel,
+      maxLength: seoActionFormMaxLabelLength,
+    );
+    final consentAcceptedLabel = canonicalizeSeoActionFormText(
+      rawReview.consentAcceptedLabel,
+      maxLength: seoActionFormMaxLabelLength,
+    );
+    final consentDeclinedLabel = canonicalizeSeoActionFormText(
+      rawReview.consentDeclinedLabel,
+      maxLength: seoActionFormMaxLabelLength,
+    );
+    if (label == null ||
+        description == null ||
+        emptyValueLabel == null ||
+        consentAcceptedLabel == null ||
+        consentDeclinedLabel == null) {
+      return null;
+    }
+    review = SeoActionFlowPlanReview(
+      label: label,
+      description: description,
+      emptyValueLabel: emptyValueLabel,
+      consentAcceptedLabel: consentAcceptedLabel,
+      consentDeclinedLabel: consentDeclinedLabel,
+    );
+  }
+
   final steps = <SeoActionFlowPlanStep>[];
   var fieldIndex = 0;
   for (final rawStep in definition.steps) {
@@ -555,11 +671,42 @@ SeoActionFlowPlan? prepareSeoActionFlow(SeoActionFlowDefinition definition) {
       fields.add(expected);
       fieldIndex++;
     }
+    SeoActionFlowPlanCondition? condition;
+    if (rawStep.condition case final rawCondition?) {
+      final conditionName = rawCondition.fieldName.trim();
+      final conditionValue = rawCondition.value.trim();
+      final conditionIndex = form.fields.indexWhere(
+        (field) => field.name == conditionName,
+      );
+      if (conditionIndex < 0 || conditionIndex >= fieldIndex - fields.length) {
+        return null;
+      }
+      final conditionField = form.fields[conditionIndex];
+      final owner = steps.cast<SeoActionFlowPlanStep?>().firstWhere(
+            (step) =>
+                step!.fields.any((field) => field.name == conditionField.name),
+            orElse: () => null,
+          );
+      if (conditionField.kind != SeoActionFormFieldKind.choice ||
+          owner == null ||
+          owner.condition != null ||
+          !conditionField.options.any(
+            (option) => option.value == conditionValue,
+          )) {
+        return null;
+      }
+      condition = SeoActionFlowPlanCondition(
+        fieldName: conditionField.name,
+        fieldIndex: conditionIndex,
+        value: conditionValue,
+      );
+    }
     steps.add(SeoActionFlowPlanStep(
       label: label,
       description: description,
       firstFieldIndex: fieldIndex - fields.length,
       fields: List.unmodifiable(fields),
+      condition: condition,
     ));
   }
   if (fieldIndex != form.fields.length) return null;
@@ -569,8 +716,30 @@ SeoActionFlowPlan? prepareSeoActionFlow(SeoActionFlowDefinition definition) {
     previousLabel: previousLabel,
     nextLabel: nextLabel,
     progressLabel: progressLabel,
+    review: review,
   );
 }
+
+/// Returns the authored step indices active for the supplied raw choice values.
+List<int> activeSeoActionFlowStepIndexes(
+  SeoActionFlowPlan plan,
+  Map<String, String> rawValues,
+) =>
+    List.unmodifiable([
+      for (final (index, step) in plan.steps.indexed)
+        if (step.condition == null ||
+            rawValues[step.condition!.fieldName] == step.condition!.value)
+          index,
+    ]);
+
+Set<String> activeSeoActionFlowFieldNames(
+  SeoActionFlowPlan plan,
+  Map<String, String> rawValues,
+) =>
+    Set.unmodifiable({
+      for (final stepIndex in activeSeoActionFlowStepIndexes(plan, rawValues))
+        for (final field in plan.steps[stepIndex].fields) field.name,
+    });
 
 List<SeoNode> buildSeoActionFlowNodes(SeoActionFlowDefinition definition) {
   final plan = prepareSeoActionFlow(definition);
@@ -604,6 +773,21 @@ List<SeoNode> buildSeoActionFlowPlanNodes(SeoActionFlowPlan plan) {
                 ),
               ],
             ),
+          if (plan.review case final review?)
+            SeoNode(
+              tag: 'li',
+              children: [
+                SeoNode(tag: 'h$stepHeadingLevel', text: review.label),
+                SeoNode(tag: 'p', text: review.description),
+                SeoNode(
+                  tag: 'ul',
+                  children: [
+                    for (final field in form.fields)
+                      SeoNode(tag: 'li', text: field.label),
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     ],
@@ -631,11 +815,27 @@ List<SeoNode> buildSeoActionFlowPlanNodes(SeoActionFlowPlan plan) {
                 description: step.description,
                 firstFieldIndex: step.firstFieldIndex,
                 fieldCount: step.fields.length,
+                condition: step.condition == null
+                    ? null
+                    : SeoActionFlowMarkupCondition(
+                        fieldName: step.condition!.fieldName,
+                        fieldIndex: step.condition!.fieldIndex,
+                        value: step.condition!.value,
+                      ),
               ),
           ]),
           previousLabel: plan.previousLabel,
           nextLabel: plan.nextLabel,
           progressLabel: plan.progressLabel,
+          review: plan.review == null
+              ? null
+              : SeoActionFlowMarkupReview(
+                  label: plan.review!.label,
+                  description: plan.review!.description,
+                  emptyValueLabel: plan.review!.emptyValueLabel,
+                  consentAcceptedLabel: plan.review!.consentAcceptedLabel,
+                  consentDeclinedLabel: plan.review!.consentDeclinedLabel,
+                ),
         ),
       ),
     ),
@@ -645,7 +845,61 @@ List<SeoNode> buildSeoActionFlowPlanNodes(SeoActionFlowPlan plan) {
 SeoActionFormValidation validateSeoActionFormValues(
   SeoActionFormPlan plan,
   Map<String, String> rawValues,
+) =>
+    _validateSeoActionFormValues(plan, rawValues);
+
+/// Validates one conditional flow and exposes only values from active steps.
+SeoActionFormValidation validateSeoActionFlowValues(
+  SeoActionFlowPlan plan,
+  Map<String, String> rawValues,
+) =>
+    _validateSeoActionFormValues(
+      plan.form,
+      rawValues,
+      activeFieldNames: activeSeoActionFlowFieldNames(plan, rawValues),
+    );
+
+List<SeoActionFlowReviewEntry> buildSeoActionFlowReviewEntries(
+  SeoActionFlowPlan plan,
+  SeoActionFormValues values,
 ) {
+  final review = plan.review;
+  if (review == null) return const [];
+  return List.unmodifiable([
+    for (final field in plan.form.fields)
+      if (values.contains(field.name))
+        SeoActionFlowReviewEntry(
+          fieldName: field.name,
+          label: field.label,
+          value: switch (field.kind) {
+            SeoActionFormFieldKind.consent => values.consent(field.name)
+                ? review.consentAcceptedLabel
+                : review.consentDeclinedLabel,
+            SeoActionFormFieldKind.choice => field.options
+                .firstWhere(
+                  (option) => option.value == values.choice(field.name),
+                  orElse: () => SeoActionFormPlanOption(
+                    value: '',
+                    label: review.emptyValueLabel,
+                  ),
+                )
+                .label,
+            SeoActionFormFieldKind.text ||
+            SeoActionFormFieldKind.email ||
+            SeoActionFormFieldKind.multiline =>
+              values.text(field.name).isEmpty
+                  ? review.emptyValueLabel
+                  : values.text(field.name),
+          },
+        ),
+  ]);
+}
+
+SeoActionFormValidation _validateSeoActionFormValues(
+  SeoActionFormPlan plan,
+  Map<String, String> rawValues, {
+  Set<String>? activeFieldNames,
+}) {
   final names = {for (final field in plan.fields) field.name};
   if (rawValues.keys.any((name) => !names.contains(name))) {
     return const SeoActionFormValidation._(
@@ -659,6 +913,8 @@ SeoActionFormValidation validateSeoActionFormValues(
   final errors = <String, String>{};
   for (final field in plan.fields) {
     final raw = rawValues[field.name] ?? '';
+    final active =
+        activeFieldNames == null || activeFieldNames.contains(field.name);
     aggregate += raw.length;
     if (aggregate > seoActionFormMaxAggregateInputLength ||
         _hasUnpairedSurrogate(raw) ||
@@ -679,6 +935,7 @@ SeoActionFormValidation validateSeoActionFormValues(
         );
       }
       final accepted = raw == 'accepted';
+      if (!active) continue;
       normalized[field.name] = accepted;
       if (field.required && !accepted) {
         errors[field.name] = plan.messages.consentRequired;
@@ -694,6 +951,7 @@ SeoActionFormValidation validateSeoActionFormValues(
           errors: {},
         );
       }
+      if (!active) continue;
       normalized[field.name] = raw;
       if (field.required && raw.isEmpty) {
         errors[field.name] = plan.messages.required;
@@ -705,6 +963,7 @@ SeoActionFormValidation validateSeoActionFormValues(
             ? raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n')
             : raw)
         .trim();
+    if (!active) continue;
     normalized[field.name] = canonical;
     if (canonical.isEmpty) {
       if (field.required) errors[field.name] = plan.messages.required;
@@ -728,8 +987,9 @@ SeoActionFormValidation validateSeoActionFormValues(
 
 SeoActionFormResult? canonicalizeSeoActionFormResult(
   SeoActionFormPlan plan,
-  SeoActionFormResult raw,
-) {
+  SeoActionFormResult raw, {
+  Set<String>? allowedFieldNames,
+}) {
   final message = _canonicalText(raw.message, seoActionFormMaxResultTextLength);
   if (message == null ||
       raw.fieldErrors.length > plan.fields.length ||
@@ -737,7 +997,8 @@ SeoActionFormResult? canonicalizeSeoActionFormResult(
           raw.fieldErrors.isNotEmpty)) {
     return null;
   }
-  final names = {for (final field in plan.fields) field.name};
+  final names =
+      allowedFieldNames ?? {for (final field in plan.fields) field.name};
   final errors = <String, String>{};
   var aggregate = message.length;
   for (final entry in raw.fieldErrors.entries) {

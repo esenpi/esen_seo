@@ -13,8 +13,11 @@
 * Added `SeoActionFlow`, a closed two-to-six-step composition of the same form
   plan, plus fixed single-choice fields. Flutter owns a native step
   presentation while the optional DOM-first runtime validates the complete
-  package structure before applying linear navigation, progress semantics and
-  current-step validation. Without JavaScript every field and the final POST
+  package structure before applying navigation, progress semantics and
+  current-step validation. A step may now depend on one declared option of an
+  earlier unconditional choice, and an optional package-generated review stage
+  exposes only the active branch. Shelf applies the same active-field
+  projection; without JavaScript all authored branches and the final POST
   remain visible and usable.
 
 ## 0.14.0

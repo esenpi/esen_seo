@@ -54,12 +54,42 @@ final class SeoActionFlowMarkupStep {
     required this.description,
     required this.firstFieldIndex,
     required this.fieldCount,
+    this.condition,
   });
 
   final String label;
   final String description;
   final int firstFieldIndex;
   final int fieldCount;
+  final SeoActionFlowMarkupCondition? condition;
+}
+
+final class SeoActionFlowMarkupCondition {
+  const SeoActionFlowMarkupCondition({
+    required this.fieldName,
+    required this.fieldIndex,
+    required this.value,
+  });
+
+  final String fieldName;
+  final int fieldIndex;
+  final String value;
+}
+
+final class SeoActionFlowMarkupReview {
+  const SeoActionFlowMarkupReview({
+    required this.label,
+    required this.description,
+    required this.emptyValueLabel,
+    required this.consentAcceptedLabel,
+    required this.consentDeclinedLabel,
+  });
+
+  final String label;
+  final String description;
+  final String emptyValueLabel;
+  final String consentAcceptedLabel;
+  final String consentDeclinedLabel;
 }
 
 final class SeoActionFlowMarkup {
@@ -68,12 +98,14 @@ final class SeoActionFlowMarkup {
     required this.previousLabel,
     required this.nextLabel,
     required this.progressLabel,
+    this.review,
   });
 
   final List<SeoActionFlowMarkupStep> steps;
   final String previousLabel;
   final String nextLabel;
   final String progressLabel;
+  final SeoActionFlowMarkupReview? review;
 }
 
 final class SeoActionFormMarkup {
@@ -203,6 +235,7 @@ bool _validFlow(SeoActionFormMarkup markup) {
     return false;
   }
   var expectedField = 0;
+  final conditionalOwnerByField = <int, bool>{};
   for (final step in flow.steps) {
     if (!_validText(step.label, internalSeoActionFormMaxLabelLength) ||
         !_validText(
@@ -214,9 +247,47 @@ bool _validFlow(SeoActionFormMarkup markup) {
         step.firstFieldIndex + step.fieldCount > markup.fields.length) {
       return false;
     }
+    if (step.condition case final condition?) {
+      if (condition.fieldIndex < 0 ||
+          condition.fieldIndex >= step.firstFieldIndex ||
+          condition.fieldIndex >= markup.fields.length ||
+          condition.fieldName != markup.fields[condition.fieldIndex].name ||
+          markup.fields[condition.fieldIndex].kind !=
+              SeoActionFormMarkupFieldKind.choice ||
+          conditionalOwnerByField[condition.fieldIndex] != false ||
+          !markup.fields[condition.fieldIndex].options.any(
+            (option) => option.value == condition.value,
+          )) {
+        return false;
+      }
+    }
+    for (var index = step.firstFieldIndex;
+        index < step.firstFieldIndex + step.fieldCount;
+        index++) {
+      conditionalOwnerByField[index] = step.condition != null;
+    }
     expectedField += step.fieldCount;
   }
-  return expectedField == markup.fields.length;
+  if (expectedField != markup.fields.length) return false;
+  final review = flow.review;
+  return review == null ||
+      (_validText(review.label, internalSeoActionFormMaxLabelLength) &&
+          _validText(
+            review.description,
+            internalSeoActionFormMaxDescriptionLength,
+          ) &&
+          _validText(
+            review.emptyValueLabel,
+            internalSeoActionFormMaxLabelLength,
+          ) &&
+          _validText(
+            review.consentAcceptedLabel,
+            internalSeoActionFormMaxLabelLength,
+          ) &&
+          _validText(
+            review.consentDeclinedLabel,
+            internalSeoActionFormMaxLabelLength,
+          ));
 }
 
 bool _validText(String value, int maxLength) =>

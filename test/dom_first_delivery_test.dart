@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_action_flow_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_collection_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
@@ -116,6 +117,21 @@ void main() {
       expect(seoDomFirstTabsRuntime, isNot(contains('outerHTML')));
       expect(seoDomFirstTabsRuntime, isNot(contains('document.write')));
       expect(seoDomFirstTabsRuntime, isNot(contains('eval(')));
+    });
+
+    test('action flow stays inside its isolated runtime budget', () {
+      final gzipBytes =
+          gzip.encode(utf8.encode(seoDomFirstActionFlowRuntime)).length;
+
+      expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(
+        seoDomFirstActionFlowRuntime.toLowerCase(),
+        isNot(contains('</script')),
+      );
+      expect(seoDomFirstActionFlowRuntime, isNot(contains('innerHTML')));
+      expect(seoDomFirstActionFlowRuntime, isNot(contains('outerHTML')));
+      expect(seoDomFirstActionFlowRuntime, isNot(contains('document.write')));
+      expect(seoDomFirstActionFlowRuntime, isNot(contains('eval(')));
     });
 
     test('compiled collection has an isolated runtime and style budget', () {
