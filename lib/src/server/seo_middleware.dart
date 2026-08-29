@@ -7,7 +7,9 @@ import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
+import '../routing/seo_dom_first_navigation.dart';
 import '../routing/seo_route.dart';
+import '../routing/seo_route_delivery.dart';
 import '../routing/seo_path_kind.dart';
 import 'bot_detector.dart';
 import 'llms_txt.dart';
@@ -143,6 +145,23 @@ Middleware seoBotMiddleware({
   if (needsApplicationRuntime && domFirstRuntimeStore == null) {
     throw ArgumentError.notNull('domFirstRuntimeStore');
   }
+  final navigationRoutes = routes
+          ?.where((route) =>
+              route.domFirstFeatures.contains(SeoDomFirstFeature.navigation))
+          .toList() ??
+      const <SeoRoute>[];
+  if (navigationRoutes.isNotEmpty && siteBase == null) {
+    throw ArgumentError.notNull('siteBase');
+  }
+  final navigationPlans = <SeoRoute, SeoDomFirstNavigationPlan>{
+    if (routes != null && siteBase != null)
+      for (final route in navigationRoutes)
+        route: buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: route,
+          siteBase: siteBase,
+        )!,
+  };
   // Not just `isDynamic`: a CLASSIC route may carry an async
   // `enumeratePaths` too, and the synchronous pass cannot await it
   // either. Deciding on "is dynamic" alone made /sitemap.xml throw for a
@@ -392,6 +411,7 @@ Middleware seoBotMiddleware({
                   lang: resolution.lang ?? match.route.lang,
                   stylesheet: domFirstStylesheet,
                   features: match.route.domFirstFeatures,
+                  navigationPlan: navigationPlans[match.route],
                   applicationRuntime: applicationRuntime,
                   interactionNonce: domFirstNonce?.call(request),
                 ),

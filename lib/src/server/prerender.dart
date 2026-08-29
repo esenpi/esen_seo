@@ -7,6 +7,7 @@ import '../renderer/seo_dom_first.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_application_runtime.dart';
+import '../routing/seo_dom_first_navigation.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_route.dart';
@@ -103,6 +104,15 @@ Future<List<String>> prerenderSite({
     routes,
     domFirstRuntimeStore,
   );
+  final navigationPlans = <SeoRoute, SeoDomFirstNavigationPlan>{
+    for (final route in routes)
+      if (route.domFirstFeatures.contains(SeoDomFirstFeature.navigation))
+        route: buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: route,
+          siteBase: siteBase,
+        )!,
+  };
   final templateFile = File('$buildDir/index.html');
   if (!templateFile.existsSync()) {
     throw StateError(
@@ -199,6 +209,7 @@ Future<List<String>> prerenderSite({
             lang: page.lang,
             stylesheet: domFirstStylesheet,
             features: page.route!.domFirstFeatures,
+            navigationPlan: navigationPlans[page.route!],
             applicationRuntime:
                 applicationRuntimes[page.route!.applicationRuntime],
             interactionNonce: interactionNonce,

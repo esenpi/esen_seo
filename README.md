@@ -73,7 +73,9 @@ The HTML only exists on the web.
   interactions run through transitions compiled from the same pure Dart
   source used by Flutter. A route may combine Tabs, Carousel and one Stepper
   family in one verified runtime bundle; Collection remains a standalone
-  runtime under the same fixed JavaScript budget.
+  runtime under the same fixed JavaScript budget. A separate profile-bound
+  navigation pilot can accelerate links between compatible document routes
+  while retaining complete no-JavaScript pages.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -804,8 +806,9 @@ loads (slow network, JS error), the user simply keeps a readable page.
 A route whose entire body comes from the pure component layer can opt out of
 the Flutter browser runtime. Humans and crawlers then receive the same
 standalone semantic document; there is no canvas, takeover or hidden app.
-Navigation is ordinary multi-page navigation, and every indexable panel stays
-in the delivered HTML when JavaScript is unavailable.
+Navigation is ordinary multi-page navigation by default; compatible document
+routes may select the profile-bound pilot described below. Every indexable
+panel stays in the delivered HTML when JavaScript is unavailable.
 
 ```dart
 final productTabs = <SeoTabComponentEntry>[
@@ -870,11 +873,63 @@ Each presentation owns its current state.
 `SeoDomFirstFeature.motion` is separate:
 it adds fixed CSS only, never a script, and responds exclusively to fixed
 markers produced by the pure component builders. General forms,
-application-authored controls, content effects and client-side routing remain
-separate, deliberately unsupported capabilities. The curated action form below
-is the only remote-input exception. `SeoCollection` owns one
+application-authored controls and content effects remain separate, deliberately
+unsupported capabilities. Client navigation is available only through the
+closed document-route pilot below. The curated action form below is the only
+remote-input exception. `SeoCollection` owns one
 bounded local-search input: it submits nothing, performs no remote I/O and is
 created only after the complete collection structure has been validated.
+
+### Profile-bound client navigation (pilot)
+
+Document-only DOM-first routes may opt into faster same-origin navigation. The
+route table remains the source: `seoBotMiddleware` and `prerenderSite` derive a
+bounded ordered manifest from it, so application data never names DOM targets
+or executable code.
+
+```dart
+const documentFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.themeToggle,
+  SeoDomFirstFeature.motion,
+};
+
+final seoRoutes = [
+  SeoRoute(
+    path: '/',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: documentFeatures,
+    meta: (_) => const SeoMeta(title: 'Home'),
+    body: (_) => homeNodes,
+  ),
+  SeoRoute(
+    path: '/about',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: documentFeatures,
+    meta: (_) => const SeoMeta(title: 'About'),
+    body: (_) => aboutNodes,
+  ),
+];
+```
+
+The browser intercepts an ordinary link only when its final URL is HTTP(S),
+same-origin, inside the configured `siteBase` path and matched by a route with
+the exact same feature profile. It fetches a complete HTML document, enforces
+strict response and DOM bounds, replaces only sanitized package-marked head
+nodes and `#esen-seo-content`, then updates History, scroll and focus. Fetched
+scripts are never inserted or executed. The theme toggle listens for the
+package navigation event and binds the fresh marker after replacement; CSS
+motion needs no reinitialization.
+
+Navigation currently cannot be combined with Tabs, Carousel, Stepper,
+Collection, forms or application runtimes. Those links deliberately retain
+native multi-page navigation until their state and reinitialization contracts
+are explicit. Modified clicks, downloads, external targets, fragments on the
+current page, malformed responses and profile changes likewise stay native or
+fall back to a full document request. Without JavaScript every route remains a
+complete, directly navigable HTML page. `siteBase` is required when any route
+selects `SeoDomFirstFeature.navigation`, including subpath deployments such as
+GitHub Pages.
 
 ### Curated action forms
 

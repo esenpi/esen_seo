@@ -55,5 +55,6 @@ export 'src/renderer/seo_stylesheet.dart' show seoDefaultStylesheet;
 export 'src/routing/seo_resolution.dart';
 export 'src/routing/seo_resolved_page.dart';
 export 'src/routing/seo_application_runtime.dart';
+export 'src/routing/seo_dom_first_navigation.dart';
 export 'src/routing/seo_route.dart';
 export 'src/routing/seo_route_delivery.dart';

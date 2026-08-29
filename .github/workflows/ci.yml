@@ -75,6 +75,7 @@ jobs:
           test/dom_first_action_form_web_test.dart
           test/dom_first_action_flow_web_test.dart
           test/dom_first_theme_toggle_web_test.dart
+          test/dom_first_navigation_web_test.dart
 
   analyzer-minimum:
     name: analyzer 6.11 compatibility
@@ -345,6 +346,9 @@ jobs:
       - name: Verify the compiled theme runtime is current
         run: dart run tool/build_dom_first_theme_toggle_runtime.dart
 
+      - name: Verify the client-navigation runtime is current
+        run: dart run tool/build_dom_first_navigation_runtime.dart
+
       - name: Verify the action form runtime is current
         run: dart run tool/build_dom_first_action_form_runtime.dart
 
@@ -361,6 +365,7 @@ jobs:
           lib/src/renderer/seo_dom_first_action_form_runtime.g.dart
           lib/src/renderer/seo_dom_first_action_flow_runtime.g.dart
           lib/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart
+          lib/src/renderer/seo_dom_first_navigation_runtime.g.dart
 
   server:
     name: server path without Flutter

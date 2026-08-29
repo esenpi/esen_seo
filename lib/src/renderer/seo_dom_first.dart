@@ -10,6 +10,7 @@ import 'seo_dom_first_carousel_runtime.g.dart';
 import 'seo_dom_first_action_form_runtime.g.dart';
 import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
+import 'seo_dom_first_navigation_runtime.g.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
 import 'seo_dom_first_theme_toggle_runtime.g.dart';
@@ -321,6 +322,10 @@ String seoDomFirstFeatureScriptHtml(
   void addRuntime(String javascript) {
     if (runtime.isNotEmpty) runtime.write(';');
     runtime.write(javascript);
+  }
+
+  if (features.contains(SeoDomFirstFeature.navigation)) {
+    addRuntime(seoDomFirstNavigationRuntime);
   }
 
   if (features.contains(SeoDomFirstFeature.tabs)) {

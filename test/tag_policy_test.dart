@@ -113,5 +113,30 @@ void main() {
       // Head-Modus abgelehnt.
       expect(renderer.renderNode(SeoNode(tag: 'base')), isEmpty);
     });
+
+    test('only the navigation head renderer owns its reserved marker', () {
+      const ordinary = HtmlRenderer.head();
+      const navigation = HtmlRenderer.navigationHead();
+      final node = SeoNode(
+        tag: 'meta',
+        attributes: const {
+          'name': 'description',
+          'content': 'Safe',
+          'data-esen-seo-navigation-head': 'borrowed',
+          'onclick': 'alert(1)',
+        },
+      );
+
+      expect(
+        ordinary.renderNode(node),
+        '<meta name="description" content="Safe"/>',
+      );
+      expect(
+        navigation.renderNode(node),
+        '<meta name="description" content="Safe" '
+        'data-esen-seo-navigation-head/>',
+      );
+      expect(navigation.renderNode(SeoNode(tag: 'base')), isEmpty);
+    });
   });
 }

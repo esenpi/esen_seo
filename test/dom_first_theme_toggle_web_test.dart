@@ -187,6 +187,23 @@ void main() {
     expect(button.querySelectorAll('img,svg').length, 0);
     expect(root.querySelectorAll('[onerror],[onload]').length, 0);
   });
+
+  test('reinitializes a fresh package marker after client navigation', () {
+    final firstContainer = _container(fixture);
+    final first = _themeToggle(firstContainer);
+    _runGeneratedCandidate();
+
+    firstContainer.remove();
+    final second = _themeToggle(_container(fixture));
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+
+    expect(first.isConnected, isFalse);
+    expect(second.hasAttribute('hidden'), isFalse);
+    expect(second.getAttribute('data-esen-enhanced'), 'true');
+    expect(second.querySelectorAll('button').length, 1);
+  });
 }
 
 web.HTMLElement _container(web.HTMLElement fixture) {

@@ -1,4 +1,5 @@
 import 'seo_action_form_markup.dart';
+import 'seo_container.dart';
 import 'seo_node.dart';
 import 'tag_policy.dart';
 
@@ -28,23 +29,36 @@ class HtmlRenderer {
   /// A renderer for body content.
   const HtmlRenderer()
       : target = SeoRenderTarget.body,
-        _domFirst = false;
+        _domFirst = false,
+        _navigationHead = false;
 
   /// A renderer for a permanent DOM-first body.
   const HtmlRenderer.domFirst()
       : target = SeoRenderTarget.body,
-        _domFirst = true;
+        _domFirst = true,
+        _navigationHead = false;
 
   /// A renderer for the document head — used by `SeoMeta`, whose tags
   /// (`title`, `meta`, `link`, …) the body policy deliberately blocks.
   const HtmlRenderer.head()
       : target = SeoRenderTarget.head,
-        _domFirst = false;
+        _domFirst = false,
+        _navigationHead = false;
+
+  /// A head renderer for nodes replaced by DOM-first client navigation.
+  ///
+  /// The marker is emitted by the renderer itself. Supplying the reserved
+  /// attribute through a [SeoNode] remains forbidden by the normal policy.
+  const HtmlRenderer.navigationHead()
+      : target = SeoRenderTarget.head,
+        _domFirst = false,
+        _navigationHead = true;
 
   /// Which policy this renderer applies.
   final SeoRenderTarget target;
 
   final bool _domFirst;
+  final bool _navigationHead;
 
   /// Renders a list of top-level nodes into one HTML fragment.
   String render(List<SeoNode> nodes) {
@@ -190,6 +204,11 @@ class HtmlRenderer {
           ..write(escapeAttribute(value))
           ..write('"');
       });
+    }
+    if (_navigationHead) {
+      buffer
+        ..write(' ')
+        ..write(seoDomFirstNavigationHeadAttribute);
     }
 
     if (SeoNode.voidElements.contains(tag)) {

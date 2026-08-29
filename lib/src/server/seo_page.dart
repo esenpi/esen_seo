@@ -6,6 +6,7 @@ import '../renderer/seo_interactions.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_application_runtime.dart';
+import '../routing/seo_dom_first_navigation.dart';
 import '../routing/seo_route_delivery.dart';
 import 'seo_runtime_store.dart';
 
@@ -37,6 +38,7 @@ class SeoPage {
         enableInteractions = false,
         interactionNonce = null,
         domFirstFeatures = const {},
+        navigationPlan = null,
         applicationRuntime = null;
 
   /// Builds the body from [SeoNode]s using the same renderer as the
@@ -69,6 +71,7 @@ class SeoPage {
           mode: SeoRenderMode.visibleShell,
         ),
         domFirstFeatures = const {},
+        navigationPlan = null,
         applicationRuntime = null;
 
   /// Builds a permanent semantic page without a Flutter browser runtime.
@@ -81,6 +84,7 @@ class SeoPage {
     this.lang = 'en',
     this.stylesheet = seoDefaultStylesheet,
     Set<SeoDomFirstFeature> features = const {},
+    this.navigationPlan,
     this.interactionNonce,
     this.applicationRuntime,
   })  : meta = meta ?? const SeoMeta(),
@@ -89,6 +93,17 @@ class SeoPage {
         ),
         enableInteractions = false,
         domFirstFeatures = Set.unmodifiable(features) {
+    final expectedNavigationProfile =
+        seoDomFirstNavigationFeatureProfile(features);
+    if ((expectedNavigationProfile == null) != (navigationPlan == null) ||
+        (navigationPlan != null &&
+            navigationPlan!.profile != expectedNavigationProfile)) {
+      throw ArgumentError.value(
+        navigationPlan,
+        'navigationPlan',
+        'must exactly match the selected DOM-first navigation profile',
+      );
+    }
     for (final runtimeFeature
         in applicationRuntime?.reference.memberKinds ?? const []) {
       final feature = _applicationRuntimeFeature(runtimeFeature);
@@ -130,6 +145,9 @@ class SeoPage {
   /// Compiled behaviours selected for a permanent DOM-first page.
   final Set<SeoDomFirstFeature> domFirstFeatures;
 
+  /// Ordered route manifest for the profile-bound navigation runtime.
+  final SeoDomFirstNavigationPlan? navigationPlan;
+
   /// A separately built and verified application transition for this page.
   final SeoDomFirstRuntimeArtifact? applicationRuntime;
 
@@ -142,6 +160,7 @@ class SeoPage {
   /// Renders the complete HTML document.
   String toHtmlDocument() {
     final language = HtmlRenderer.escapeAttribute(lang);
+    final navigation = navigationPlan;
     final effectiveFeatures = {
       ...domFirstFeatures,
       for (final member
@@ -157,6 +176,17 @@ class SeoPage {
       },
     };
     final head = StringBuffer();
+    final metaHtml = navigation == null
+        ? meta.toHtml()
+        : const HtmlRenderer.navigationHead().render(meta.toNodes());
+    final navigationManifestHtml = navigation == null
+        ? ''
+        : '<script type="application/json" '
+            '$seoDomFirstNavigationManifestAttribute '
+            'data-esen-navigation-profile="'
+            '${HtmlRenderer.escapeAttribute(navigation.profile)}"'
+            '${_nonceAttribute(interactionNonce)}>'
+            '${navigation.manifestJson}</script>';
     head.write(
       seoDomFirstFeatureBootstrapScriptHtml(
         bootstrapFeatures,
@@ -196,7 +226,8 @@ class SeoPage {
         '<head>'
         '<meta charset="utf-8"/>'
         '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
-        '${meta.toHtml()}'
+        '$metaHtml'
+        '$navigationManifestHtml'
         '$head'
         '</head>'
         '<body>$bodyHtml$runtime</body>'
@@ -229,10 +260,7 @@ String _applicationRuntimeScriptHtml(
 }) {
   final id = HtmlRenderer.escapeAttribute(artifact.reference.id);
   final hash = HtmlRenderer.escapeAttribute(artifact.manifest.sha256);
-  final value = nonce?.trim();
-  final nonceAttribute = value == null || value.isEmpty
-      ? ''
-      : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
+  final nonceAttribute = _nonceAttribute(nonce);
   final hasInteractionLayout = artifact.reference.memberKinds
       .any((kind) => kind != SeoDomFirstApplicationRuntimeKind.collection);
   return '<script $seoDomFirstApplicationScriptAttribute="$id" '
@@ -241,4 +269,11 @@ String _applicationRuntimeScriptHtml(
       '${artifact.reference.memberKinds.contains(SeoDomFirstApplicationRuntimeKind.collection) ? ';delete document.documentElement.dataset.esenCollectionPending' : ''}'
       '${hasInteractionLayout ? ';delete document.documentElement.dataset.esenInteractionPending' : ''}'
       '</script>';
+}
+
+String _nonceAttribute(String? nonce) {
+  final value = nonce?.trim();
+  return value == null || value.isEmpty
+      ? ''
+      : ' nonce="${HtmlRenderer.escapeAttribute(value)}"';
 }

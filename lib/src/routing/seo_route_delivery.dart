@@ -14,6 +14,13 @@ enum SeoRouteDelivery {
 ///
 /// The closed set keeps executable browser capabilities out of route data.
 enum SeoDomFirstFeature {
+  /// Navigate between compatible registered content routes without a reload.
+  ///
+  /// The pilot is intentionally compatible only with [themeToggle] and
+  /// [motion]. Stateful component and application runtimes keep native page
+  /// navigation until they define an explicit reinitialization contract.
+  navigation,
+
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
   tabs,
 
@@ -50,3 +57,10 @@ enum SeoDomFirstFeature {
   /// final static state.
   motion,
 }
+
+/// Features whose browser state survives the client-navigation pilot.
+const Set<SeoDomFirstFeature> seoDomFirstNavigationCompatibleFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.themeToggle,
+  SeoDomFirstFeature.motion,
+};

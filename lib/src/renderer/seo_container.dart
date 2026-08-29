@@ -58,6 +58,14 @@ const String seoDomFirstAttribute = 'data-esen-seo-dom-first';
 /// injector would later mistake for its own and remove.
 const String seoMetaMarker = 'data-esen-seo';
 
+/// Marks sanitized head elements owned by DOM-first client navigation.
+///
+/// The attribute is appended by the dedicated head renderer after ordinary
+/// node attributes have passed the policy. Application content therefore
+/// cannot borrow the marker through a `SeoNode`.
+const String seoDomFirstNavigationHeadAttribute =
+    'data-esen-seo-navigation-head';
+
 /// Takes the invisible mirror out of the keyboard tab order and the
 /// accessibility tree.
 ///

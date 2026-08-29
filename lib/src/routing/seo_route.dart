@@ -244,6 +244,17 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       'require delivery: SeoRouteDelivery.domFirst',
     );
   }
+  if (features.contains(SeoDomFirstFeature.navigation)) {
+    final unsupported =
+        features.difference(seoDomFirstNavigationCompatibleFeatures);
+    if (unsupported.isNotEmpty) {
+      throw ArgumentError.value(
+        features,
+        'domFirstFeatures',
+        'navigation currently supports only themeToggle and motion',
+      );
+    }
+  }
   return Set<SeoDomFirstFeature>.unmodifiable(features);
 }
 
@@ -258,6 +269,13 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
       runtime,
       'applicationRuntime',
       'requires delivery: SeoRouteDelivery.domFirst',
+    );
+  }
+  if (features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'cannot be combined with the navigation pilot',
     );
   }
   if (!isValidSeoApplicationRuntimeId(runtime.id)) {
