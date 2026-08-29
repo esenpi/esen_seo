@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
 
@@ -16,6 +18,12 @@ const _template = '''
 
 const _navigation = {
   SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _tabsNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.tabs,
   SeoDomFirstFeature.themeToggle,
 };
 
@@ -76,12 +84,17 @@ void main() {
         ),
         throwsArgumentError,
       );
+      final tabs = _route('/', features: _tabsNavigation);
+      expect(
+        seoDomFirstNavigationProfile(tabs),
+        'navigation.tabs.themeToggle',
+      );
       expect(
         () => _route(
-          '/',
+          '/carousel',
           features: const {
             SeoDomFirstFeature.navigation,
-            SeoDomFirstFeature.tabs,
+            SeoDomFirstFeature.carousel,
           },
         ),
         throwsArgumentError,
@@ -268,8 +281,21 @@ void main() {
       final themeOnly = seoDomFirstFeatureScriptHtml(
         const {SeoDomFirstFeature.themeToggle},
       );
+      final tabsNavigation = utf8.encode(
+        '$seoDomFirstNavigationRuntime$seoDomFirstTabsRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final tabsNavigationHtml = seoDomFirstFeatureScriptHtml(_tabsNavigation);
 
       expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
+      expect(
+        gzip.encode(tabsNavigation).length,
+        lessThanOrEqualTo(25 * 1024),
+      );
+      expect(
+        tabsNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
+        lessThan(tabsNavigationHtml.indexOf(seoDomFirstTabsRuntime)),
+      );
       expect(seoDomFirstFeatureScriptHtml(const {}), isEmpty);
       expect(navigationOnly, contains(seoDomFirstNavigationRuntime));
       expect(navigationOnly, isNot(contains('localStorage.getItem')));

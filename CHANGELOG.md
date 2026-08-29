@@ -4,9 +4,11 @@
   DOM-first routes. Compatible same-origin links fetch and validate another
   complete semantic document, replace only package-marked metadata and the
   package-owned content container, preserve History and focus, and reinitialize
-  the theme toggle without loading or executing fetched scripts. The pilot is
-  limited to routes whose feature profile contains only navigation, theme and
-  CSS motion; every other link remains a normal document navigation.
+  package-owned Tabs and the theme toggle without loading or executing fetched
+  scripts. Tabs restore each document's delivered initial state and reveal a
+  validated fragment target before navigation focus and scroll. The pilot is
+  limited to routes whose feature profile contains only navigation, Tabs,
+  theme and CSS motion; every other link remains a normal document navigation.
 * Added a curated cross-platform action-form slice for text, email, multiline
   and consent fields. One bounded pure definition drives the native Flutter
   widget, the non-interactive mirror fallback and the permanent DOM-first

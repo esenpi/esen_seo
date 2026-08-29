@@ -201,6 +201,92 @@ void main() {
     );
   });
 
+  test('navigation event initializes fresh groups exactly once', () {
+    final firstContainer = _container(fixture);
+    final first = _tabs(firstContainer, 'first-route-tabs');
+
+    _runCompiledCandidate();
+    expect(first.querySelectorAll('[role="tablist"]').length, 1);
+
+    firstContainer.remove();
+    final nextContainer = _container(fixture);
+    final next = _tabs(nextContainer, 'next-route-tabs', initialIndex: 1);
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+
+    expect(first.isConnected, isFalse);
+    expect(next.querySelectorAll('[role="tablist"]').length, 1);
+    expect(next.querySelectorAll('[role="tab"]').length, 2);
+    expect(
+      (next.querySelectorAll('[role="tab"]').item(1)! as web.Element)
+          .getAttribute(
+        'aria-selected',
+      ),
+      'true',
+    );
+    expect(
+      (next.querySelectorAll('[role="tabpanel"]').item(0)! as web.Element)
+          .hasAttribute(
+        'hidden',
+      ),
+      isTrue,
+    );
+  });
+
+  test('fragment target reveals its validated panel before focus', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final root = _tabs(container, 'fragment-tabs');
+    final target = root.querySelectorAll('p').item(1)! as web.HTMLElement;
+    target.id = 'details-anchor';
+    web.window.history.replaceState(null, '', '#details-anchor');
+
+    _runCompiledCandidate();
+
+    final tabs = root.querySelectorAll('[role="tab"]');
+    final panels = root.querySelectorAll('[role="tabpanel"]');
+    expect(
+      (tabs.item(1)! as web.Element).getAttribute('aria-selected'),
+      'true',
+    );
+    expect((panels.item(0)! as web.Element).hasAttribute('hidden'), isTrue);
+    expect((panels.item(1)! as web.Element).hasAttribute('hidden'), isFalse);
+  });
+
+  test('ambiguous fragment ids cannot override the delivered state', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final root = _tabs(container, 'ambiguous-fragment-tabs');
+    final target = root.querySelectorAll('p').item(1)! as web.HTMLElement;
+    target.id = 'repeated-anchor';
+    fixture.appendChild(
+      web.document.createElement('span')..id = 'repeated-anchor',
+    );
+    web.window.history.replaceState(null, '', '#repeated-anchor');
+
+    _runCompiledCandidate();
+
+    final tabs = root.querySelectorAll('[role="tab"]');
+    expect(
+      (tabs.item(0)! as web.Element).getAttribute('aria-selected'),
+      'true',
+    );
+    expect(
+      (tabs.item(1)! as web.Element).getAttribute('aria-selected'),
+      'false',
+    );
+  });
+
   test('adapter executes an application transition instead of the default', () {
     final container = _container(fixture);
     final root = _tabs(container, 'application-tabs', initialIndex: 1);

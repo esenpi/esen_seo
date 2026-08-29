@@ -251,7 +251,7 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       throw ArgumentError.value(
         features,
         'domFirstFeatures',
-        'navigation currently supports only themeToggle and motion',
+        'navigation currently supports only tabs, themeToggle and motion',
       );
     }
   }

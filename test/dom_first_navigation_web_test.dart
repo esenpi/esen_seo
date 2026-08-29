@@ -5,12 +5,13 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:esen_seo/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
 
-const _profile = 'navigation.themeToggle';
+const _profile = 'navigation.tabs.themeToggle';
 
 void main() {
   test('navigates compatible documents and leaves other links native',
@@ -40,13 +41,23 @@ void main() {
     final initialDocument = _document(
       title: 'Initial page',
       description: 'Initial description',
-      body: _body('Initial page', '?esen-nav-target=1'),
+      body: _body(
+        'Initial page',
+        '?esen-nav-target=1',
+        tabsId: 'initial-tabs',
+        initialTab: 0,
+      ),
       manifest: manifest,
     );
     final targetDocument = _document(
       title: 'Target page',
       description: 'Target description',
-      body: _body('Target page', '?esen-nav-second=1'),
+      body: _body(
+        'Target page',
+        '?esen-nav-second=1',
+        tabsId: 'target-tabs',
+        initialTab: 1,
+      ),
       manifest: manifest,
     );
 
@@ -67,13 +78,19 @@ void main() {
       ..appendChild(description)
       ..appendChild(manifestNode);
 
-    final initial = _content('Initial page', '?esen-nav-target=1');
+    final initial = _content(
+      'Initial page',
+      '?esen-nav-target=1',
+      tabsId: 'initial-tabs',
+      initialTab: 0,
+    );
     web.document.body?.appendChild(initial);
     _mockFetch(initialDocument, targetDocument);
 
     final runtime = web.document.createElement('script')
       ..setAttribute('data-esen-seo-dom-first-runtime', '')
       ..textContent = '$seoDomFirstNavigationRuntime;'
+          '$seoDomFirstTabsRuntime;'
           '$seoDomFirstThemeToggleRuntime';
     web.document.body?.appendChild(runtime);
 
@@ -81,6 +98,14 @@ void main() {
       '[data-esen-component="theme-toggle"]',
     )!;
     expect(firstToggle.querySelectorAll('button').length, 1);
+    expect(initial.querySelectorAll('[role="tablist"]').length, 1);
+    expect(
+      (initial.querySelectorAll('[role="tab"]').item(0)! as web.Element)
+          .getAttribute(
+        'aria-selected',
+      ),
+      'true',
+    );
 
     final link = initial.querySelector('a')! as web.HTMLElement;
     final click = web.MouseEvent(
@@ -113,6 +138,24 @@ void main() {
           ?.querySelectorAll('button')
           .length,
       1,
+    );
+    expect(target.querySelectorAll('[role="tablist"]').length, 1);
+    expect(target.querySelectorAll('[role="tab"]').length, 2);
+    expect(
+      (target.querySelectorAll('[role="tab"]').item(1)! as web.Element)
+          .getAttribute(
+        'aria-selected',
+      ),
+      'true',
+    );
+    (target.querySelectorAll('[role="tab"]').item(0)! as web.HTMLElement)
+        .click();
+    expect(
+      (target.querySelectorAll('[role="tab"]').item(0)! as web.Element)
+          .getAttribute(
+        'aria-selected',
+      ),
+      'true',
     );
     expect(web.document.activeElement?.textContent, contains('Target page'));
     expect(
@@ -168,6 +211,16 @@ void main() {
     expect(
       web.document.querySelector('#esen-seo-content')?.textContent,
       contains('Initial page'),
+    );
+    final restored = web.document.querySelector('#esen-seo-content')!;
+    expect(restored.querySelectorAll('[role="tablist"]').length, 1);
+    expect(restored.querySelectorAll('[role="tab"]').length, 2);
+    expect(
+      (restored.querySelectorAll('[role="tab"]').item(0)! as web.Element)
+          .getAttribute(
+        'aria-selected',
+      ),
+      'true',
     );
     expect(
       web.document.documentElement?.getAttribute('data-mock-fetch-count'),
@@ -227,16 +280,42 @@ void main() {
   });
 }
 
-web.HTMLElement _content(String heading, String href) {
+web.HTMLElement _content(
+  String heading,
+  String href, {
+  required String tabsId,
+  required int initialTab,
+}) {
   final holder = web.document.createElement('div');
-  holder.setHTMLUnsafe(_body(heading, href).toJS);
+  holder.setHTMLUnsafe(
+    _body(
+      heading,
+      href,
+      tabsId: tabsId,
+      initialTab: initialTab,
+    ).toJS,
+  );
   return holder.firstElementChild! as web.HTMLElement;
 }
 
-String _body(String heading, String href) =>
+String _body(
+  String heading,
+  String href, {
+  required String tabsId,
+  required int initialTab,
+}) =>
     '<div id="esen-seo-content" data-esen-seo-dom-first="true">'
     '<main><h1>$heading</h1><a href="$href">Continue</a>'
-    '${_themeToggle()}</main></div>';
+    '${_tabs(tabsId, initialTab)}${_themeToggle()}</main></div>';
+
+String _tabs(String id, int initialIndex) =>
+    '<div id="$id" data-esen-component="tabs" '
+    'data-esen-label="Page sections" '
+    'data-esen-initial-index="$initialIndex">'
+    '<section id="$id-panel-0" data-esen-tab-panel>'
+    '<h2>Overview</h2><p>Overview content</p></section>'
+    '<section id="$id-panel-1" data-esen-tab-panel>'
+    '<h2>Details</h2><p>Details content</p></section></div>';
 
 String _themeToggle() => '<span hidden data-esen-component="theme-toggle" '
     'data-esen-light-label="Light" data-esen-dark-label="Dark" '

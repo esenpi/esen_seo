@@ -25,7 +25,7 @@ void _enhanceTabs(
 ) {
   var state = initialSeoTabsState(
     count: apply.count,
-    index: apply.initialIndex,
+    index: apply.fragmentIndex ?? apply.initialIndex,
   );
 
   void dispatch(SeoTabsAction action, {required bool moveFocus}) {
@@ -79,6 +79,25 @@ final class _TabsApplyBoundary {
 
   int get count => plan.panels.length;
   int get initialIndex => plan.initialIndex;
+
+  int? get fragmentIndex {
+    final raw = web.window.location.hash;
+    if (raw.length < 2 || raw.length > 4097) return null;
+    late final String id;
+    try {
+      id = _decodeURIComponent(raw.substring(1).toJS).toDart;
+    } catch (_) {
+      return null;
+    }
+    if (id.isEmpty || _idCount(document, id) != 1) return null;
+    final target = document.getElementById(id);
+    if (target == null || !plan.root.contains(target)) return null;
+    for (var index = 0; index < plan.panels.length; index++) {
+      final panel = plan.panels[index];
+      if (panel == target || panel.contains(target)) return index;
+    }
+    return null;
+  }
 
   static List<_TabsApplyBoundary> discover(web.Document document) {
     final container = document.getElementById(seoContainerId);
@@ -311,3 +330,6 @@ final class _TabsApplyBoundary {
 
 final RegExp _headingTag = RegExp(r'^H[1-6]$');
 final RegExp _decimalIndex = RegExp(r'^(0|[1-9][0-9]*)$');
+
+@JS('decodeURIComponent')
+external JSString _decodeURIComponent(JSString component);
