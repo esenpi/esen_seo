@@ -69,12 +69,13 @@ The HTML only exists on the web.
   frame — styled, readable content before the Flutter engine has
   loaded, with Flutter taking the screen over on its first frame.
 - **DOM-first routes (opt-in)**: let a pure route body remain the permanent
-  page without loading Flutter Web. `SeoTabs` and bounded `SeoCollection`
-  interactions run through transitions compiled from the same pure Dart
-  source used by Flutter. A route may combine Tabs, Carousel and one Stepper
-  family in one verified runtime bundle; Collection remains a standalone
-  runtime under the same fixed JavaScript budget. A separate profile-bound
-  navigation pilot can accelerate links between compatible document routes
+  page without loading Flutter Web. `SeoTabs`, `SeoCarousel` and bounded
+  `SeoCollection` interactions run through transitions compiled from the same
+  pure Dart source used by Flutter. A route may combine Tabs, Carousel and one
+  Stepper family in one verified runtime bundle; Collection remains a
+  standalone runtime under the same fixed JavaScript budget. A separate
+  profile-bound navigation pilot can accelerate links between compatible
+  document routes and reinitialize package-owned Tabs and Carousel controls
   while retaining complete no-JavaScript pages.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
@@ -919,19 +920,20 @@ strict response and DOM bounds, replaces only sanitized package-marked head
 nodes and `#esen-seo-content`, then updates History, scroll and focus. Fetched
 scripts are never inserted or executed. The theme toggle listens for the
 package navigation event and binds the fresh marker after replacement.
-Package-owned Tabs groups validate and initialize the new document from its
-delivered initial state; a fragment inside a panel reveals that panel before
-navigation focus and scroll. CSS motion needs no reinitialization.
+Package-owned Tabs and Carousel controls validate and initialize the new
+document from its delivered initial state; a fragment inside a panel or slide
+reveals that region before navigation focus and scroll. CSS motion needs no
+reinitialization.
 
-Navigation currently cannot be combined with Carousel, Stepper, Collection,
-forms or application runtimes. Those links deliberately retain native
-multi-page navigation until their state and reinitialization contracts are
-explicit. Modified clicks, downloads, external targets, fragments on the
-current page, malformed responses and profile changes likewise stay native or
-fall back to a full document request. Without JavaScript every route remains a
-complete, directly navigable HTML page. `siteBase` is required when any route
-selects `SeoDomFirstFeature.navigation`, including subpath deployments such as
-GitHub Pages.
+Navigation currently cannot be combined with Stepper, Collection, forms or
+application runtimes. Those links deliberately retain native multi-page
+navigation until their state and reinitialization contracts are explicit.
+Modified clicks, downloads, external targets, fragments on the current page,
+malformed responses and profile changes likewise stay native or fall back to a
+full document request. Without JavaScript every route remains a complete,
+directly navigable HTML page. `siteBase` is required when any route selects
+`SeoDomFirstFeature.navigation`, including subpath deployments such as GitHub
+Pages.
 
 ### Curated action forms
 

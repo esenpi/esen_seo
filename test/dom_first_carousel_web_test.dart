@@ -235,6 +235,153 @@ void main() {
     expect(root.querySelectorAll('[onerror],[onload]').length, 0);
   });
 
+  test('navigation event initializes fresh carousels exactly once', () {
+    final firstContainer = _container(fixture);
+    final first = _carousel(
+      firstContainer,
+      'first-route-carousel',
+      initialIndex: 0,
+    );
+
+    _runCompiledCandidate();
+    expect(first.querySelectorAll('[data-esen-carousel-controls]').length, 1);
+
+    firstContainer.remove();
+    final nextContainer = _container(fixture);
+    final next = _carousel(
+      nextContainer,
+      'next-route-carousel',
+      initialIndex: 1,
+    );
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+
+    expect(first.isConnected, isFalse);
+    expect(next.querySelectorAll('[data-esen-carousel-controls]').length, 1);
+    expect(next.querySelectorAll('[data-esen-carousel-control]').length, 2);
+    expect(
+      next.querySelector('[data-esen-carousel-status]')?.textContent,
+      '2 / 3',
+    );
+    expect(
+      (next.querySelectorAll('[data-esen-carousel-slide]').item(0)!
+              as web.Element)
+          .hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(
+      (next.querySelectorAll('[data-esen-carousel-slide]').item(1)!
+              as web.Element)
+          .hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
+  test('fragment target reveals its validated slide before focus', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final root = _carousel(container, 'fragment-carousel', initialIndex: 0);
+    final target = root.querySelectorAll('p').item(2)! as web.HTMLElement;
+    target.id = 'reviews-anchor';
+    web.window.history.replaceState(null, '', '#reviews-anchor');
+
+    _runCompiledCandidate();
+
+    expect(
+      root.querySelector('[data-esen-carousel-status]')?.textContent,
+      '3 / 3',
+    );
+    expect(
+      (root.querySelectorAll('[data-esen-carousel-slide]').item(0)!
+              as web.Element)
+          .hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(
+      (root.querySelectorAll('[data-esen-carousel-slide]').item(2)!
+              as web.Element)
+          .hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
+  test('ambiguous and external fragments retain the delivered slide', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final ambiguous = _carousel(
+      container,
+      'ambiguous-fragment-carousel',
+      initialIndex: 1,
+    );
+    final duplicate = ambiguous.querySelectorAll('p').item(2)! as web.Element;
+    duplicate.id = 'repeated-carousel-anchor';
+    fixture.appendChild(
+      web.document.createElement('span')..id = 'repeated-carousel-anchor',
+    );
+    web.window.history.replaceState(null, '', '#repeated-carousel-anchor');
+
+    _runCompiledCandidate();
+
+    expect(
+      ambiguous.querySelector('[data-esen-carousel-status]')?.textContent,
+      '2 / 3',
+    );
+
+    final external = _carousel(
+      container,
+      'external-fragment-carousel',
+      initialIndex: 0,
+    );
+    final outside = web.document.createElement('span')..id = 'outside-carousel';
+    fixture.appendChild(outside);
+    web.window.history.replaceState(null, '', '#outside-carousel');
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+
+    expect(
+      external.querySelector('[data-esen-carousel-status]')?.textContent,
+      '1 / 3',
+    );
+  });
+
+  test('one unique nested target reveals each containing carousel region', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final outer = _carousel(container, 'fragment-outer', initialIndex: 0);
+    final outerSecond =
+        outer.querySelectorAll('section').item(1)! as web.Element;
+    final inner = _carousel(outerSecond, 'fragment-inner', initialIndex: 0);
+    final target = inner.querySelectorAll('p').item(2)! as web.HTMLElement;
+    target.id = 'nested-carousel-anchor';
+    web.window.history.replaceState(null, '', '#nested-carousel-anchor');
+
+    _runCompiledCandidate();
+
+    expect(
+      outer.querySelector('[data-esen-carousel-status]')?.textContent,
+      '2 / 3',
+    );
+    expect(
+      inner.querySelector('[data-esen-carousel-status]')?.textContent,
+      '3 / 3',
+    );
+    expect(outerSecond.hasAttribute('hidden'), isFalse);
+  });
+
   test('adapter executes an application transition instead of the default', () {
     final container = _container(fixture);
     final root = _carousel(container, 'application-carousel', initialIndex: 0);

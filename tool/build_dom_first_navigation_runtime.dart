@@ -13,7 +13,7 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
-  const javascript = r'''(()=>{
+  const source = r'''(()=>{
 let d=document,w=window,MAX=1048576,MAN=32768,HEAD=64,ELEMENTS=10000,ATTRS=32,eventName="esen-seo:navigation",stateKey="esenSeoNavigation",tags=new Set("div,span,section,article,aside,nav,header,footer,main,figure,figcaption,hgroup,address,details,summary,h1,h2,h3,h4,h5,h6,p,a,strong,em,b,i,u,s,small,mark,abbr,cite,q,blockquote,code,pre,kbd,samp,var,sub,sup,time,data,br,wbr,hr,ins,del,bdi,bdo,ruby,rt,rp,ul,ol,li,dl,dt,dd,table,caption,thead,tbody,tfoot,tr,th,td,col,colgroup,img,picture,source,audio,video,track,progress,meter".split(",")),behaviour=new Set("autoplay,loop,preload,autobuffer,autofocus,contenteditable,accesskey,tabindex".split(",")),urlAttrs=new Set("href,src,srcset,imagesrcset,cite,action,formaction,poster,data,ping,background,longdesc,manifest,lowsrc,dynsrc,codebase,archive,profile,usemap,srcdoc".split(",")),urlLists=new Set("srcset,imagesrcset,ping".split(",")),schemes=new Set("http,https,mailto,tel,sms,ftp".split(",")),pageExt=new Set("asp,aspx,cfm,htm,html,jsp,php,xhtml".split(","));
 let plain=v=>typeof v==="string"&&v.length<=256&&!/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(v),norm=p=>{if(typeof p!=="string"||!p.startsWith("/"))return null;while(p.length>1&&p.endsWith("/"))p=p.slice(0,-1);return p},segments=p=>{p=norm(p);if(p==null)return null;let out=[];for(let s of p.split("/"))try{out.push(decodeURIComponent(s))}catch(_){return null}return out},parseManifest=doc=>{
  let nodes=doc.querySelectorAll('script[data-esen-seo-navigation-manifest]');if(nodes.length!=1)return null;let node=nodes[0],raw=node.textContent||"",j,names=Array.from(node.attributes).map(a=>a.name),allowed=new Set(["type","data-esen-seo-navigation-manifest","data-esen-navigation-profile","nonce"]);
@@ -45,6 +45,24 @@ try{history.scrollRestoration="manual"}catch(_){}if(!state(history.state))histor
 d.addEventListener("click",event=>{if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!(event.target instanceof Element))return;let anchor=event.target.closest("a[href]");if(!anchor||!c.contains(anchor)||anchor.hasAttribute("download")||(anchor.target&&anchor.target.toLowerCase()!=="_self")||anchor.relList.contains("external"))return;let raw=anchor.getAttribute("href");if(!raw||raw.length>4096)return;let url;try{url=new URL(raw,location.href)}catch(_){return}if(!validUrl(url,plan)||url.pathname===location.pathname&&url.search===location.search)return;event.preventDefault();save();go(url,true,null)});
 addEventListener("popstate",event=>{let url=new URL(location.href),position=state(event.state);if(!position||!validUrl(url,plan)){hard(url,true);return}go(url,false,position)});addEventListener("pagehide",()=>{g++;if(controller)controller.abort()},{once:true})
 })();''';
+  var javascript = source.split('\n').map((line) => line.trim()).join();
+  javascript = _replaceOnce(javascript, 'w=window,', '');
+  javascript = _renameIdentifier(javascript, 'controller', 'ctrl', 10);
+  javascript = _renameIdentifier(javascript, 'pending', 'busy', 7);
+  javascript = _renameIdentifier(javascript, 'position', 'pos', 11);
+  javascript = _renameIdentifier(javascript, 'response', 'res', 7);
+  javascript = _renameIdentifier(javascript, 'parseManifest', 'pm', 3);
+  javascript = _renameIdentifier(javascript, 'profileFor', 'pf', 2);
+  javascript = _renameIdentifier(javascript, 'validUrl', 'vu', 5);
+  javascript = _renameIdentifier(javascript, 'samePlan', 'sp', 2);
+  javascript = _renameIdentifier(javascript, 'safeUrl', 'su', 3);
+  javascript = _renameIdentifier(javascript, 'validContent', 'vc', 2);
+  javascript = _renameIdentifier(javascript, 'validHead', 'vh', 2);
+  javascript = _renameIdentifier(javascript, 'focusAndScroll', 'fs', 2);
+  javascript = _renameIdentifier(javascript, 'initialPlan', 'ip', 3);
+  javascript = _renameIdentifier(javascript, 'newContent', 'nc', 3);
+  javascript = _renameIdentifier(javascript, 'newManifest', 'nm', 3);
+  javascript = _renameIdentifier(javascript, 'oldFocus', 'of', 4);
 
   if (javascript.toLowerCase().contains('</script') ||
       javascript.contains('<!--')) {
@@ -88,4 +106,29 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
   } finally {
     await temp.delete(recursive: true);
   }
+}
+
+String _replaceOnce(String source, String from, String to) {
+  final first = source.indexOf(from);
+  if (first < 0 || source.indexOf(from, first + from.length) >= 0) {
+    throw StateError('Navigation runtime token "$from" drifted.');
+  }
+  return source.replaceFirst(from, to);
+}
+
+String _renameIdentifier(
+  String source,
+  String from,
+  String to,
+  int expectedMatches,
+) {
+  final pattern = RegExp('\\b${RegExp.escape(from)}\\b');
+  final matches = pattern.allMatches(source).length;
+  if (matches != expectedMatches) {
+    throw StateError(
+      'Navigation runtime identifier "$from" drifted '
+      '($matches matches, expected $expectedMatches).',
+    );
+  }
+  return source.replaceAll(pattern, to);
 }

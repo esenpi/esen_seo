@@ -5,13 +5,13 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
-import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:esen_seo/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web/web.dart' as web;
 
-const _profile = 'navigation.tabs.themeToggle';
+const _profile = 'carousel.navigation.tabs.themeToggle';
 
 void main() {
   test('navigates compatible documents and leaves other links native',
@@ -43,9 +43,11 @@ void main() {
       description: 'Initial description',
       body: _body(
         'Initial page',
-        '?esen-nav-target=1',
+        '?esen-nav-target=1#target-carousel-slide-2',
         tabsId: 'initial-tabs',
         initialTab: 0,
+        carouselId: 'initial-carousel',
+        initialSlide: 0,
       ),
       manifest: manifest,
     );
@@ -57,6 +59,8 @@ void main() {
         '?esen-nav-second=1',
         tabsId: 'target-tabs',
         initialTab: 1,
+        carouselId: 'target-carousel',
+        initialSlide: 1,
       ),
       manifest: manifest,
     );
@@ -80,9 +84,11 @@ void main() {
 
     final initial = _content(
       'Initial page',
-      '?esen-nav-target=1',
+      '?esen-nav-target=1#target-carousel-slide-2',
       tabsId: 'initial-tabs',
       initialTab: 0,
+      carouselId: 'initial-carousel',
+      initialSlide: 0,
     );
     web.document.body?.appendChild(initial);
     _mockFetch(initialDocument, targetDocument);
@@ -90,7 +96,7 @@ void main() {
     final runtime = web.document.createElement('script')
       ..setAttribute('data-esen-seo-dom-first-runtime', '')
       ..textContent = '$seoDomFirstNavigationRuntime;'
-          '$seoDomFirstTabsRuntime;'
+          '$seoDomFirstTabsCarouselRuntime;'
           '$seoDomFirstThemeToggleRuntime';
     web.document.body?.appendChild(runtime);
 
@@ -99,6 +105,10 @@ void main() {
     )!;
     expect(firstToggle.querySelectorAll('button').length, 1);
     expect(initial.querySelectorAll('[role="tablist"]').length, 1);
+    expect(
+      initial.querySelector('[data-esen-carousel-status]')?.textContent,
+      '1 / 3',
+    );
     expect(
       (initial.querySelectorAll('[role="tab"]').item(0)! as web.Element)
           .getAttribute(
@@ -147,6 +157,20 @@ void main() {
         'aria-selected',
       ),
       'true',
+    );
+    expect(
+      target.querySelectorAll('[data-esen-carousel-controls]').length,
+      1,
+    );
+    expect(
+      target.querySelector('[data-esen-carousel-status]')?.textContent,
+      '3 / 3',
+    );
+    expect(
+      (target.querySelectorAll('[data-esen-carousel-slide]').item(2)!
+              as web.Element)
+          .hasAttribute('hidden'),
+      isFalse,
     );
     (target.querySelectorAll('[role="tab"]').item(0)! as web.HTMLElement)
         .click();
@@ -223,6 +247,14 @@ void main() {
       'true',
     );
     expect(
+      restored.querySelectorAll('[data-esen-carousel-controls]').length,
+      1,
+    );
+    expect(
+      restored.querySelector('[data-esen-carousel-status]')?.textContent,
+      '1 / 3',
+    );
+    expect(
       web.document.documentElement?.getAttribute('data-mock-fetch-count'),
       '2',
     );
@@ -285,6 +317,8 @@ web.HTMLElement _content(
   String href, {
   required String tabsId,
   required int initialTab,
+  required String carouselId,
+  required int initialSlide,
 }) {
   final holder = web.document.createElement('div');
   holder.setHTMLUnsafe(
@@ -293,6 +327,8 @@ web.HTMLElement _content(
       href,
       tabsId: tabsId,
       initialTab: initialTab,
+      carouselId: carouselId,
+      initialSlide: initialSlide,
     ).toJS,
   );
   return holder.firstElementChild! as web.HTMLElement;
@@ -303,10 +339,13 @@ String _body(
   String href, {
   required String tabsId,
   required int initialTab,
+  required String carouselId,
+  required int initialSlide,
 }) =>
     '<div id="esen-seo-content" data-esen-seo-dom-first="true">'
     '<main><h1>$heading</h1><a href="$href">Continue</a>'
-    '${_tabs(tabsId, initialTab)}${_themeToggle()}</main></div>';
+    '${_tabs(tabsId, initialTab)}${_carousel(carouselId, initialSlide)}'
+    '${_themeToggle()}</main></div>';
 
 String _tabs(String id, int initialIndex) =>
     '<div id="$id" data-esen-component="tabs" '
@@ -316,6 +355,19 @@ String _tabs(String id, int initialIndex) =>
     '<h2>Overview</h2><p>Overview content</p></section>'
     '<section id="$id-panel-1" data-esen-tab-panel>'
     '<h2>Details</h2><p>Details content</p></section></div>';
+
+String _carousel(String id, int initialIndex) =>
+    '<div id="$id" class="esen-seo-carousel" '
+    'data-esen-component="carousel" data-esen-label="Page highlights" '
+    'data-esen-previous-label="Previous slide" '
+    'data-esen-next-label="Next slide" '
+    'data-esen-initial-index="$initialIndex">'
+    '<section id="$id-slide-0" data-esen-carousel-slide>'
+    '<h2>First highlight</h2><p>First content</p></section>'
+    '<section id="$id-slide-1" data-esen-carousel-slide>'
+    '<h2>Second highlight</h2><p>Second content</p></section>'
+    '<section id="$id-slide-2" data-esen-carousel-slide>'
+    '<h2>Third highlight</h2><p>Third content</p></section></div>';
 
 String _themeToggle() => '<span hidden data-esen-component="theme-toggle" '
     'data-esen-light-label="Light" data-esen-dark-label="Dark" '

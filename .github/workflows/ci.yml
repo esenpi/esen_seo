@@ -337,6 +337,9 @@ jobs:
       - name: Verify the compiled carousel runtime is current
         run: dart run tool/build_dom_first_carousel_runtime.dart
 
+      - name: Verify the compiled tabs + carousel runtime is current
+        run: dart run tool/build_dom_first_tabs_carousel_runtime.dart
+
       - name: Verify the compiled collection runtime is current
         run: dart run tool/build_dom_first_collection_runtime.dart
 

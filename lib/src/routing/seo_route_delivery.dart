@@ -17,9 +17,9 @@ enum SeoDomFirstFeature {
   /// Navigate between compatible registered content routes without a reload.
   ///
   /// The pilot is intentionally compatible only with [themeToggle], [motion]
-  /// and the package-owned [tabs] runtime. Other stateful component and every
-  /// application runtime keep native page navigation until they define an
-  /// explicit reinitialization contract.
+  /// and the package-owned [tabs] and [carousel] runtimes. Other stateful
+  /// components and every application runtime keep native page navigation
+  /// until they define an explicit reinitialization contract.
   navigation,
 
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
@@ -63,6 +63,7 @@ enum SeoDomFirstFeature {
 const Set<SeoDomFirstFeature> seoDomFirstNavigationCompatibleFeatures = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.tabs,
+  SeoDomFirstFeature.carousel,
   SeoDomFirstFeature.themeToggle,
   SeoDomFirstFeature.motion,
 };

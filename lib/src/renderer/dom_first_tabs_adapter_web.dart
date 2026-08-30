@@ -4,7 +4,7 @@ import 'package:web/web.dart' as web;
 
 import '../components/seo_component_format.dart';
 import '../components/seo_tabs_transition.dart';
-import 'seo_container.dart';
+import 'dom_first_adapter_web.dart';
 
 /// Enhances every valid tab group in the package-owned DOM-first container.
 ///
@@ -81,17 +81,8 @@ final class _TabsApplyBoundary {
   int get initialIndex => plan.initialIndex;
 
   int? get fragmentIndex {
-    final raw = web.window.location.hash;
-    if (raw.length < 2 || raw.length > 4097) return null;
-    late final String id;
-    try {
-      id = _decodeURIComponent(raw.substring(1).toJS).toDart;
-    } catch (_) {
-      return null;
-    }
-    if (id.isEmpty || _idCount(document, id) != 1) return null;
-    final target = document.getElementById(id);
-    if (target == null || !plan.root.contains(target)) return null;
+    final target = domFirstFragmentTarget(document, plan.root);
+    if (target == null) return null;
     for (var index = 0; index < plan.panels.length; index++) {
       final panel = plan.panels[index];
       if (panel == target || panel.contains(target)) return index;
@@ -100,12 +91,8 @@ final class _TabsApplyBoundary {
   }
 
   static List<_TabsApplyBoundary> discover(web.Document document) {
-    final container = document.getElementById(seoContainerId);
-    if (container == null ||
-        container.getAttribute(seoDomFirstAttribute) != 'true' ||
-        _idCount(document, seoContainerId) != 1) {
-      return const [];
-    }
+    final container = domFirstContainer(document);
+    if (container == null) return const [];
 
     final boundaries = <_TabsApplyBoundary>[];
     final roots = container.querySelectorAll('[data-esen-component="tabs"]');
@@ -124,9 +111,9 @@ final class _TabsApplyBoundary {
     web.Element root,
   ) {
     if (root.getAttribute('data-esen-enhanced') == 'true') return null;
-    if (_hiddenByAncestor(root, container)) return null;
+    if (domFirstHiddenByAncestor(root, container)) return null;
     final id = root.id;
-    if (!isValidSeoInteractionId(id) || _idCount(document, id) != 1) {
+    if (!isValidSeoInteractionId(id) || domFirstIdCount(document, id) != 1) {
       return null;
     }
 
@@ -153,10 +140,10 @@ final class _TabsApplyBoundary {
       final heading = child.firstElementChild;
       if (child.id != expectedPanelId ||
           !panelIds.add(child.id) ||
-          _idCount(document, child.id) != 1 ||
-          _idCount(document, expectedTabId) != 0 ||
+          domFirstIdCount(document, child.id) != 1 ||
+          domFirstIdCount(document, expectedTabId) != 0 ||
           heading == null ||
-          !_headingTag.hasMatch(heading.tagName) ||
+          !domFirstHeadingTag.hasMatch(heading.tagName) ||
           (heading.textContent ?? '').trim().isEmpty) {
         return null;
       }
@@ -165,14 +152,8 @@ final class _TabsApplyBoundary {
     }
     if (panels.isEmpty) return null;
 
-    final initial = root.getAttribute('data-esen-initial-index');
-    if (initial == null || !_decimalIndex.hasMatch(initial)) return null;
-    final initialIndex = int.tryParse(initial);
-    if (initialIndex == null ||
-        initialIndex < 0 ||
-        initialIndex >= panels.length) {
-      return null;
-    }
+    final initialIndex = domFirstInitialIndex(root, panels.length);
+    if (initialIndex == null) return null;
     if (!_validStableLayout(
       root: root,
       placeholder: placeholder,
@@ -228,34 +209,6 @@ final class _TabsApplyBoundary {
       }
     }
     return true;
-  }
-
-  static bool _hiddenByAncestor(
-    web.Element root,
-    web.Element container,
-  ) {
-    web.Element? current = root;
-    while (current != null) {
-      final ariaHidden = current.getAttribute('aria-hidden');
-      if (current.hasAttribute('inert') ||
-          (ariaHidden != null && ariaHidden.trim().toLowerCase() == 'true')) {
-        return true;
-      }
-      if (current == container) return false;
-      current = current.parentElement;
-    }
-    return true;
-  }
-
-  static int _idCount(web.Document document, String id) {
-    if (id.isEmpty) return 0;
-    final elements = document.querySelectorAll('[id]');
-    var count = 0;
-    for (var index = 0; index < elements.length; index++) {
-      final element = elements.item(index);
-      if (element != null && (element as web.Element).id == id) count++;
-    }
-    return count;
   }
 
   void mount(_TabsEventSink dispatch) {
@@ -327,9 +280,3 @@ final class _TabsApplyBoundary {
     if (moveFocus) _tabs[state.index].focus();
   }
 }
-
-final RegExp _headingTag = RegExp(r'^H[1-6]$');
-final RegExp _decimalIndex = RegExp(r'^(0|[1-9][0-9]*)$');
-
-@JS('decodeURIComponent')
-external JSString _decodeURIComponent(JSString component);

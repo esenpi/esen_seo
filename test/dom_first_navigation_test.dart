@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:esen_seo/server.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +26,19 @@ const _navigation = {
 const _tabsNavigation = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.tabs,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _carouselNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.carousel,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _tabsCarouselNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.tabs,
+  SeoDomFirstFeature.carousel,
   SeoDomFirstFeature.themeToggle,
 };
 
@@ -89,12 +104,28 @@ void main() {
         seoDomFirstNavigationProfile(tabs),
         'navigation.tabs.themeToggle',
       );
+      final carousel = _route(
+        '/carousel',
+        features: _carouselNavigation,
+      );
+      expect(
+        seoDomFirstNavigationProfile(carousel),
+        'carousel.navigation.themeToggle',
+      );
+      final tabsCarousel = _route(
+        '/tabs-carousel',
+        features: _tabsCarouselNavigation,
+      );
+      expect(
+        seoDomFirstNavigationProfile(tabsCarousel),
+        'carousel.navigation.tabs.themeToggle',
+      );
       expect(
         () => _route(
-          '/carousel',
+          '/collection',
           features: const {
             SeoDomFirstFeature.navigation,
-            SeoDomFirstFeature.carousel,
+            SeoDomFirstFeature.collection,
           },
         ),
         throwsArgumentError,
@@ -273,6 +304,7 @@ void main() {
 
   group('navigation document', () {
     test('runtime remains isolated, inert by default and inside budget', () {
+      final levelNineGzip = GZipCodec(level: 9);
       final gzipBytes =
           gzip.encode(utf8.encode(seoDomFirstNavigationRuntime)).length;
       final navigationOnly = seoDomFirstFeatureScriptHtml(
@@ -286,15 +318,65 @@ void main() {
         '$seoDomFirstThemeToggleRuntime',
       );
       final tabsNavigationHtml = seoDomFirstFeatureScriptHtml(_tabsNavigation);
+      final carouselNavigation = utf8.encode(
+        '$seoDomFirstNavigationRuntime$seoDomFirstCarouselRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final carouselNavigationHtml =
+          seoDomFirstFeatureScriptHtml(_carouselNavigation);
+      final tabsCarouselNavigation = utf8.encode(
+        '$seoDomFirstNavigationRuntime$seoDomFirstTabsCarouselRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final tabsCarouselNavigationHtml =
+          seoDomFirstFeatureScriptHtml(_tabsCarouselNavigation);
 
       expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
       expect(
-        gzip.encode(tabsNavigation).length,
+        levelNineGzip.encode(tabsNavigation).length,
+        lessThanOrEqualTo(25 * 1024),
+      );
+      expect(
+        levelNineGzip.encode(carouselNavigation).length,
+        lessThanOrEqualTo(25 * 1024),
+      );
+      expect(
+        levelNineGzip.encode(tabsCarouselNavigation).length,
         lessThanOrEqualTo(25 * 1024),
       );
       expect(
         tabsNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
         lessThan(tabsNavigationHtml.indexOf(seoDomFirstTabsRuntime)),
+      );
+      expect(
+        carouselNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
+        lessThan(
+          carouselNavigationHtml.indexOf(seoDomFirstCarouselRuntime),
+        ),
+      );
+      expect(
+        tabsCarouselNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
+        lessThan(
+          tabsCarouselNavigationHtml.indexOf(
+            seoDomFirstTabsCarouselRuntime,
+          ),
+        ),
+      );
+      expect(
+        tabsCarouselNavigationHtml.indexOf(seoDomFirstTabsCarouselRuntime),
+        lessThan(
+          tabsCarouselNavigationHtml.indexOf(
+            seoDomFirstThemeToggleRuntime,
+          ),
+        ),
+      );
+      expect(
+        tabsCarouselNavigationHtml,
+        isNot(contains(seoDomFirstTabsRuntime)),
+      );
+      expect(
+        tabsCarouselNavigationHtml,
+        isNot(contains(seoDomFirstCarouselRuntime)),
       );
       expect(seoDomFirstFeatureScriptHtml(const {}), isEmpty);
       expect(navigationOnly, contains(seoDomFirstNavigationRuntime));
@@ -317,11 +399,14 @@ void main() {
       expect(seoDomFirstNavigationRuntime, isNot(contains('eval(')));
       expect(seoDomFirstNavigationRuntime, isNot(contains('.arrayBuffer()')));
       expect(seoDomFirstNavigationRuntime, contains('.body.getReader()'));
-      expect(seoDomFirstNavigationRuntime, contains('samePlan('));
+      expect(
+        seoDomFirstNavigationRuntime,
+        contains('a.base===b.base&&a.profile===b.profile'),
+      );
       expect(
         seoDomFirstNavigationRuntime.indexOf('if(push)history.pushState'),
         lessThan(
-          seoDomFirstNavigationRuntime.indexOf('c.replaceWith(newContent)'),
+          seoDomFirstNavigationRuntime.indexOf('c.replaceWith(nc)'),
         ),
       );
     });

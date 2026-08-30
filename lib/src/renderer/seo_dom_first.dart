@@ -12,6 +12,7 @@ import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_navigation_runtime.g.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
+import 'seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
 import 'seo_dom_first_theme_toggle_runtime.g.dart';
 import 'seo_motion_stylesheet.dart';
@@ -328,11 +329,13 @@ String seoDomFirstFeatureScriptHtml(
     addRuntime(seoDomFirstNavigationRuntime);
   }
 
-  if (features.contains(SeoDomFirstFeature.tabs)) {
-    addRuntime(seoDomFirstTabsRuntime);
-  }
-  if (features.contains(SeoDomFirstFeature.carousel)) {
-    addRuntime(seoDomFirstCarouselRuntime);
+  final tabs = features.contains(SeoDomFirstFeature.tabs);
+  final carousel = features.contains(SeoDomFirstFeature.carousel);
+  if (tabs && carousel) {
+    addRuntime(seoDomFirstTabsCarouselRuntime);
+  } else {
+    if (tabs) addRuntime(seoDomFirstTabsRuntime);
+    if (carousel) addRuntime(seoDomFirstCarouselRuntime);
   }
   if (features.contains(SeoDomFirstFeature.stepper)) {
     addRuntime(seoDomFirstStepperRuntime);
@@ -355,8 +358,8 @@ String seoDomFirstFeatureScriptHtml(
       ';delete document.documentElement.dataset.esenCollectionPending',
     );
   }
-  if (features.contains(SeoDomFirstFeature.tabs) ||
-      features.contains(SeoDomFirstFeature.carousel) ||
+  if (tabs ||
+      carousel ||
       features.contains(SeoDomFirstFeature.stepper) ||
       features.contains(SeoDomFirstFeature.configurator) ||
       features.contains(SeoDomFirstFeature.editorialWorkflow) ||
