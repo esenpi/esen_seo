@@ -1375,6 +1375,64 @@ dart run esen_seo:esen_seo_runtime \
   --bundle runtime_bundle.json
 ```
 
+For an application with several runtime routes, keep their complete artifact
+set in one authoritative plan instead of maintaining separate build commands:
+
+```json
+{
+  "schemaVersion": 1,
+  "runtimes": [
+    {
+      "kind": "collection",
+      "id": "articles",
+      "library": "package:my_app/article_collection_transition.dart",
+      "symbol": "transitionArticles"
+    },
+    {
+      "kind": "bundle",
+      "id": "product-page",
+      "entries": [
+        {
+          "kind": "tabs",
+          "library": "package:my_app/product_tabs_transition.dart",
+          "symbol": "transitionProductTabs"
+        },
+        {
+          "kind": "carousel",
+          "library": "package:my_app/product_carousel_transition.dart",
+          "symbol": "transitionProductCarousel"
+        }
+      ]
+    }
+  ]
+}
+```
+
+```shell
+dart run esen_seo:esen_seo_runtime --plan esen_seo_runtimes.json
+```
+
+The plan accepts all standalone kinds and inline bundle entries using the same
+fields as their individual commands. Configurator, editorial-workflow and
+approval-checklist entries use `projectionSymbol` and `interactionIds`;
+stepper-effects uses `interactionIds`. The plan is limited to 64 KiB and 64
+runtime artifacts, rejects unknown fields and duplicate artifact identities,
+and validates every entry before starting the first compiler process.
+
+Compilation happens in a fresh sibling staging directory. Only a complete,
+exact set of `.js` and `.json` pairs replaces the dedicated output directory,
+so a later import, compiler or budget failure leaves its prior contents
+unchanged. A successful replacement removes runtimes no longer present in the
+plan. The output must be below `build/` and cannot be `build/` itself or a
+symbolic link. CI can execute the same compilers and compare both bytes and the
+complete file-name set without changing the output:
+
+```shell
+dart run esen_seo:esen_seo_runtime \
+  --plan esen_seo_runtimes.json \
+  --check
+```
+
 `stepper` and `stepper-effects` are the same ownership family and cannot both
 appear in one bundle. Collection, configurator, editorial workflow and approval
 checklist use standalone application runtimes. Measured Collection combinations

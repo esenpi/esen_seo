@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "runtimes": [
+    {
+      "kind": "tabs",
+      "id": "example-tabs",
+      "library": "package:example/application_tabs_transition.dart",
+      "symbol": "transitionExampleTabs"
+    },
+    {
+      "kind": "carousel",
+      "id": "example-carousel",
+      "library": "package:example/application_carousel_transition.dart",
+      "symbol": "transitionExampleCarousel"
+    },
+    {
+      "kind": "collection",
+      "id": "example-collection",
+      "library": "package:example/application_collection_transition.dart",
+      "symbol": "transitionExampleCollection"
+    },
+    {
+      "kind": "stepper-effects",
+      "id": "example-stepper-effects",
+      "library": "package:example/application_stepper_transition.dart",
+      "symbol": "transitionExampleStepperEffects",
+      "interactionIds": [
+        "application-demo-stepper"
+      ]
+    },
+    {
+      "kind": "bundle",
+      "id": "example-page",
+      "entries": [
+        {
+          "kind": "tabs",
+          "library": "package:example/application_tabs_transition.dart",
+          "symbol": "transitionExampleTabs"
+        },
+        {
+          "kind": "carousel",
+          "library": "package:example/application_carousel_transition.dart",
+          "symbol": "transitionExampleCarousel"
+        },
+        {
+          "kind": "stepper-effects",
+          "library": "package:example/application_stepper_transition.dart",
+          "symbol": "transitionExampleStepperEffects",
+          "interactionIds": [
+            "application-demo-stepper"
+          ]
+        }
+      ]
+    }
+  ]
+}

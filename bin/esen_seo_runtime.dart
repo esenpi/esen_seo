@@ -18,21 +18,28 @@ Future<void> main(List<String> arguments) async {
       arguments.where((value) => value != '--check').toList(),
     );
     final output = values['output'] ?? 'build/esen_seo/runtimes';
-    final artifact = values.containsKey('bundle')
-        ? await _buildBundle(values, output, check)
-        : await _buildSingle(values, output, check);
-    final members = artifact.reference.kind == 'bundle'
-        ? ', members '
-            '${artifact.reference.memberKinds.map((kind) => kind.value).join(',')}'
-        : '';
-    stdout.writeln(
-      '${check ? 'Verified' : 'Built'} ${artifact.reference.kind} runtime '
-      '"${artifact.reference.id}"$members: '
-      '${artifact.manifest.bytes} bytes, '
-      '${artifact.manifest.gzipBytes} gzip bytes, '
-      'contract revision ${artifact.manifest.contractRevision}, '
-      'sha256 ${artifact.manifest.sha256}.',
-    );
+    final artifacts = values.containsKey('plan')
+        ? await _buildPlan(values, output, check)
+        : [
+            values.containsKey('bundle')
+                ? await _buildBundle(values, output, check)
+                : await _buildSingle(values, output, check),
+          ];
+    for (final artifact in artifacts) {
+      final members = artifact.reference.kind == 'bundle'
+          ? ', members '
+              '${artifact.reference.memberKinds.map((kind) => kind.value).join(',')}'
+          : '';
+      stdout.writeln(
+        '${check ? 'Verified' : 'Built'} ${artifact.reference.kind} runtime '
+        '"${artifact.reference.id}"$members: '
+        'schema ${artifact.manifest.schemaVersion}, '
+        'contract revision ${artifact.manifest.contractRevision}, '
+        '${artifact.manifest.bytes} bytes, '
+        '${artifact.manifest.gzipBytes} gzip bytes, '
+        'sha256 ${artifact.manifest.sha256}.',
+      );
+    }
   } on FormatException catch (error) {
     stderr.writeln(error.message);
     stderr.write(_usage);
@@ -43,7 +50,30 @@ Future<void> main(List<String> arguments) async {
   } on StateError catch (error) {
     stderr.writeln(error.message);
     exitCode = 1;
+  } on FileSystemException catch (error) {
+    stderr.writeln(error.message);
+    exitCode = 1;
   }
+}
+
+Future<List<SeoDomFirstRuntimeArtifact>> _buildPlan(
+  Map<String, String> values,
+  String output,
+  bool check,
+) async {
+  const allowed = {'plan', 'output'};
+  final incompatible = values.keys.toSet().difference(allowed);
+  if (incompatible.isNotEmpty) {
+    throw FormatException(
+      'Option "--plan" cannot be combined with '
+      '${incompatible.map((name) => '"--$name"').join(', ')}.',
+    );
+  }
+  final plan = await loadSeoRuntimeBuildPlan(
+    _required(values, 'plan'),
+    outputDirectory: output,
+  );
+  return buildSeoApplicationRuntimePlan(plan, check: check);
 }
 
 Future<SeoDomFirstRuntimeArtifact> _buildBundle(
@@ -197,6 +227,7 @@ Map<String, String> _arguments(List<String> arguments) {
     'interaction-ids',
     'projection-symbol',
     'bundle',
+    'plan',
   };
   final values = <String, String>{};
   for (var index = 0; index < arguments.length; index++) {
@@ -261,6 +292,20 @@ Bundle mode:
 Bundle config schema:
   {"schemaVersion":1,"id":"page-runtime","entries":[
     {"kind":"tabs","library":"package:app/tabs.dart","symbol":"transitionTabs"},
-    {"kind":"collection","library":"package:app/collection.dart","symbol":"transitionCollection"}
+    {"kind":"carousel","library":"package:app/carousel.dart","symbol":"transitionCarousel"}
+  ]}
+
+Plan mode:
+  dart run esen_seo:esen_seo_runtime \\
+    --plan <relative-plan.json> \\
+    [--output build/esen_seo/runtimes] [--check]
+
+Plan schema:
+  {"schemaVersion":1,"runtimes":[
+    {"kind":"tabs","id":"page-tabs","library":"package:app/tabs.dart","symbol":"transitionTabs"},
+    {"kind":"bundle","id":"page-runtime","entries":[
+      {"kind":"tabs","library":"package:app/tabs.dart","symbol":"transitionTabs"},
+      {"kind":"carousel","library":"package:app/carousel.dart","symbol":"transitionCarousel"}
+    ]}
   ]}
 ''';

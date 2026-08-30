@@ -17,7 +17,7 @@ the injected meta tags and the JSON-LD schema.
 ## Run the SSR server
 
 ```sh
-dart run esen_seo:esen_seo_runtime --bundle runtime_bundle.json
+dart run esen_seo:esen_seo_runtime --plan runtime_plan.json
 flutter build web --release --pwa-strategy=none
 dart run bin/server.dart
 ```
@@ -34,7 +34,7 @@ curl http://localhost:8080/dom-first-application-bundle # one DOM-first bundle
 ## Or: prerender for static hosting (no server)
 
 ```sh
-dart run esen_seo:esen_seo_runtime --bundle runtime_bundle.json
+dart run esen_seo:esen_seo_runtime --plan runtime_plan.json
 flutter build web --release --pwa-strategy=none
 dart run bin/prerender.dart
 ```

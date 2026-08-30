@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Added one strict runtime build plan for applications with several standalone
+  runtimes and bundles. The CLI validates the complete bounded plan before
+  compilation, builds every artifact in staging and replaces its dedicated
+  output directory only after full success. Plan check mode compiles the real
+  path and compares the exact file set and bytes, including stale extras.
 * Bound every compiled application runtime to an explicit package runtime
   contract revision. Current standalone and bundle manifests use new schemas;
   legacy, stale and future revisions fail before JavaScript is read with an

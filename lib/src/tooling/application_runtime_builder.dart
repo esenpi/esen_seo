@@ -10,6 +10,7 @@ import '../components/seo_component_format.dart';
 import '../routing/seo_application_runtime.dart';
 import '../routing/seo_application_runtime_artifact.dart';
 import '../server/seo_runtime_store.dart';
+import 'runtime_plan_transaction.dart';
 
 /// Inputs for one application-authored tabs runtime build.
 final class SeoTabsRuntimeBuildRequest {
@@ -252,6 +253,80 @@ final class SeoRuntimeBundleBuildRequest {
   final String outputDirectory;
 }
 
+/// One authoritative set of application runtime artifacts.
+///
+/// Plans are loaded from a bounded JSON file. Their entries remain private so
+/// callers cannot bypass the same parser and validation used by the CLI.
+final class SeoRuntimeBuildPlan {
+  SeoRuntimeBuildPlan._({
+    required List<_RuntimePlanEntry> entries,
+    required this.outputDirectory,
+  }) : _entries = List<_RuntimePlanEntry>.unmodifiable(entries);
+
+  final List<_RuntimePlanEntry> _entries;
+
+  /// The exact runtime identities owned by this plan.
+  List<SeoDomFirstApplicationRuntime> get runtimes =>
+      List<SeoDomFirstApplicationRuntime>.unmodifiable(
+        _entries.map((entry) => entry.reference),
+      );
+
+  /// Dedicated build-owned directory replaced after a successful build.
+  final String outputDirectory;
+}
+
+/// Reads one bounded, strictly shaped application runtime build plan.
+Future<SeoRuntimeBuildPlan> loadSeoRuntimeBuildPlan(
+  String configPath, {
+  String? packageRoot,
+  String outputDirectory = 'build/esen_seo/runtimes',
+}) async {
+  final root = Directory(packageRoot ?? Directory.current.path).absolute;
+  final decoded = await _readRuntimeConfig(
+    root,
+    configPath,
+    description: 'Runtime build plan',
+    maxBytes: _runtimePlanConfigMaxBytes,
+  );
+  _requireExactFields(
+    decoded,
+    const {'schemaVersion', 'runtimes'},
+    'Runtime build plan',
+  );
+  final rawRuntimes = decoded['runtimes'];
+  if (decoded['schemaVersion'] is! int ||
+      decoded['schemaVersion'] != 1 ||
+      rawRuntimes is! List) {
+    throw const FormatException('Runtime build plan has invalid field types.');
+  }
+  if (rawRuntimes.isEmpty || rawRuntimes.length > _runtimePlanMaxEntries) {
+    throw const FormatException(
+      'Runtime build plan must contain between 1 and 64 runtimes.',
+    );
+  }
+
+  final entries = <_RuntimePlanEntry>[];
+  final stems = <String>{};
+  for (final (index, raw) in rawRuntimes.indexed) {
+    if (raw is! Map<String, Object?>) {
+      throw FormatException(
+          'Runtime build plan entry $index must be an object.');
+    }
+    final entry = _parseRuntimePlanEntry(raw, index);
+    final stem = seoApplicationRuntimeArtifactStem(entry.reference);
+    if (!stems.add(stem)) {
+      throw FormatException(
+        'Runtime build plan entry $index duplicates artifact "$stem".',
+      );
+    }
+    entries.add(entry);
+  }
+  return SeoRuntimeBuildPlan._(
+    entries: entries,
+    outputDirectory: outputDirectory,
+  );
+}
+
 /// Reads one bounded, strictly shaped bundle build configuration.
 Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
   String configPath, {
@@ -259,49 +334,12 @@ Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
   String outputDirectory = 'build/esen_seo/runtimes',
 }) async {
   final root = Directory(packageRoot ?? Directory.current.path).absolute;
-  final file = await _checkedBundleConfigFile(root, configPath);
-  final String source;
-  try {
-    final handle = await file.open();
-    try {
-      if (await handle.length() > _runtimeBundleConfigMaxBytes) {
-        throw StateError(
-          'Runtime bundle config "$configPath" exceeds '
-          '$_runtimeBundleConfigMaxBytes bytes.',
-        );
-      }
-      final bytes = await handle.read(_runtimeBundleConfigMaxBytes + 1);
-      if (bytes.length > _runtimeBundleConfigMaxBytes) {
-        throw StateError(
-          'Runtime bundle config "$configPath" exceeds '
-          '$_runtimeBundleConfigMaxBytes bytes.',
-        );
-      }
-      source = utf8.decode(bytes);
-    } finally {
-      await handle.close();
-    }
-  } on FileSystemException catch (error) {
-    throw StateError('Cannot read runtime bundle config "$configPath": $error');
-  } on FormatException catch (error) {
-    throw FormatException(
-      'Runtime bundle config "$configPath" is not valid UTF-8: '
-      '${error.message}',
-    );
-  }
-
-  final Object? decoded;
-  try {
-    decoded = jsonDecode(source);
-  } on FormatException catch (error) {
-    throw FormatException(
-      'Runtime bundle config "$configPath" is not valid JSON: '
-      '${error.message}',
-    );
-  }
-  if (decoded is! Map<String, Object?>) {
-    throw const FormatException('Runtime bundle config must be a JSON object.');
-  }
+  final decoded = await _readRuntimeConfig(
+    root,
+    configPath,
+    description: 'Runtime bundle config',
+    maxBytes: _runtimeBundleConfigMaxBytes,
+  );
   _requireExactFields(
     decoded,
     const {'schemaVersion', 'id', 'entries'},
@@ -315,74 +353,10 @@ Future<SeoRuntimeBundleBuildRequest> loadSeoRuntimeBundleBuildRequest(
         'Runtime bundle config has invalid field types.');
   }
 
-  final entries = <SeoRuntimeBundleEntry>[];
-  for (final (index, raw) in (decoded['entries']! as List).indexed) {
-    if (raw is! Map<String, Object?>) {
-      throw FormatException('Runtime bundle entry $index must be an object.');
-    }
-    final rawKind = raw['kind'];
-    final kind = rawKind is String
-        ? SeoDomFirstApplicationRuntimeKind.tryParse(rawKind)
-        : null;
-    if (kind == null) {
-      throw FormatException('Runtime bundle entry $index has an unknown kind.');
-    }
-    final expectedFields =
-        kind == SeoDomFirstApplicationRuntimeKind.stepperEffects
-            ? const {'kind', 'library', 'symbol', 'interactionIds'}
-            : const {'kind', 'library', 'symbol'};
-    _requireExactFields(raw, expectedFields, 'Runtime bundle entry $index');
-    final library = raw['library'];
-    final symbol = raw['symbol'];
-    if (library is! String || symbol is! String) {
-      throw FormatException(
-        'Runtime bundle entry $index has invalid field types.',
-      );
-    }
-    entries.add(switch (kind) {
-      SeoDomFirstApplicationRuntimeKind.tabs => SeoRuntimeBundleEntry.tabs(
-          library: library,
-          symbol: symbol,
-        ),
-      SeoDomFirstApplicationRuntimeKind.carousel =>
-        SeoRuntimeBundleEntry.carousel(
-          library: library,
-          symbol: symbol,
-        ),
-      SeoDomFirstApplicationRuntimeKind.collection => throw FormatException(
-          'Runtime bundle entry $index uses collection, which requires a '
-          'standalone artifact.',
-        ),
-      SeoDomFirstApplicationRuntimeKind.configurator => throw FormatException(
-          'Runtime bundle entry $index uses configurator, which requires a '
-          'standalone artifact.',
-        ),
-      SeoDomFirstApplicationRuntimeKind.editorialWorkflow =>
-        throw FormatException(
-          'Runtime bundle entry $index uses editorial-workflow, which requires '
-          'a standalone artifact.',
-        ),
-      SeoDomFirstApplicationRuntimeKind.approvalChecklist =>
-        throw FormatException(
-          'Runtime bundle entry $index uses approval-checklist, which requires '
-          'a standalone artifact.',
-        ),
-      SeoDomFirstApplicationRuntimeKind.stepper =>
-        SeoRuntimeBundleEntry.stepper(
-          library: library,
-          symbol: symbol,
-        ),
-      SeoDomFirstApplicationRuntimeKind.stepperEffects =>
-        SeoRuntimeBundleEntry.stepperEffects(
-          library: library,
-          symbol: symbol,
-          interactionIds: _configInteractionIds(
-            raw['interactionIds'],
-            index,
-          ),
-        ),
-    });
-  }
+  final entries = _parseRuntimeBundleEntries(
+    (decoded['entries']! as List).cast<Object?>(),
+    description: 'Runtime bundle',
+  );
   return SeoRuntimeBundleBuildRequest(
     id: decoded['id']! as String,
     entries: List<SeoRuntimeBundleEntry>.unmodifiable(entries),
@@ -591,6 +565,166 @@ Future<SeoDomFirstRuntimeArtifact> buildSeoApplicationRuntimeBundle(
   );
 }
 
+/// Compiles and atomically admits every artifact in an authoritative plan.
+///
+/// Check mode executes the same compiler path but only compares the exact
+/// staged directory with the current output.
+Future<List<SeoDomFirstRuntimeArtifact>> buildSeoApplicationRuntimePlan(
+  SeoRuntimeBuildPlan plan, {
+  String? packageRoot,
+  bool check = false,
+}) async {
+  final root = Directory(packageRoot ?? Directory.current.path).absolute;
+  final entries = List<_RuntimePlanEntry>.unmodifiable(plan._entries);
+  final output = _checkedOutputDirectory(root, plan.outputDirectory);
+  _validatePlanOutputDirectory(root, output, plan.outputDirectory);
+  await _preflightRuntimePlan(root, entries);
+  final expectedFiles = <String>{
+    for (final entry in entries) ..._runtimeArtifactFileNames(entry.reference),
+  };
+  return runSeoRuntimePlanTransaction(
+    output: output,
+    expectedFiles: expectedFiles,
+    check: check,
+    build: (staging) async {
+      final stagingRelative = _relativePathBelowRoot(root, staging);
+      final artifacts = <SeoDomFirstRuntimeArtifact>[];
+      for (final entry in entries) {
+        artifacts.add(await _buildRuntimePlanEntry(
+          entry,
+          packageRoot: root.path,
+          outputDirectory: stagingRelative,
+        ));
+      }
+      return List<SeoDomFirstRuntimeArtifact>.unmodifiable(artifacts);
+    },
+  );
+}
+
+Future<void> _preflightRuntimePlan(
+  Directory root,
+  List<_RuntimePlanEntry> entries,
+) async {
+  final packageConfig = File('${root.path}/.dart_tool/package_config.json');
+  if (!await packageConfig.exists()) {
+    throw StateError(
+      'Missing ${packageConfig.path}. Run dart pub get in ${root.path}.',
+    );
+  }
+  final graph = await _PackageGraph.load(packageConfig, root);
+  for (final entry in entries) {
+    if (entry.reference is SeoDomFirstApplicationRuntimeBundle) {
+      for (final member in entry.bundleEntries) {
+        _checkedApplicationLibraryUri(graph, member.library);
+      }
+    } else {
+      _checkedApplicationLibraryUri(graph, entry.library!);
+    }
+  }
+}
+
+Future<SeoDomFirstRuntimeArtifact> _buildRuntimePlanEntry(
+  _RuntimePlanEntry entry, {
+  required String packageRoot,
+  required String outputDirectory,
+}) =>
+    switch (entry.reference) {
+      SeoDomFirstTabsApplicationRuntime() => buildSeoTabsApplicationRuntime(
+          SeoTabsRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            symbol: entry.symbol!,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstCarouselApplicationRuntime() =>
+        buildSeoCarouselApplicationRuntime(
+          SeoCarouselRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            symbol: entry.symbol!,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstCollectionApplicationRuntime() =>
+        buildSeoCollectionApplicationRuntime(
+          SeoCollectionRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            symbol: entry.symbol!,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstConfiguratorApplicationRuntime() =>
+        buildSeoConfiguratorApplicationRuntime(
+          SeoConfiguratorRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            transitionSymbol: entry.symbol!,
+            projectionSymbol: entry.projectionSymbol!,
+            interactionIds: entry.interactionIds,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstEditorialWorkflowApplicationRuntime() =>
+        buildSeoEditorialWorkflowApplicationRuntime(
+          SeoEditorialWorkflowRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            transitionSymbol: entry.symbol!,
+            projectionSymbol: entry.projectionSymbol!,
+            interactionIds: entry.interactionIds,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstApprovalChecklistApplicationRuntime() =>
+        buildSeoApprovalChecklistApplicationRuntime(
+          SeoApprovalChecklistRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            transitionSymbol: entry.symbol!,
+            projectionSymbol: entry.projectionSymbol!,
+            interactionIds: entry.interactionIds,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstStepperApplicationRuntime() =>
+        buildSeoStepperApplicationRuntime(
+          SeoStepperRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            symbol: entry.symbol!,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstStepperEffectsApplicationRuntime() =>
+        buildSeoStepperEffectsApplicationRuntime(
+          SeoStepperEffectsRuntimeBuildRequest(
+            id: entry.reference.id,
+            library: entry.library!,
+            symbol: entry.symbol!,
+            interactionIds: entry.interactionIds,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+      SeoDomFirstApplicationRuntimeBundle() => buildSeoApplicationRuntimeBundle(
+          SeoRuntimeBundleBuildRequest(
+            id: entry.reference.id,
+            entries: entry.bundleEntries,
+            outputDirectory: outputDirectory,
+          ),
+          packageRoot: packageRoot,
+        ),
+    };
+
 final class _PreparedRuntimeBundleEntry {
   const _PreparedRuntimeBundleEntry({
     required this.kind,
@@ -620,8 +754,287 @@ final class _CheckedRuntimeBundleEntry {
 }
 
 const int _runtimeBundleConfigMaxBytes = 32 * 1024;
+const int _runtimePlanConfigMaxBytes = 64 * 1024;
+const int _runtimePlanMaxEntries = 64;
 
-Future<File> _checkedBundleConfigFile(Directory root, String relative) async {
+final class _RuntimePlanEntry {
+  const _RuntimePlanEntry.single({
+    required this.reference,
+    required this.library,
+    required this.symbol,
+    this.projectionSymbol,
+    this.interactionIds = const {},
+  }) : bundleEntries = const [];
+
+  const _RuntimePlanEntry.bundle({
+    required this.reference,
+    required this.bundleEntries,
+  })  : library = null,
+        symbol = null,
+        projectionSymbol = null,
+        interactionIds = const {};
+
+  final SeoDomFirstApplicationRuntime reference;
+  final String? library;
+  final String? symbol;
+  final String? projectionSymbol;
+  final Set<String> interactionIds;
+  final List<SeoRuntimeBundleEntry> bundleEntries;
+}
+
+_RuntimePlanEntry _parseRuntimePlanEntry(
+  Map<String, Object?> raw,
+  int index,
+) {
+  final rawKind = raw['kind'];
+  if (rawKind == 'bundle') {
+    _requireExactFields(
+      raw,
+      const {'kind', 'id', 'entries'},
+      'Runtime build plan entry $index',
+    );
+    final id = raw['id'];
+    final rawEntries = raw['entries'];
+    if (id is! String || rawEntries is! List) {
+      throw FormatException(
+        'Runtime build plan entry $index has invalid field types.',
+      );
+    }
+    final entries = _parseRuntimeBundleEntries(
+      rawEntries,
+      description: 'Runtime build plan entry $index bundle',
+    );
+    final reference = SeoDomFirstApplicationRuntime.bundle(
+      id,
+      members: entries.map((entry) => entry.kind),
+    );
+    return _RuntimePlanEntry.bundle(
+      reference: reference,
+      bundleEntries: List<SeoRuntimeBundleEntry>.unmodifiable(entries),
+    );
+  }
+
+  final kind = rawKind is String
+      ? SeoDomFirstApplicationRuntimeKind.tryParse(rawKind)
+      : null;
+  if (kind == null) {
+    throw FormatException(
+        'Runtime build plan entry $index has an unknown kind.');
+  }
+  final hasProjection =
+      kind == SeoDomFirstApplicationRuntimeKind.configurator ||
+          kind == SeoDomFirstApplicationRuntimeKind.editorialWorkflow ||
+          kind == SeoDomFirstApplicationRuntimeKind.approvalChecklist;
+  final hasInteractionIds =
+      hasProjection || kind == SeoDomFirstApplicationRuntimeKind.stepperEffects;
+  final expectedFields = {
+    'kind',
+    'id',
+    'library',
+    'symbol',
+    if (hasProjection) 'projectionSymbol',
+    if (hasInteractionIds) 'interactionIds',
+  };
+  _requireExactFields(raw, expectedFields, 'Runtime build plan entry $index');
+  final id = raw['id'];
+  final library = raw['library'];
+  final symbol = raw['symbol'];
+  final projectionSymbol = raw['projectionSymbol'];
+  if (id is! String ||
+      library is! String ||
+      symbol is! String ||
+      (hasProjection && projectionSymbol is! String)) {
+    throw FormatException(
+      'Runtime build plan entry $index has invalid field types.',
+    );
+  }
+  if (!isValidSeoApplicationRuntimeId(id)) {
+    throw FormatException('Runtime build plan entry $index has an invalid id.');
+  }
+  _validateSymbol(symbol);
+  if (projectionSymbol case final String value) _validateSymbol(value);
+  _parseApplicationLibraryUri(library);
+  final interactionIds = hasInteractionIds
+      ? _runtimeConfigInteractionIds(
+          raw['interactionIds'],
+          'Runtime build plan entry $index',
+        )
+      : const <String>{};
+  final reference = switch (kind) {
+    SeoDomFirstApplicationRuntimeKind.tabs =>
+      SeoDomFirstApplicationRuntime.tabs(id),
+    SeoDomFirstApplicationRuntimeKind.carousel =>
+      SeoDomFirstApplicationRuntime.carousel(id),
+    SeoDomFirstApplicationRuntimeKind.collection =>
+      SeoDomFirstApplicationRuntime.collection(id),
+    SeoDomFirstApplicationRuntimeKind.configurator =>
+      SeoDomFirstApplicationRuntime.configurator(id),
+    SeoDomFirstApplicationRuntimeKind.editorialWorkflow =>
+      SeoDomFirstApplicationRuntime.editorialWorkflow(id),
+    SeoDomFirstApplicationRuntimeKind.approvalChecklist =>
+      SeoDomFirstApplicationRuntime.approvalChecklist(id),
+    SeoDomFirstApplicationRuntimeKind.stepper =>
+      SeoDomFirstApplicationRuntime.stepper(id),
+    SeoDomFirstApplicationRuntimeKind.stepperEffects =>
+      SeoDomFirstApplicationRuntime.stepperEffects(id),
+  };
+  return _RuntimePlanEntry.single(
+    reference: reference,
+    library: library,
+    symbol: symbol,
+    projectionSymbol: projectionSymbol is String ? projectionSymbol : null,
+    interactionIds: interactionIds,
+  );
+}
+
+List<SeoRuntimeBundleEntry> _parseRuntimeBundleEntries(
+  List<Object?> rawEntries, {
+  required String description,
+}) {
+  final entries = <SeoRuntimeBundleEntry>[];
+  for (final (index, raw) in rawEntries.indexed) {
+    if (raw is! Map<String, Object?>) {
+      throw FormatException('$description entry $index must be an object.');
+    }
+    final rawKind = raw['kind'];
+    final kind = rawKind is String
+        ? SeoDomFirstApplicationRuntimeKind.tryParse(rawKind)
+        : null;
+    if (kind == null) {
+      throw FormatException('$description entry $index has an unknown kind.');
+    }
+    final expectedFields =
+        kind == SeoDomFirstApplicationRuntimeKind.stepperEffects
+            ? const {'kind', 'library', 'symbol', 'interactionIds'}
+            : const {'kind', 'library', 'symbol'};
+    _requireExactFields(raw, expectedFields, '$description entry $index');
+    final library = raw['library'];
+    final symbol = raw['symbol'];
+    if (library is! String || symbol is! String) {
+      throw FormatException(
+          '$description entry $index has invalid field types.');
+    }
+    _parseApplicationLibraryUri(library);
+    _validateSymbol(symbol);
+    entries.add(switch (kind) {
+      SeoDomFirstApplicationRuntimeKind.tabs => SeoRuntimeBundleEntry.tabs(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.carousel =>
+        SeoRuntimeBundleEntry.carousel(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.collection => throw FormatException(
+          '$description entry $index uses collection, which requires a '
+          'standalone artifact.',
+        ),
+      SeoDomFirstApplicationRuntimeKind.configurator => throw FormatException(
+          '$description entry $index uses configurator, which requires a '
+          'standalone artifact.',
+        ),
+      SeoDomFirstApplicationRuntimeKind.editorialWorkflow =>
+        throw FormatException(
+          '$description entry $index uses editorial-workflow, which requires '
+          'a standalone artifact.',
+        ),
+      SeoDomFirstApplicationRuntimeKind.approvalChecklist =>
+        throw FormatException(
+          '$description entry $index uses approval-checklist, which requires '
+          'a standalone artifact.',
+        ),
+      SeoDomFirstApplicationRuntimeKind.stepper =>
+        SeoRuntimeBundleEntry.stepper(
+          library: library,
+          symbol: symbol,
+        ),
+      SeoDomFirstApplicationRuntimeKind.stepperEffects =>
+        SeoRuntimeBundleEntry.stepperEffects(
+          library: library,
+          symbol: symbol,
+          interactionIds: _runtimeConfigInteractionIds(
+            raw['interactionIds'],
+            '$description entry $index',
+          ),
+        ),
+    });
+  }
+  return entries;
+}
+
+Set<String> _runtimeConfigInteractionIds(
+  Object? value,
+  String description,
+) {
+  if (value is! List || value.any((id) => id is! String)) {
+    throw FormatException('$description has invalid interactionIds.');
+  }
+  final ids = value.cast<String>();
+  final unique = ids.toSet();
+  if (ids.isEmpty ||
+      unique.length != ids.length ||
+      unique.any((id) => !isValidSeoInteractionId(id))) {
+    throw FormatException(
+      '$description requires unique, valid interactionIds.',
+    );
+  }
+  final sorted = unique.toList()..sort();
+  return Set<String>.unmodifiable(sorted);
+}
+
+Future<Map<String, Object?>> _readRuntimeConfig(
+  Directory root,
+  String configPath, {
+  required String description,
+  required int maxBytes,
+}) async {
+  final file = await _checkedRuntimeConfigFile(
+    root,
+    configPath,
+    description: description,
+  );
+  final String source;
+  try {
+    final handle = await file.open();
+    try {
+      if (await handle.length() > maxBytes) {
+        throw StateError('$description "$configPath" exceeds $maxBytes bytes.');
+      }
+      final bytes = await handle.read(maxBytes + 1);
+      if (bytes.length > maxBytes) {
+        throw StateError('$description "$configPath" exceeds $maxBytes bytes.');
+      }
+      source = utf8.decode(bytes);
+    } finally {
+      await handle.close();
+    }
+  } on FileSystemException catch (error) {
+    throw StateError('Cannot read $description "$configPath": $error');
+  } on FormatException catch (error) {
+    throw FormatException(
+      '$description "$configPath" is not valid UTF-8: ${error.message}',
+    );
+  }
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(source);
+  } on FormatException catch (error) {
+    throw FormatException(
+      '$description "$configPath" is not valid JSON: ${error.message}',
+    );
+  }
+  if (decoded is! Map<String, Object?>) {
+    throw FormatException('$description must be a JSON object.');
+  }
+  return decoded;
+}
+
+Future<File> _checkedRuntimeConfigFile(
+  Directory root,
+  String relative, {
+  required String description,
+}) async {
   final uri = Uri.tryParse(relative);
   if (uri == null ||
       uri.hasScheme ||
@@ -651,8 +1064,7 @@ Future<File> _checkedBundleConfigFile(Directory root, String relative) async {
     }
     return File(filePath);
   } on FileSystemException catch (error) {
-    throw StateError(
-        'Cannot resolve runtime bundle config "$relative": $error');
+    throw StateError('Cannot resolve $description "$relative": $error');
   }
 }
 
@@ -666,22 +1078,6 @@ void _requireExactFields(
       expected.difference(actual).isNotEmpty) {
     throw FormatException('$description has missing or unknown fields.');
   }
-}
-
-Set<String> _configInteractionIds(Object? value, int index) {
-  if (value is! List || value.any((id) => id is! String)) {
-    throw FormatException(
-      'Runtime bundle entry $index has invalid interactionIds.',
-    );
-  }
-  final ids = value.cast<String>();
-  final unique = ids.toSet();
-  if (ids.isEmpty || unique.length != ids.length) {
-    throw FormatException(
-      'Runtime bundle entry $index requires unique interactionIds.',
-    );
-  }
-  return Set<String>.unmodifiable(unique);
 }
 
 final class _ApplicationRuntimeBuildRequest {
@@ -808,19 +1204,28 @@ void _validateSymbol(String symbol) {
 }
 
 Uri _checkedApplicationLibraryUri(_PackageGraph graph, String library) {
+  final libraryUri = _parseApplicationLibraryUri(library);
+  final rootLibrary = graph.resolveApplicationLibrary(libraryUri);
+  _PureApplicationGraph(graph).check(rootLibrary);
+  return libraryUri;
+}
+
+Uri _parseApplicationLibraryUri(String library) {
   final libraryUri = Uri.tryParse(library);
   if (libraryUri == null ||
       libraryUri.scheme != 'package' ||
+      libraryUri.hasAuthority ||
       libraryUri.hasQuery ||
-      libraryUri.hasFragment) {
+      libraryUri.hasFragment ||
+      libraryUri.pathSegments.length < 2 ||
+      libraryUri.pathSegments.any(_isUnsafePathSegment) ||
+      !libraryUri.path.endsWith('.dart')) {
     throw ArgumentError.value(
       library,
       'library',
       'must be a package: URI below the application lib directory',
     );
   }
-  final rootLibrary = graph.resolveApplicationLibrary(libraryUri);
-  _PureApplicationGraph(graph).check(rootLibrary);
   return libraryUri;
 }
 
@@ -1230,6 +1635,53 @@ Directory _checkedOutputDirectory(Directory root, String relative) {
     );
   }
   return output;
+}
+
+void _validatePlanOutputDirectory(
+  Directory root,
+  Directory output,
+  String requested,
+) {
+  final buildRoot = Directory('${root.path}${Platform.pathSeparator}build');
+  if (output.absolute.path == buildRoot.absolute.path) {
+    throw ArgumentError.value(
+      requested,
+      'outputDirectory',
+      'must name a dedicated directory below build/, not build/ itself',
+    );
+  }
+  final type = FileSystemEntity.typeSync(output.path, followLinks: false);
+  if (type == FileSystemEntityType.link) {
+    throw ArgumentError.value(
+      requested,
+      'outputDirectory',
+      'must not be a symbolic link',
+    );
+  }
+  if (type != FileSystemEntityType.notFound &&
+      type != FileSystemEntityType.directory) {
+    throw ArgumentError.value(
+      requested,
+      'outputDirectory',
+      'must be a directory',
+    );
+  }
+}
+
+String _relativePathBelowRoot(Directory root, Directory child) {
+  final prefix = '${root.absolute.path}${Platform.pathSeparator}';
+  final path = child.absolute.path;
+  if (!path.startsWith(prefix)) {
+    throw StateError('Runtime plan staging escaped the application root.');
+  }
+  return path.substring(prefix.length).replaceAll(Platform.pathSeparator, '/');
+}
+
+Set<String> _runtimeArtifactFileNames(
+  SeoDomFirstApplicationRuntime reference,
+) {
+  final stem = seoApplicationRuntimeArtifactStem(reference);
+  return {'$stem.js', '$stem.json'};
 }
 
 Future<void> _writeArtifact(

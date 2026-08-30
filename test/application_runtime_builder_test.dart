@@ -739,7 +739,287 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('runtime plan parser accepts every existing build boundary', () async {
+    await write(
+      'runtime_plan.json',
+      jsonEncode({
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('tabs', 'tabs'),
+          _planRuntime('carousel', 'carousel'),
+          _planRuntime('collection', 'collection'),
+          _planRuntime(
+            'configurator',
+            'pricing',
+            projection: true,
+            interactions: true,
+          ),
+          _planRuntime(
+            'editorial-workflow',
+            'workflow',
+            projection: true,
+            interactions: true,
+          ),
+          _planRuntime(
+            'approval-checklist',
+            'checklist',
+            projection: true,
+            interactions: true,
+          ),
+          _planRuntime('stepper', 'stepper'),
+          _planRuntime(
+            'stepper-effects',
+            'effects',
+            interactions: true,
+          ),
+          {
+            'kind': 'bundle',
+            'id': 'page-runtime',
+            'entries': [
+              _bundleRuntime('tabs', 'bundle_tabs'),
+              _bundleRuntime('carousel', 'bundle_carousel'),
+            ],
+          },
+        ],
+      }),
+    );
+
+    final plan = await loadSeoRuntimeBuildPlan(
+      'runtime_plan.json',
+      packageRoot: root.path,
+      outputDirectory: 'build/custom-runtimes',
+    );
+
+    expect(plan.outputDirectory, 'build/custom-runtimes');
+    expect(plan.runtimes, hasLength(9));
+    expect(
+      plan.runtimes.map((runtime) => runtime.kind),
+      [
+        'tabs',
+        'carousel',
+        'collection',
+        'configurator',
+        'editorial-workflow',
+        'approval-checklist',
+        'stepper',
+        'stepper-effects',
+        'bundle',
+      ],
+    );
+    expect(
+      plan.runtimes.last.memberKinds.map((kind) => kind.value),
+      ['tabs', 'carousel'],
+    );
+  });
+
+  test('runtime plan rejects ambiguous or malformed entries before build',
+      () async {
+    final invalidPlans = <Map<String, Object?>>[
+      {'schemaVersion': 1, 'runtimes': const []},
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('tabs', 'same'),
+          _planRuntime('tabs', 'same'),
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          {..._planRuntime('tabs', 'tabs'), 'unknown': true},
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('tabs', 'tabs')..['symbol'] = 'break',
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('tabs', 'tabs')
+            ..['library'] = 'package:fixture_app/not_dart.txt',
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('stepper-effects', 'effects', interactions: true)
+            ..['interactionIds'] = ['same', 'same'],
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          {
+            'kind': 'bundle',
+            'id': 'invalid-bundle',
+            'entries': [_bundleRuntime('tabs', 'tabs')],
+          },
+        ],
+      },
+      {
+        'schemaVersion': 1,
+        'runtimes': [
+          {
+            'kind': 'bundle',
+            'id': 'invalid-bundle',
+            'entries': [
+              _bundleRuntime('tabs', 'tabs'),
+              _bundleRuntime('collection', 'collection'),
+            ],
+          },
+        ],
+      },
+    ];
+    for (final (index, invalid) in invalidPlans.indexed) {
+      await write('invalid_plan_$index.json', jsonEncode(invalid));
+      await expectLater(
+        loadSeoRuntimeBuildPlan(
+          'invalid_plan_$index.json',
+          packageRoot: root.path,
+        ),
+        throwsA(anyOf(isA<FormatException>(), isA<ArgumentError>())),
+        reason: 'accepted invalid plan $index',
+      );
+    }
+
+    await write(
+      'too_many_runtimes.json',
+      jsonEncode({
+        'schemaVersion': 1,
+        'runtimes': [
+          for (var index = 0; index < 65; index++)
+            _planRuntime('tabs', 'tabs-$index'),
+        ],
+      }),
+    );
+    await expectLater(
+      loadSeoRuntimeBuildPlan(
+        'too_many_runtimes.json',
+        packageRoot: root.path,
+      ),
+      throwsFormatException,
+    );
+  });
+
+  test('runtime plan path and input size fail closed', () async {
+    for (final path in const [
+      '../outside.json',
+      '%2e%2e/outside.json',
+      '/absolute.json',
+      'plan.json?alternate=true',
+    ]) {
+      await expectLater(
+        loadSeoRuntimeBuildPlan(path, packageRoot: root.path),
+        throwsArgumentError,
+      );
+    }
+    await write('oversized_plan.json', List.filled(64 * 1024 + 1, ' ').join());
+    await expectLater(
+      loadSeoRuntimeBuildPlan(
+        'oversized_plan.json',
+        packageRoot: root.path,
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('runtime plan refuses build root and symbolic-link outputs', () async {
+    await write(
+      'runtime_plan.json',
+      jsonEncode({
+        'schemaVersion': 1,
+        'runtimes': [_planRuntime('tabs', 'tabs')],
+      }),
+    );
+    final buildRootPlan = await loadSeoRuntimeBuildPlan(
+      'runtime_plan.json',
+      packageRoot: root.path,
+      outputDirectory: 'build',
+    );
+    await expectLater(
+      buildSeoApplicationRuntimePlan(buildRootPlan, packageRoot: root.path),
+      throwsArgumentError,
+    );
+
+    final realOutput = Directory('${root.path}/build/real-output');
+    await realOutput.create(recursive: true);
+    await Link('${root.path}/build/linked-output').create(realOutput.path);
+    final linkedPlan = await loadSeoRuntimeBuildPlan(
+      'runtime_plan.json',
+      packageRoot: root.path,
+      outputDirectory: 'build/linked-output',
+    );
+    await expectLater(
+      buildSeoApplicationRuntimePlan(linkedPlan, packageRoot: root.path),
+      throwsArgumentError,
+    );
+  });
+
+  test('runtime plan preflights every graph before creating staging', () async {
+    await write('lib/first.dart', 'const value = 1;');
+    await write('lib/second.dart', "import 'dart:io';");
+    await write(
+      'runtime_plan.json',
+      jsonEncode({
+        'schemaVersion': 1,
+        'runtimes': [
+          _planRuntime('tabs', 'first'),
+          _planRuntime('carousel', 'second'),
+        ],
+      }),
+    );
+    final output = Directory('${root.path}/build/runtimes');
+    await output.create(recursive: true);
+    final sentinel = File('${output.path}/prior.txt');
+    await sentinel.writeAsString('prior');
+    final plan = await loadSeoRuntimeBuildPlan(
+      'runtime_plan.json',
+      packageRoot: root.path,
+    );
+
+    await expectLater(
+      buildSeoApplicationRuntimePlan(plan, packageRoot: root.path),
+      throwsStateError,
+    );
+
+    expect(await sentinel.readAsString(), 'prior');
+    expect(await output.list().map((entry) => entry.path).toList(), [
+      sentinel.path,
+    ]);
+    expect(
+      await output.parent
+          .list()
+          .where((entry) => entry.path.contains('runtimes.staging.'))
+          .toList(),
+      isEmpty,
+    );
+  });
 }
+
+Map<String, Object?> _planRuntime(
+  String kind,
+  String id, {
+  bool projection = false,
+  bool interactions = false,
+}) =>
+    {
+      'kind': kind,
+      'id': id,
+      'library': 'package:fixture_app/$id.dart',
+      'symbol': 'transitionRuntime',
+      if (projection) 'projectionSymbol': 'projectRuntime',
+      if (interactions) 'interactionIds': ['$id-control'],
+    };
+
+Map<String, Object?> _bundleRuntime(String kind, String file) => {
+      'kind': kind,
+      'library': 'package:fixture_app/$file.dart',
+      'symbol': 'transitionRuntime',
+    };
 
 final class _UnexpectedSuccess {
   const _UnexpectedSuccess();
