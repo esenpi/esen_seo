@@ -1401,6 +1401,14 @@ their canonical member set. Compiler output above 512 KiB raw or the fixed
 25 KiB gzip budget, script-tokenizer hazards and string-to-code constructors
 are refused.
 
+The manifest also binds the package runtime contract revision. This revision
+is independent of the file schema and compiler version: it changes only when
+newly emitted component markup is no longer compatible with an already
+compiled adapter. Rebuild application runtimes after upgrading `esen_seo`.
+Legacy or otherwise mismatched revisions are named and rejected before their
+JavaScript is read, so an old artifact cannot silently disable controls on a
+newly rendered page.
+
 This is a capability and held-state boundary, not a formal proof that arbitrary
 Dart is referentially transparent. Keep environment reads and side effects out
 of the transition, and test identical action sequences on the pure, Flutter and
@@ -1435,7 +1443,7 @@ SeoRoute(
 ```
 
 Select all bundle members explicitly on the route. The member set is checked
-against the schema-2 manifest before the script can be delivered:
+against the current bundle manifest before the script can be delivered:
 
 ```dart
 SeoRoute(
@@ -1494,17 +1502,18 @@ await prerenderSite(
 );
 ```
 
-On first load through a `SeoDirectoryRuntimeStore`, the store checks kind,
-logical id, bundle members where applicable, SHA-256, byte sizes and the
-expected Dart compiler version, then caches the verified artifact for that
-store's lifetime. Missing, stale, foreign or inconsistent artifacts fail by
-name instead of falling back to package logic or Flutter. Treat the build
-directory as trusted deployment input: the hash detects a mismatched script and
-manifest, but cannot authenticate them against an actor who can replace both. A
-route may select either the corresponding package feature or one matching
-application runtime member, never both. Cubit or another Flutter state manager
-may dispatch the same pure transition on the Flutter side, but it is not
-compiled and is not a dependency of `esen_seo`.
+On first load through a `SeoDirectoryRuntimeStore`, the store checks manifest
+schema, runtime contract revision, kind, logical id, bundle members where
+applicable, SHA-256, byte sizes and the expected Dart compiler version, then
+caches the verified artifact for that store's lifetime. Missing, stale,
+foreign or inconsistent artifacts fail by name instead of falling back to
+package logic or Flutter. Treat the build directory as trusted deployment
+input: the hash detects a mismatched script and manifest, but cannot
+authenticate them against an actor who can replace both. A route may select
+either the corresponding package feature or one matching application runtime
+member, never both. Cubit or another Flutter state manager may dispatch the
+same pure transition on the Flutter side, but it is not compiled and is not a
+dependency of `esen_seo`.
 
 For a hybrid site that serves Flutter and DOM-first routes from the same
 origin, disable Flutter's root-scoped application-shell cache:

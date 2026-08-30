@@ -111,7 +111,11 @@ void main() {
         dartVersion: dartVersion,
       );
 
-      expect(artifact.manifest.schemaVersion, 1);
+      expect(artifact.manifest.schemaVersion, 3);
+      expect(
+        artifact.manifest.contractRevision,
+        seoDomFirstRuntimeContractRevision,
+      );
       expect(artifact.manifest.id, 'application-tabs');
       expect(artifact.manifest.kind, 'tabs');
       expect(artifact.manifest.dartVersion, dartVersion);
@@ -121,14 +125,18 @@ void main() {
       expect(artifact.manifest.toJson(), isNot(contains('members')));
     });
 
-    test('bundle manifests bind canonical members in schema two', () {
+    test('bundle manifests bind canonical members in schema four', () {
       final artifact = SeoDomFirstRuntimeArtifact.create(
         reference: bundleReference,
         javascript: javascript,
         dartVersion: dartVersion,
       );
 
-      expect(artifact.manifest.schemaVersion, 2);
+      expect(artifact.manifest.schemaVersion, 4);
+      expect(
+        artifact.manifest.contractRevision,
+        seoDomFirstRuntimeContractRevision,
+      );
       expect(artifact.manifest.kind, 'bundle');
       expect(
         artifact.manifest.memberKinds,
@@ -155,6 +163,7 @@ void main() {
       );
       final manifest = SeoDomFirstRuntimeManifest(
         schemaVersion: seoDomFirstRuntimeBundleManifestSchema,
+        contractRevision: seoDomFirstRuntimeContractRevision,
         id: 'application-page',
         kind: 'bundle',
         dartVersion: dartVersion,
@@ -177,6 +186,77 @@ void main() {
         () => verified.manifest.memberKinds.add('stepper'),
         throwsUnsupportedError,
       );
+    });
+
+    test('rejects older and newer runtime contract revisions explicitly', () {
+      final artifact = SeoDomFirstRuntimeArtifact.create(
+        reference: reference,
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+
+      for (final revision in const [0, 2]) {
+        final manifest = SeoDomFirstRuntimeManifest.fromJson({
+          ...artifact.manifest.toJson(),
+          'contractRevision': revision,
+        });
+        expect(
+          () => SeoDomFirstRuntimeArtifact.verify(
+            reference: reference,
+            manifest: manifest,
+            javascript: javascript,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              allOf(
+                contains('$revision'),
+                contains('$seoDomFirstRuntimeContractRevision'),
+                revision == 0 ? contains('Rebuild') : contains('Upgrade'),
+              ),
+            ),
+          ),
+        );
+      }
+    });
+
+    test('parses legacy manifests only to require a rebuild', () {
+      final single = SeoDomFirstRuntimeArtifact.create(
+        reference: reference,
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+      final bundle = SeoDomFirstRuntimeArtifact.create(
+        reference: bundleReference,
+        javascript: javascript,
+        dartVersion: dartVersion,
+      );
+
+      for (final entry in [
+        (reference: reference, artifact: single, schema: 1),
+        (reference: bundleReference, artifact: bundle, schema: 2),
+      ]) {
+        final json = entry.artifact.manifest.toJson()
+          ..['schemaVersion'] = entry.schema
+          ..remove('contractRevision');
+        final manifest = SeoDomFirstRuntimeManifest.fromJson(json);
+        expect(manifest.contractRevision, 0);
+        expect(
+          () => SeoDomFirstRuntimeArtifact.verify(
+            reference: entry.reference,
+            manifest: manifest,
+            javascript: javascript,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              allOf(contains('legacy'), contains('Rebuild')),
+            ),
+          ),
+        );
+      }
     });
 
     test('bundle verification rejects missing or reordered members', () {
@@ -454,6 +534,54 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('rejects a legacy contract before reading JavaScript', () async {
+      final json = artifact.manifest.toJson()
+        ..['schemaVersion'] = 1
+        ..remove('contractRevision');
+      await _manifestFile(directory, reference).writeAsString(jsonEncode(json));
+      await _javascriptFile(directory, reference).writeAsBytes([0xff]);
+
+      await expectLater(
+        SeoDirectoryRuntimeStore(directory.path).load(reference),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            allOf(
+              contains('legacy manifest schema 1'),
+              contains('revision 0'),
+              contains('expected revision 1'),
+              contains('Rebuild'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('rejects stale and future contracts before delivery', () async {
+      for (final revision in const [0, 2]) {
+        final json = artifact.manifest.toJson()
+          ..['contractRevision'] = revision;
+        await _manifestFile(directory, reference)
+            .writeAsString(jsonEncode(json));
+
+        await expectLater(
+          SeoDirectoryRuntimeStore(directory.path).load(reference),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              allOf(
+                contains('$revision'),
+                contains('$seoDomFirstRuntimeContractRevision'),
+                revision == 0 ? contains('Rebuild') : contains('Upgrade'),
+              ),
+            ),
+          ),
+        );
+      }
     });
 
     test('rejects missing and unknown manifest fields', () async {

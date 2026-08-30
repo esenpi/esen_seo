@@ -1,5 +1,10 @@
 ## Unreleased
 
+* Bound every compiled application runtime to an explicit package runtime
+  contract revision. Current standalone and bundle manifests use new schemas;
+  legacy, stale and future revisions fail before JavaScript is read with an
+  actionable rebuild or upgrade message, preventing validly hashed but
+  markup-incompatible artifacts from silently dropping progressive controls.
 * Added an opt-in, profile-bound client-navigation pilot for permanent
   DOM-first routes. Compatible same-origin links fetch and validate another
   complete semantic document, replace only package-marked metadata and the

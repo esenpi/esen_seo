@@ -8,10 +8,20 @@ import '../routing/seo_application_runtime.dart';
 import '../routing/seo_application_runtime_artifact.dart';
 
 /// Current on-disk format of an application DOM-first runtime manifest.
-const int seoDomFirstRuntimeManifestSchema = 1;
+const int seoDomFirstRuntimeManifestSchema = 3;
 
 /// On-disk format for a route-scoped application runtime bundle.
-const int seoDomFirstRuntimeBundleManifestSchema = 2;
+const int seoDomFirstRuntimeBundleManifestSchema = 4;
+
+/// Current markup and adapter contract for compiled application runtimes.
+///
+/// Increment this when newly emitted component markup can no longer be safely
+/// consumed by an already compiled application runtime. It is deliberately
+/// independent of the manifest schema and Dart compiler version.
+const int seoDomFirstRuntimeContractRevision = 1;
+
+const int _legacySeoDomFirstRuntimeManifestSchema = 1;
+const int _legacySeoDomFirstRuntimeBundleManifestSchema = 2;
 
 /// Maximum accepted application runtime size after level-9 gzip compression.
 const int seoDomFirstRuntimeMaxGzipBytes = 25 * 1024;
@@ -29,6 +39,7 @@ const int _seoDomFirstRuntimeMaxManifestBytes = 8 * 1024;
 final class SeoDomFirstRuntimeManifest {
   const SeoDomFirstRuntimeManifest({
     required this.schemaVersion,
+    this.contractRevision = seoDomFirstRuntimeContractRevision,
     required this.id,
     required this.kind,
     required this.dartVersion,
@@ -39,6 +50,7 @@ final class SeoDomFirstRuntimeManifest {
   });
 
   final int schemaVersion;
+  final int contractRevision;
   final String id;
   final String kind;
   final String dartVersion;
@@ -49,13 +61,15 @@ final class SeoDomFirstRuntimeManifest {
 
   Map<String, Object> toJson() => {
         'schemaVersion': schemaVersion,
+        if (_hasRuntimeContractRevision(schemaVersion))
+          'contractRevision': contractRevision,
         'id': id,
         'kind': kind,
         'dartVersion': dartVersion,
         'sha256': sha256,
         'bytes': bytes,
         'gzipBytes': gzipBytes,
-        if (schemaVersion == seoDomFirstRuntimeBundleManifestSchema)
+        if (_isRuntimeBundleManifestSchema(schemaVersion))
           'members': memberKinds,
       };
 
@@ -76,9 +90,16 @@ final class SeoDomFirstRuntimeManifest {
     if (rawSchemaVersion is! int) {
       throw const FormatException('Runtime manifest has invalid field types.');
     }
-    final fields = rawSchemaVersion == seoDomFirstRuntimeBundleManifestSchema
-        ? {...baseFields, 'members'}
-        : baseFields;
+    if (!_isKnownRuntimeManifestSchema(rawSchemaVersion)) {
+      throw FormatException(
+        'Unsupported runtime manifest schema $rawSchemaVersion.',
+      );
+    }
+    final fields = {
+      ...baseFields,
+      if (_hasRuntimeContractRevision(rawSchemaVersion)) 'contractRevision',
+      if (_isRuntimeBundleManifestSchema(rawSchemaVersion)) 'members',
+    };
     if (value.keys.toSet().difference(fields).isNotEmpty ||
         fields.difference(value.keys.toSet()).isNotEmpty) {
       throw const FormatException(
@@ -86,6 +107,7 @@ final class SeoDomFirstRuntimeManifest {
       );
     }
     final schemaVersion = rawSchemaVersion;
+    final rawContractRevision = value['contractRevision'];
     final id = value['id'];
     final kind = value['kind'];
     final dartVersion = value['dartVersion'];
@@ -93,7 +115,9 @@ final class SeoDomFirstRuntimeManifest {
     final bytes = value['bytes'];
     final gzipBytes = value['gzipBytes'];
     final rawMembers = value['members'];
-    if (id is! String ||
+    if ((_hasRuntimeContractRevision(schemaVersion) &&
+            rawContractRevision is! int) ||
+        id is! String ||
         kind is! String ||
         dartVersion is! String ||
         hash is! String ||
@@ -102,7 +126,7 @@ final class SeoDomFirstRuntimeManifest {
       throw const FormatException('Runtime manifest has invalid field types.');
     }
     final List<String> memberKinds;
-    if (schemaVersion == seoDomFirstRuntimeBundleManifestSchema) {
+    if (_isRuntimeBundleManifestSchema(schemaVersion)) {
       if (rawMembers is! List ||
           rawMembers.any((member) => member is! String)) {
         throw const FormatException(
@@ -115,6 +139,9 @@ final class SeoDomFirstRuntimeManifest {
     }
     return SeoDomFirstRuntimeManifest(
       schemaVersion: schemaVersion,
+      contractRevision: _hasRuntimeContractRevision(schemaVersion)
+          ? rawContractRevision! as int
+          : 0,
       id: id,
       kind: kind,
       dartVersion: dartVersion,
@@ -155,6 +182,7 @@ final class SeoDomFirstRuntimeArtifact {
       schemaVersion: bundle
           ? seoDomFirstRuntimeBundleManifestSchema
           : seoDomFirstRuntimeManifestSchema,
+      contractRevision: seoDomFirstRuntimeContractRevision,
       id: reference.id,
       kind: reference.kind,
       dartVersion: dartVersion,
@@ -187,22 +215,15 @@ final class SeoDomFirstRuntimeArtifact {
     if (!isValidSeoApplicationRuntimeId(reference.id)) {
       throw StateError('Invalid application runtime id "${reference.id}".');
     }
-    final expectedSchema = reference is SeoDomFirstApplicationRuntimeBundle
-        ? seoDomFirstRuntimeBundleManifestSchema
-        : seoDomFirstRuntimeManifestSchema;
-    if (manifest.schemaVersion != expectedSchema) {
-      throw StateError(
-        'Unsupported runtime manifest schema ${manifest.schemaVersion} '
-        'for "${reference.id}".',
-      );
-    }
+    final bundle = reference is SeoDomFirstApplicationRuntimeBundle;
+    _verifyRuntimeManifestContract(reference, manifest);
     if (manifest.id != reference.id || manifest.kind != reference.kind) {
       throw StateError(
         'Runtime manifest identity does not match "${reference.id}" '
         '(${reference.kind}).',
       );
     }
-    final expectedMembers = reference is SeoDomFirstApplicationRuntimeBundle
+    final expectedMembers = bundle
         ? reference.memberKinds
             .map((kind) => kind.value)
             .toList(growable: false)
@@ -253,9 +274,10 @@ final class SeoDomFirstRuntimeArtifact {
       throw StateError('Runtime "${reference.id}" contains forbidden code.');
     }
     final verifiedManifest =
-        expectedSchema == seoDomFirstRuntimeBundleManifestSchema
+        bundle
             ? SeoDomFirstRuntimeManifest(
                 schemaVersion: manifest.schemaVersion,
+                contractRevision: manifest.contractRevision,
                 id: manifest.id,
                 kind: manifest.kind,
                 dartVersion: manifest.dartVersion,
@@ -360,6 +382,7 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
           '${error.message}',
         );
       }
+      _verifyRuntimeManifestContract(reference, manifest);
       if (manifest.dartVersion != expectedDartVersion) {
         throw StateError(
           'Application runtime "${reference.id}" was built with Dart '
@@ -381,6 +404,49 @@ final class SeoDirectoryRuntimeStore implements SeoDomFirstRuntimeStore {
         'Cannot read application runtime "${reference.id}": $error',
       );
     }
+  }
+}
+
+void _verifyRuntimeManifestContract(
+  SeoDomFirstApplicationRuntime reference,
+  SeoDomFirstRuntimeManifest manifest,
+) {
+  final bundle = reference is SeoDomFirstApplicationRuntimeBundle;
+  final expectedSchema = bundle
+      ? seoDomFirstRuntimeBundleManifestSchema
+      : seoDomFirstRuntimeManifestSchema;
+  final legacySchema = bundle
+      ? _legacySeoDomFirstRuntimeBundleManifestSchema
+      : _legacySeoDomFirstRuntimeManifestSchema;
+  if (manifest.schemaVersion == legacySchema) {
+    throw StateError(
+      'Application runtime "${reference.id}" uses legacy manifest schema '
+      '${manifest.schemaVersion} with runtime contract revision 0; expected '
+      'revision $seoDomFirstRuntimeContractRevision. Rebuild it with the '
+      'current esen_seo runtime builder.',
+    );
+  }
+  if (manifest.schemaVersion != expectedSchema) {
+    throw StateError(
+      'Unsupported runtime manifest schema ${manifest.schemaVersion} '
+      'for "${reference.id}".',
+    );
+  }
+  if (manifest.contractRevision < seoDomFirstRuntimeContractRevision) {
+    throw StateError(
+      'Application runtime "${reference.id}" uses runtime contract revision '
+      '${manifest.contractRevision}; expected '
+      '$seoDomFirstRuntimeContractRevision. Rebuild it with the current '
+      'esen_seo runtime builder.',
+    );
+  }
+  if (manifest.contractRevision > seoDomFirstRuntimeContractRevision) {
+    throw StateError(
+      'Application runtime "${reference.id}" requires runtime contract '
+      'revision ${manifest.contractRevision}, but this esen_seo version '
+      'supports $seoDomFirstRuntimeContractRevision. Upgrade esen_seo or '
+      'rebuild the artifact with this package version.',
+    );
   }
 }
 
@@ -422,3 +488,17 @@ bool _sameStrings(List<String> left, List<String> right) {
   }
   return true;
 }
+
+bool _isKnownRuntimeManifestSchema(int schema) =>
+    schema == _legacySeoDomFirstRuntimeManifestSchema ||
+    schema == _legacySeoDomFirstRuntimeBundleManifestSchema ||
+    schema == seoDomFirstRuntimeManifestSchema ||
+    schema == seoDomFirstRuntimeBundleManifestSchema;
+
+bool _isRuntimeBundleManifestSchema(int schema) =>
+    schema == _legacySeoDomFirstRuntimeBundleManifestSchema ||
+    schema == seoDomFirstRuntimeBundleManifestSchema;
+
+bool _hasRuntimeContractRevision(int schema) =>
+    schema == seoDomFirstRuntimeManifestSchema ||
+    schema == seoDomFirstRuntimeBundleManifestSchema;

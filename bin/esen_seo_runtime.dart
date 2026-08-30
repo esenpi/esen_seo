@@ -30,6 +30,7 @@ Future<void> main(List<String> arguments) async {
       '"${artifact.reference.id}"$members: '
       '${artifact.manifest.bytes} bytes, '
       '${artifact.manifest.gzipBytes} gzip bytes, '
+      'contract revision ${artifact.manifest.contractRevision}, '
       'sha256 ${artifact.manifest.sha256}.',
     );
   } on FormatException catch (error) {
