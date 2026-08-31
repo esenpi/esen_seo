@@ -1,5 +1,12 @@
 ## Unreleased
 
+* Expanded profile-bound DOM-first navigation to package-owned `SeoStepper`
+  routes. Fresh documents initialize idempotently from their delivered step,
+  Back and Forward discard route-local state, and a unique fragment inside a
+  step reveals that panel before navigation focus and scroll. Stepper profiles
+  may include theme and CSS motion but remain separate from Tabs and Carousel
+  profiles under the unchanged 25 KiB gzip budget; application runtimes and
+  Stepper Effects still use normal document navigation.
 * Added one strict runtime build plan for applications with several standalone
   runtimes and bundles. The CLI validates the complete bounded plan before
   compilation, builds every artifact in staging and replaces its dedicated

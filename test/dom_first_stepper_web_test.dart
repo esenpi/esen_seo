@@ -166,6 +166,107 @@ void main() {
     expect(root.querySelectorAll('[hidden]').length, 0);
   });
 
+  test('navigation event initializes fresh steppers exactly once', () {
+    final firstContainer = _container(fixture);
+    final first = _stepper(
+      firstContainer,
+      'first-route-stepper',
+      initialIndex: 0,
+    );
+
+    _runCompiledCandidate();
+    expect(first.querySelectorAll('[data-esen-stepper-controls]').length, 1);
+
+    firstContainer.remove();
+    final nextContainer = _container(fixture);
+    final next = _stepper(
+      nextContainer,
+      'next-route-stepper',
+      initialIndex: 2,
+    );
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+    web.document.documentElement?.dispatchEvent(
+      web.Event('esen-seo:navigation'),
+    );
+
+    expect(first.isConnected, isFalse);
+    expect(next.querySelectorAll('[data-esen-stepper-controls]').length, 1);
+    expect(next.querySelectorAll('[data-esen-step-button]').length, 3);
+    expect(
+      next.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 3 / 3',
+    );
+    expect(
+      next.querySelector('#next-route-stepper-panel-2')?.hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
+  test('fragment target reveals its validated panel before focus', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final root = _stepper(
+      container,
+      'fragment-stepper',
+      initialIndex: 0,
+    );
+    final target = root.querySelector('#fragment-stepper-panel-2 p')!;
+    target.id = 'review-anchor';
+    web.window.history.replaceState(null, '', '#review-anchor');
+
+    _runCompiledCandidate();
+
+    expect(
+      root.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 3 / 3',
+    );
+    expect(
+      root.querySelector('#fragment-stepper-panel-0')?.hasAttribute('hidden'),
+      isTrue,
+    );
+    expect(
+      root.querySelector('#fragment-stepper-panel-2')?.hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
+  test('ambiguous fragment ids cannot override the delivered state', () {
+    final originalHref = web.window.location.href;
+    addTearDown(
+      () => web.window.history.replaceState(null, '', originalHref),
+    );
+    final container = _container(fixture);
+    final root = _stepper(
+      container,
+      'ambiguous-fragment-stepper',
+      initialIndex: 1,
+    );
+    final target = root.querySelector('#ambiguous-fragment-stepper-panel-2 p')!;
+    target.id = 'repeated-step-anchor';
+    fixture.appendChild(
+      web.document.createElement('span')..id = 'repeated-step-anchor',
+    );
+    web.window.history.replaceState(null, '', '#repeated-step-anchor');
+
+    _runCompiledCandidate();
+
+    expect(
+      root.querySelector('[data-esen-stepper-status]')?.textContent,
+      'Step 2 / 3',
+    );
+    expect(
+      root
+          .querySelector('#ambiguous-fragment-stepper-panel-1')
+          ?.hasAttribute('hidden'),
+      isFalse,
+    );
+  });
+
   test('rejects a mismatched pre-paint plan before the first mutation', () {
     final container = _container(fixture);
     final root = _stepper(

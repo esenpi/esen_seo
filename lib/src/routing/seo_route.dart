@@ -244,16 +244,14 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       'require delivery: SeoRouteDelivery.domFirst',
     );
   }
-  if (features.contains(SeoDomFirstFeature.navigation)) {
-    final unsupported =
-        features.difference(seoDomFirstNavigationCompatibleFeatures);
-    if (unsupported.isNotEmpty) {
-      throw ArgumentError.value(
-        features,
-        'domFirstFeatures',
-        'navigation currently supports only tabs, themeToggle and motion',
-      );
-    }
+  if (features.contains(SeoDomFirstFeature.navigation) &&
+      !isSeoDomFirstNavigationFeatureProfile(features)) {
+    throw ArgumentError.value(
+      features,
+      'domFirstFeatures',
+      'navigation supports themeToggle and motion, but stepper cannot share '
+          'one profile with tabs or carousel',
+    );
   }
   return Set<SeoDomFirstFeature>.unmodifiable(features);
 }

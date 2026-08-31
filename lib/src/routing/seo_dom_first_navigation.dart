@@ -154,9 +154,7 @@ String? seoDomFirstNavigationFeatureProfile(
   Set<SeoDomFirstFeature> features,
 ) {
   if (!features.contains(SeoDomFirstFeature.navigation)) return null;
-  final unsupported =
-      features.difference(seoDomFirstNavigationCompatibleFeatures);
-  if (unsupported.isNotEmpty) {
+  if (!isSeoDomFirstNavigationFeatureProfile(features)) {
     throw StateError('Invalid DOM-first navigation feature profile');
   }
   final names = features.map((feature) => feature.name).toList()..sort();

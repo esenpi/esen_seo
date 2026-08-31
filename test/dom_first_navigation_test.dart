@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
@@ -39,6 +40,12 @@ const _tabsCarouselNavigation = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.tabs,
   SeoDomFirstFeature.carousel,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _stepperNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.stepper,
   SeoDomFirstFeature.themeToggle,
 };
 
@@ -119,6 +126,36 @@ void main() {
       expect(
         seoDomFirstNavigationProfile(tabsCarousel),
         'carousel.navigation.tabs.themeToggle',
+      );
+      final stepper = _route(
+        '/stepper',
+        features: _stepperNavigation,
+      );
+      expect(
+        seoDomFirstNavigationProfile(stepper),
+        'navigation.stepper.themeToggle',
+      );
+      expect(
+        () => _route(
+          '/tabs-stepper',
+          features: const {
+            SeoDomFirstFeature.navigation,
+            SeoDomFirstFeature.tabs,
+            SeoDomFirstFeature.stepper,
+          },
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => _route(
+          '/carousel-stepper',
+          features: const {
+            SeoDomFirstFeature.navigation,
+            SeoDomFirstFeature.carousel,
+            SeoDomFirstFeature.stepper,
+          },
+        ),
+        throwsArgumentError,
       );
       expect(
         () => _route(
@@ -330,6 +367,12 @@ void main() {
       );
       final tabsCarouselNavigationHtml =
           seoDomFirstFeatureScriptHtml(_tabsCarouselNavigation);
+      final stepperNavigation = utf8.encode(
+        '$seoDomFirstNavigationRuntime$seoDomFirstStepperRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final stepperNavigationHtml =
+          seoDomFirstFeatureScriptHtml(_stepperNavigation);
 
       expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
       expect(
@@ -342,6 +385,10 @@ void main() {
       );
       expect(
         levelNineGzip.encode(tabsCarouselNavigation).length,
+        lessThanOrEqualTo(25 * 1024),
+      );
+      expect(
+        levelNineGzip.encode(stepperNavigation).length,
         lessThanOrEqualTo(25 * 1024),
       );
       expect(
@@ -377,6 +424,10 @@ void main() {
       expect(
         tabsCarouselNavigationHtml,
         isNot(contains(seoDomFirstCarouselRuntime)),
+      );
+      expect(
+        stepperNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
+        lessThan(stepperNavigationHtml.indexOf(seoDomFirstStepperRuntime)),
       );
       expect(seoDomFirstFeatureScriptHtml(const {}), isEmpty);
       expect(navigationOnly, contains(seoDomFirstNavigationRuntime));

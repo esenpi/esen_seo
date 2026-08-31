@@ -75,8 +75,8 @@ The HTML only exists on the web.
   Stepper family in one verified runtime bundle; Collection remains a
   standalone runtime under the same fixed JavaScript budget. A separate
   profile-bound navigation pilot can accelerate links between compatible
-  document routes and reinitialize package-owned Tabs and Carousel controls
-  while retaining complete no-JavaScript pages.
+  document routes and reinitialize package-owned Tabs, Carousel or Stepper
+  controls while retaining complete no-JavaScript pages.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -920,13 +920,16 @@ strict response and DOM bounds, replaces only sanitized package-marked head
 nodes and `#esen-seo-content`, then updates History, scroll and focus. Fetched
 scripts are never inserted or executed. The theme toggle listens for the
 package navigation event and binds the fresh marker after replacement.
-Package-owned Tabs and Carousel controls validate and initialize the new
-document from its delivered initial state; a fragment inside a panel or slide
-reveals that region before navigation focus and scroll. CSS motion needs no
+Package-owned Tabs, Carousel and Stepper controls validate and initialize the
+new document from its delivered initial state; a fragment inside a panel,
+slide or step reveals that region before navigation focus and scroll. A
+Stepper navigation profile may include theme toggle and CSS motion, but it is
+mutually exclusive with Tabs and Carousel in the same profile to preserve the
+fixed runtime budget with a stable reserve. CSS motion needs no
 reinitialization.
 
-Navigation currently cannot be combined with Stepper, Collection, forms or
-application runtimes. Those links deliberately retain native multi-page
+Navigation currently cannot be combined with Collection, forms, application
+runtimes or Stepper Effects. Those links deliberately retain native multi-page
 navigation until their state and reinitialization contracts are explicit.
 Modified clicks, downloads, external targets, fragments on the current page,
 malformed responses and profile changes likewise stay native or fall back to a
