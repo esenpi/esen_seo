@@ -250,7 +250,16 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       features,
       'domFirstFeatures',
       'navigation supports themeToggle and motion, but stepper cannot share '
-          'one profile with tabs or carousel',
+          'one profile with tabs or carousel; prefetch supports at most one '
+          'of tabs or carousel and does not support stepper',
+    );
+  }
+  if (features.contains(SeoDomFirstFeature.prefetch) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'domFirstFeatures',
+      'prefetch requires navigation',
     );
   }
   return Set<SeoDomFirstFeature>.unmodifiable(features);

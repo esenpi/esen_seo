@@ -153,6 +153,10 @@ String? seoDomFirstNavigationProfile(SeoRoute route) {
 String? seoDomFirstNavigationFeatureProfile(
   Set<SeoDomFirstFeature> features,
 ) {
+  if (features.contains(SeoDomFirstFeature.prefetch) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw StateError('DOM-first prefetch requires navigation');
+  }
   if (!features.contains(SeoDomFirstFeature.navigation)) return null;
   if (!isSeoDomFirstNavigationFeatureProfile(features)) {
     throw StateError('Invalid DOM-first navigation feature profile');

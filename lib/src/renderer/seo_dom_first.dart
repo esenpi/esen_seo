@@ -10,6 +10,7 @@ import 'seo_dom_first_carousel_runtime.g.dart';
 import 'seo_dom_first_action_form_runtime.g.dart';
 import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
+import 'seo_dom_first_navigation_prefetch_runtime.g.dart';
 import 'seo_dom_first_navigation_runtime.g.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_carousel_runtime.g.dart';
@@ -317,6 +318,22 @@ String seoDomFirstFeatureScriptHtml(
   Set<SeoDomFirstFeature> features, {
   String? nonce,
 }) {
+  if (features.contains(SeoDomFirstFeature.prefetch) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'features',
+      'prefetch requires navigation',
+    );
+  }
+  if (features.contains(SeoDomFirstFeature.navigation) &&
+      !isSeoDomFirstNavigationFeatureProfile(features)) {
+    throw ArgumentError.value(
+      features,
+      'features',
+      'invalid DOM-first navigation feature profile',
+    );
+  }
   final nonceAttribute = _nonceAttribute(nonce);
   final runtime = StringBuffer();
 
@@ -326,7 +343,11 @@ String seoDomFirstFeatureScriptHtml(
   }
 
   if (features.contains(SeoDomFirstFeature.navigation)) {
-    addRuntime(seoDomFirstNavigationRuntime);
+    addRuntime(
+      features.contains(SeoDomFirstFeature.prefetch)
+          ? seoDomFirstNavigationPrefetchRuntime
+          : seoDomFirstNavigationRuntime,
+    );
   }
 
   final tabs = features.contains(SeoDomFirstFeature.tabs);

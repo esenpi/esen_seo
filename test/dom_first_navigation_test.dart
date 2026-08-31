@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_navigation_prefetch_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_carousel_runtime.g.dart';
@@ -46,6 +47,26 @@ const _tabsCarouselNavigation = {
 const _stepperNavigation = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.stepper,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _prefetchNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.prefetch,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _prefetchTabsNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.prefetch,
+  SeoDomFirstFeature.tabs,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _prefetchCarouselNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.prefetch,
+  SeoDomFirstFeature.carousel,
   SeoDomFirstFeature.themeToggle,
 };
 
@@ -134,6 +155,59 @@ void main() {
       expect(
         seoDomFirstNavigationProfile(stepper),
         'navigation.stepper.themeToggle',
+      );
+      final prefetch = _route(
+        '/prefetch',
+        features: _prefetchNavigation,
+      );
+      expect(
+        seoDomFirstNavigationProfile(prefetch),
+        'navigation.prefetch.themeToggle',
+      );
+      expect(
+        seoDomFirstNavigationProfile(
+          _route('/prefetch-tabs', features: _prefetchTabsNavigation),
+        ),
+        'navigation.prefetch.tabs.themeToggle',
+      );
+      expect(
+        seoDomFirstNavigationProfile(
+          _route(
+            '/prefetch-carousel',
+            features: _prefetchCarouselNavigation,
+          ),
+        ),
+        'carousel.navigation.prefetch.themeToggle',
+      );
+      expect(
+        () => _route(
+          '/prefetch-only',
+          features: const {SeoDomFirstFeature.prefetch},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => _route(
+          '/prefetch-tabs-carousel',
+          features: const {
+            SeoDomFirstFeature.navigation,
+            SeoDomFirstFeature.prefetch,
+            SeoDomFirstFeature.tabs,
+            SeoDomFirstFeature.carousel,
+          },
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => _route(
+          '/prefetch-stepper',
+          features: const {
+            SeoDomFirstFeature.navigation,
+            SeoDomFirstFeature.prefetch,
+            SeoDomFirstFeature.stepper,
+          },
+        ),
+        throwsArgumentError,
       );
       expect(
         () => _route(
@@ -373,6 +447,20 @@ void main() {
       );
       final stepperNavigationHtml =
           seoDomFirstFeatureScriptHtml(_stepperNavigation);
+      final prefetchNavigation = utf8.encode(
+        '$seoDomFirstNavigationPrefetchRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final prefetchTabsNavigation = utf8.encode(
+        '$seoDomFirstNavigationPrefetchRuntime$seoDomFirstTabsRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final prefetchCarouselNavigation = utf8.encode(
+        '$seoDomFirstNavigationPrefetchRuntime$seoDomFirstCarouselRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
+      final prefetchNavigationHtml =
+          seoDomFirstFeatureScriptHtml(_prefetchNavigation);
 
       expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
       expect(
@@ -391,6 +479,16 @@ void main() {
         levelNineGzip.encode(stepperNavigation).length,
         lessThanOrEqualTo(25 * 1024),
       );
+      for (final profile in [
+        prefetchNavigation,
+        prefetchTabsNavigation,
+        prefetchCarouselNavigation,
+      ]) {
+        expect(
+          25 * 1024 - levelNineGzip.encode(profile).length,
+          greaterThanOrEqualTo(512),
+        );
+      }
       expect(
         tabsNavigationHtml.indexOf(seoDomFirstNavigationRuntime),
         lessThan(tabsNavigationHtml.indexOf(seoDomFirstTabsRuntime)),
@@ -431,6 +529,14 @@ void main() {
       );
       expect(seoDomFirstFeatureScriptHtml(const {}), isEmpty);
       expect(navigationOnly, contains(seoDomFirstNavigationRuntime));
+      expect(
+        prefetchNavigationHtml,
+        contains(seoDomFirstNavigationPrefetchRuntime),
+      );
+      expect(
+        prefetchNavigationHtml,
+        isNot(contains(seoDomFirstNavigationRuntime)),
+      );
       expect(navigationOnly, isNot(contains('localStorage.getItem')));
       expect(themeOnly, isNot(contains(seoDomFirstNavigationRuntime)));
       expect(
@@ -441,6 +547,22 @@ void main() {
         ),
       );
       expect(
+        () => seoDomFirstFeatureScriptHtml(
+          const {SeoDomFirstFeature.prefetch},
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => seoDomFirstFeatureScriptHtml(
+          const {
+            SeoDomFirstFeature.navigation,
+            SeoDomFirstFeature.prefetch,
+            SeoDomFirstFeature.stepper,
+          },
+        ),
+        throwsArgumentError,
+      );
+      expect(
         seoDomFirstNavigationRuntime.toLowerCase(),
         isNot(contains('</script')),
       );
@@ -448,6 +570,18 @@ void main() {
       expect(seoDomFirstNavigationRuntime, isNot(contains('outerHTML')));
       expect(seoDomFirstNavigationRuntime, isNot(contains('document.write')));
       expect(seoDomFirstNavigationRuntime, isNot(contains('eval(')));
+      expect(
+        seoDomFirstNavigationPrefetchRuntime,
+        allOf(
+          isNot(contains('innerHTML')),
+          isNot(contains('outerHTML')),
+          isNot(contains('document.write')),
+          isNot(contains('eval(')),
+          contains('.body.getReader()'),
+          contains('visibilityState!=="hidden"'),
+          contains('saveData'),
+        ),
+      );
       expect(seoDomFirstNavigationRuntime, isNot(contains('.arrayBuffer()')));
       expect(seoDomFirstNavigationRuntime, contains('.body.getReader()'));
       expect(

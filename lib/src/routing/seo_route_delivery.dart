@@ -22,6 +22,12 @@ enum SeoDomFirstFeature {
   /// navigation until they define an explicit reinitialization contract.
   navigation,
 
+  /// Prefetch an intended compatible navigation target before activation.
+  ///
+  /// This transport optimization requires [navigation]. It retains at most
+  /// one short-lived document that passed the complete navigation validator.
+  prefetch,
+
   /// Enhance validated `SeoTabs` markup through the shared tabs transition.
   tabs,
 
@@ -59,9 +65,10 @@ enum SeoDomFirstFeature {
   motion,
 }
 
-/// Features whose browser state survives the client-navigation pilot.
+/// Features admitted by the profile-bound client-navigation pilot.
 const Set<SeoDomFirstFeature> seoDomFirstNavigationCompatibleFeatures = {
   SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.prefetch,
   SeoDomFirstFeature.tabs,
   SeoDomFirstFeature.carousel,
   SeoDomFirstFeature.stepper,
@@ -75,6 +82,12 @@ bool isSeoDomFirstNavigationFeatureProfile(
 ) {
   if (!features.contains(SeoDomFirstFeature.navigation) ||
       features.difference(seoDomFirstNavigationCompatibleFeatures).isNotEmpty) {
+    return false;
+  }
+  if (features.contains(SeoDomFirstFeature.prefetch) &&
+      (features.contains(SeoDomFirstFeature.stepper) ||
+          (features.contains(SeoDomFirstFeature.tabs) &&
+              features.contains(SeoDomFirstFeature.carousel)))) {
     return false;
   }
   return !features.contains(SeoDomFirstFeature.stepper) ||

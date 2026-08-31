@@ -1,3 +1,13 @@
+## Unreleased
+
+* Added intent-bound prefetching as an explicit extension of profile-bound
+  DOM-first navigation. It retains at most one short-lived document only after
+  the complete navigation validator accepts it, coalesces an activation with
+  an in-flight request, respects cache prohibitions, expiry, Save-Data and
+  reported 2G connections, and never mutates the page before activation.
+  Existing navigation runtimes remain byte-identical; the budgeted pilot may
+  combine prefetch with theme, motion and at most one of Tabs or Carousel.
+
 ## 0.14.0
 
 * Expanded profile-bound DOM-first navigation to package-owned `SeoStepper`

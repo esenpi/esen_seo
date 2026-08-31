@@ -891,6 +891,7 @@ or executable code.
 ```dart
 const documentFeatures = {
   SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.prefetch,
   SeoDomFirstFeature.themeToggle,
   SeoDomFirstFeature.motion,
 };
@@ -927,6 +928,30 @@ Stepper navigation profile may include theme toggle and CSS motion, but it is
 mutually exclusive with Tabs and Carousel in the same profile to preserve the
 fixed runtime budget with a stable reserve. CSS motion needs no
 reinitialization.
+
+`SeoDomFirstFeature.prefetch` is a separate opt-in. Pointer intent, keyboard
+focus or a primary pointer press may start the same checked GET before link
+activation. At most one fragment-free candidate is retained for up to ten
+seconds; activating an anchor consumes it and applies that anchor's fragment.
+The speculative response must pass the complete navigation URL, size,
+manifest, head and content validator. Prefetch itself never changes the live
+DOM, History, focus, scroll or busy state, and a failed candidate stays silent.
+The later click simply uses the ordinary checked request and full-navigation
+recovery.
+
+The candidate is not retained when the response sends `Cache-Control:
+no-store`, `no-cache` or `max-age=0`, `Pragma: no-cache`, `Vary: *` or an
+already expired `Expires` value. Positive `max-age`, `Age` and `Expires`
+values can shorten the ten-second package ceiling. Save-Data, reported 2G
+connections and hidden documents disable speculation without disabling
+navigation. Because a GET may now occur before activation, route resolvers
+must keep document GETs safe and free of application side effects.
+
+Under the fixed runtime budget a prefetch profile may contain theme, motion
+and at most one of Tabs or Carousel. It cannot currently contain Stepper or
+the combined Tabs-and-Carousel runtime. Unsupported combinations fail when
+the route is constructed; existing navigation profiles continue to use their
+unchanged runtime.
 
 Navigation currently cannot be combined with Collection, forms, application
 runtimes or Stepper Effects. Those links deliberately retain native multi-page

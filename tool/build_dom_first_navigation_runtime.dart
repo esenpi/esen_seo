@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 const _generated = 'lib/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+const _generatedPrefetch =
+    'lib/src/renderer/seo_dom_first_navigation_prefetch_runtime.g.dart';
 
 Future<void> main(List<String> arguments) async {
   final write = arguments.contains('--write');
@@ -45,16 +47,119 @@ try{history.scrollRestoration="manual"}catch(_){}if(!state(history.state))histor
 d.addEventListener("click",event=>{if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!(event.target instanceof Element))return;let anchor=event.target.closest("a[href]");if(!anchor||!c.contains(anchor)||anchor.hasAttribute("download")||(anchor.target&&anchor.target.toLowerCase()!=="_self")||anchor.relList.contains("external"))return;let raw=anchor.getAttribute("href");if(!raw||raw.length>4096)return;let url;try{url=new URL(raw,location.href)}catch(_){return}if(!validUrl(url,plan)||url.pathname===location.pathname&&url.search===location.search)return;event.preventDefault();save();go(url,true,null)});
 addEventListener("popstate",event=>{let url=new URL(location.href),position=state(event.state);if(!position||!validUrl(url,plan)){hard(url,true);return}go(url,false,position)});addEventListener("pagehide",()=>{g++;if(controller)controller.abort()},{once:true})
 })();''';
+  final javascript = _compileRuntime(source);
+  final prefetchJavascript = _compileRuntime(_withPrefetch(source));
+
+  if (!_isSafeInlineRuntime(javascript) ||
+      !_isSafeInlineRuntime(prefetchJavascript)) {
+    stderr.writeln('Refusing a runtime containing unsafe inline code.');
+    exitCode = 1;
+    return;
+  }
+  final sources = {
+    _generated: _generatedSource(
+      javascript,
+      'seoDomFirstNavigationRuntime',
+    ),
+    _generatedPrefetch: _generatedSource(
+      prefetchJavascript,
+      'seoDomFirstNavigationPrefetchRuntime',
+    ),
+  };
+  final temp = await Directory.systemTemp.createTemp('esen-navigation-');
+  try {
+    for (final entry in sources.entries) {
+      final sourceFile = File('${temp.path}/${entry.key.split('/').last}');
+      await sourceFile.writeAsString(entry.value);
+      final result = await Process.run(
+        Platform.resolvedExecutable,
+        ['format', sourceFile.path],
+        runInShell: false,
+      );
+      if (result.exitCode != 0) {
+        stderr.write(result.stdout);
+        stderr.write(result.stderr);
+        exitCode = result.exitCode;
+        return;
+      }
+      final formatted = await sourceFile.readAsString();
+      final target = File(entry.key);
+      if (write) {
+        await target.writeAsString(formatted);
+      } else if (!target.existsSync() ||
+          await target.readAsString() != formatted) {
+        stderr.writeln('${entry.key} is stale. Run this command with --write.');
+        exitCode = 1;
+        return;
+      }
+    }
+    if (write) {
+      stdout.writeln(
+        'Wrote $_generated (${javascript.length} JS bytes) and '
+        '$_generatedPrefetch (${prefetchJavascript.length} JS bytes).',
+      );
+    } else {
+      stdout.writeln('DOM-first navigation runtimes are current.');
+    }
+  } finally {
+    await temp.delete(recursive: true);
+  }
+}
+
+String _compileRuntime(String source) {
   var javascript = source.split('\n').map((line) => line.trim()).join();
+  final prefetch = source.contains('PREFETCH_TTL=10000');
   javascript = _replaceOnce(javascript, 'w=window,', '');
-  javascript = _renameIdentifier(javascript, 'controller', 'ctrl', 10);
-  javascript = _renameIdentifier(javascript, 'pending', 'busy', 7);
-  javascript = _renameIdentifier(javascript, 'position', 'pos', 11);
-  javascript = _renameIdentifier(javascript, 'response', 'res', 7);
+  javascript = _renameIdentifier(
+    javascript,
+    'prefetchCandidate',
+    'pc',
+    prefetch ? 12 : 0,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'prefetchController',
+    'pctrl',
+    prefetch ? 9 : 0,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'controller',
+    'ctrl',
+    prefetch ? 14 : 10,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'pending',
+    'busy',
+    7,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'position',
+    'pos',
+    11,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'response',
+    'res',
+    prefetch ? 13 : 7,
+  );
   javascript = _renameIdentifier(javascript, 'parseManifest', 'pm', 3);
   javascript = _renameIdentifier(javascript, 'profileFor', 'pf', 2);
-  javascript = _renameIdentifier(javascript, 'validUrl', 'vu', 5);
-  javascript = _renameIdentifier(javascript, 'samePlan', 'sp', 2);
+  javascript = _renameIdentifier(
+    javascript,
+    'validUrl',
+    'vu',
+    5,
+  );
+  javascript = _renameIdentifier(
+    javascript,
+    'samePlan',
+    'sp',
+    2,
+  );
   javascript = _renameIdentifier(javascript, 'safeUrl', 'su', 3);
   javascript = _renameIdentifier(javascript, 'validContent', 'vc', 2);
   javascript = _renameIdentifier(javascript, 'validHead', 'vh', 2);
@@ -63,50 +168,52 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
   javascript = _renameIdentifier(javascript, 'newContent', 'nc', 3);
   javascript = _renameIdentifier(javascript, 'newManifest', 'nm', 3);
   javascript = _renameIdentifier(javascript, 'oldFocus', 'of', 4);
-
-  if (javascript.toLowerCase().contains('</script') ||
-      javascript.contains('<!--')) {
-    stderr.writeln('Refusing a runtime containing unsafe inline code.');
-    exitCode = 1;
-    return;
-  }
-  final encoded = jsonEncode(javascript).replaceAll(r'$', r'\$');
-  final unformattedSource =
-      '// Generated by tool/build_dom_first_navigation_runtime.dart.\n'
-      '// Do not edit by hand.\n'
-      'const String seoDomFirstNavigationRuntime = $encoded;\n';
-  final temp = await Directory.systemTemp.createTemp('esen-navigation-');
-  try {
-    final sourceFile = File('${temp.path}/runtime.dart');
-    await sourceFile.writeAsString(unformattedSource);
-    final result = await Process.run(
-      Platform.resolvedExecutable,
-      ['format', sourceFile.path],
-      runInShell: false,
-    );
-    if (result.exitCode != 0) {
-      stderr.write(result.stdout);
-      stderr.write(result.stderr);
-      exitCode = result.exitCode;
-      return;
-    }
-    final source = await sourceFile.readAsString();
-    final target = File(_generated);
-    if (write) {
-      await target.writeAsString(source);
-      stdout.writeln('Wrote $_generated (${javascript.length} JS bytes).');
-      return;
-    }
-    if (!target.existsSync() || await target.readAsString() != source) {
-      stderr.writeln('$_generated is stale. Run this command with --write.');
-      exitCode = 1;
-      return;
-    }
-    stdout.writeln('DOM-first navigation runtime is current.');
-  } finally {
-    await temp.delete(recursive: true);
-  }
+  return javascript;
 }
+
+bool _isSafeInlineRuntime(String javascript) =>
+    !javascript.toLowerCase().contains('</script') &&
+    !javascript.contains('<!--');
+
+String _generatedSource(String javascript, String identifier) {
+  final encoded = jsonEncode(javascript).replaceAll(r'$', r'\$');
+  return '// Generated by tool/build_dom_first_navigation_runtime.dart.\n'
+      '// Do not edit by hand.\n'
+      'const String $identifier = $encoded;\n';
+}
+
+String _withPrefetch(String source) {
+  source = _replaceOnce(
+    source,
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile);if(!current)return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null;',
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile);if(!current)return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null,prefetchCandidate=null,prefetchController=null,PREFETCH_TTL=10000;',
+  );
+  source = _replaceOnce(source, _navigationGo, _prefetchNavigationGo);
+  return _replaceOnce(source, _navigationEvents, _prefetchNavigationEvents);
+}
+
+const _navigationGo =
+    r'''},go=async(url,push,position)=>{let token=++g;if(controller)controller.abort();controller=new AbortController;pending=c;pending.setAttribute("aria-busy","true");d.documentElement.dataset.esenNavigationPending="1";try{
+ let response=await fetch(url.href,{headers:{Accept:"text/html"},credentials:"same-origin",redirect:"follow",signal:controller.signal});if(token!==g)return;let length=response.headers.get("content-length"),type=(response.headers.get("content-type")||"").toLowerCase(),finalUrl=new URL(response.url||url.href);if(!finalUrl.hash)finalUrl.hash=url.hash;if(!response.ok||!type.startsWith("text/html")||(length!==null&&(!/^\d+$/.test(length)||Number(length)>MAX))||!validUrl(finalUrl,plan))throw 0;let reader=response.body&&response.body.getReader();if(!reader)throw 0;let decoder=new TextDecoder("utf-8",{fatal:true}),text="",total=0;try{for(;;){let chunk=await reader.read();if(token!==g){reader.cancel();return}if(chunk.done)break;total+=chunk.value.byteLength;if(total>MAX){reader.cancel();throw 0}text+=decoder.decode(chunk.value,{stream:true})}text+=decoder.decode()}catch(_){throw 0}let parsed=new DOMParser().parseFromString(text,"text/html"),target=validate(parsed,finalUrl,plan.profile);if(!target||!samePlan(target.plan,plan))throw 0;apply(target,finalUrl,push,position)
+ }catch(error){if(token===g&&!(controller&&controller.signal.aborted))hard(url,!push)}finally{if(token===g){if(pending&&pending.isConnected)pending.removeAttribute("aria-busy");delete d.documentElement.dataset.esenNavigationPending;controller=null;pending=null}}
+};''';
+
+const _prefetchNavigationGo =
+    r'''},cacheKey=url=>{let value=new URL(url.href);value.hash="";return value.href},clearPrefetch=()=>{let active=prefetchController;prefetchCandidate=null;prefetchController=null;if(active)active.abort()},takePrefetch=url=>{let candidate=prefetchCandidate;if(!candidate)return null;if(candidate.key!==cacheKey(url)||Date.now()>=candidate.expires){clearPrefetch();return null}prefetchCandidate=null;prefetchController=null;return candidate},prefetchAllowed=()=>{let connection;try{connection=navigator.connection}catch(_){return false}return d.visibilityState!=="hidden"&&!(connection&&(connection.saveData||/^(slow-)?2g$/i.test(connection.effectiveType||"")))},load=async(url,signal)=>{
+ let requestUrl=new URL(url.href);requestUrl.hash="";let response=await fetch(requestUrl.href,{headers:{Accept:"text/html"},credentials:"same-origin",redirect:"follow",signal});let length=response.headers.get("content-length"),type=(response.headers.get("content-type")||"").toLowerCase(),finalUrl=new URL(response.url||requestUrl.href);if(!response.ok||!type.startsWith("text/html")||(length!==null&&(!/^\d+$/.test(length)||Number(length)>MAX))||!validUrl(finalUrl,plan))throw 0;let reader=response.body&&response.body.getReader();if(!reader)throw 0;let decoder=new TextDecoder("utf-8",{fatal:true}),text="",total=0;try{for(;;){let chunk=await reader.read();if(chunk.done)break;total+=chunk.value.byteLength;if(total>MAX){reader.cancel();throw 0}text+=decoder.decode(chunk.value,{stream:true})}text+=decoder.decode()}catch(_){throw 0}let parsed=new DOMParser().parseFromString(text,"text/html"),target=validate(parsed,finalUrl,plan.profile);if(!target||!samePlan(target.plan,plan))throw 0;let control=(response.headers.get("cache-control")||"").toLowerCase().split(",").map(value=>value.trim()),pragma=(response.headers.get("pragma")||"").toLowerCase().split(",").map(value=>value.trim()),vary=(response.headers.get("vary")||"").split(",").map(value=>value.trim()),maxAges=control.filter(value=>value.startsWith("max-age")),lifetime=PREFETCH_TTL;for(let value of maxAges){let match=value.match(/^max-age\s*=\s*"?(\d+)"?\s*$/);lifetime=match?Math.min(lifetime,Number(match[1])*1000):0}let age=response.headers.get("age");if(age!==null)lifetime=/^\d+$/.test(age)?Math.max(0,lifetime-Number(age)*1000):0;let expires=response.headers.get("expires");if(!maxAges.length&&expires!==null){let expiry=Date.parse(expires),date=Date.parse(response.headers.get("date")||"");lifetime=Number.isFinite(expiry)?Math.min(lifetime,Math.max(0,expiry-(Number.isFinite(date)?date:Date.now()))):0}if(control.some(value=>value==="no-store"||value.startsWith("no-store=")||value==="no-cache"||value.startsWith("no-cache="))||pragma.includes("no-cache")||vary.includes("*"))lifetime=0;return{target,url:finalUrl,lifetime}
+},prefetch=url=>{if(!prefetchAllowed()||controller)return;let key=cacheKey(url),now=Date.now();if(prefetchCandidate&&prefetchCandidate.key===key&&now<prefetchCandidate.expires)return;clearPrefetch();prefetchController=new AbortController;let candidate={key,expires:now+PREFETCH_TTL,controller:prefetchController,promise:null};prefetchCandidate=candidate;candidate.promise=load(url,prefetchController.signal).then(value=>{if(prefetchCandidate===candidate){if(value.lifetime>0)candidate.expires=Date.now()+value.lifetime;else{prefetchCandidate=null;prefetchController=null}}return value}).catch(_=>{if(prefetchCandidate===candidate){prefetchCandidate=null;prefetchController=null}return null})},go=async(url,push,position)=>{let token=++g,hit=push?takePrefetch(url):null;if(!push)clearPrefetch();if(controller)controller.abort();if(!hit)clearPrefetch();controller=hit?hit.controller:new AbortController;pending=c;pending.setAttribute("aria-busy","true");d.documentElement.dataset.esenNavigationPending="1";try{
+ let loaded=hit?await hit.promise:null;if(token!==g)return;if(!loaded){controller=new AbortController;loaded=await load(url,controller.signal)}if(token!==g)return;let finalUrl=new URL(loaded.url.href);if(!finalUrl.hash)finalUrl.hash=url.hash;clearPrefetch();apply(loaded.target,finalUrl,push,position)
+ }catch(error){if(token===g&&!(controller&&controller.signal.aborted))hard(url,!push)}finally{if(token===g){if(pending&&pending.isConnected)pending.removeAttribute("aria-busy");delete d.documentElement.dataset.esenNavigationPending;controller=null;pending=null}}
+};''';
+
+const _navigationEvents =
+    r'''d.addEventListener("click",event=>{if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!(event.target instanceof Element))return;let anchor=event.target.closest("a[href]");if(!anchor||!c.contains(anchor)||anchor.hasAttribute("download")||(anchor.target&&anchor.target.toLowerCase()!=="_self")||anchor.relList.contains("external"))return;let raw=anchor.getAttribute("href");if(!raw||raw.length>4096)return;let url;try{url=new URL(raw,location.href)}catch(_){return}if(!validUrl(url,plan)||url.pathname===location.pathname&&url.search===location.search)return;event.preventDefault();save();go(url,true,null)});
+addEventListener("popstate",event=>{let url=new URL(location.href),position=state(event.state);if(!position||!validUrl(url,plan)){hard(url,true);return}go(url,false,position)});addEventListener("pagehide",()=>{g++;if(controller)controller.abort()},{once:true})''';
+
+const _prefetchNavigationEvents =
+    r'''let anchorUrl=anchor=>{if(!anchor||!c.contains(anchor)||anchor.hasAttribute("download")||(anchor.target&&anchor.target.toLowerCase()!=="_self")||anchor.relList.contains("external"))return null;let raw=anchor.getAttribute("href");if(!raw||raw.length>4096)return null;let url;try{url=new URL(raw,location.href)}catch(_){return null}return !validUrl(url,plan)||url.pathname===location.pathname&&url.search===location.search?null:url},intent=event=>{if(!(event.target instanceof Element))return;let anchor=event.target.closest("a[href]");if(event.type==="pointerover"&&event.relatedTarget instanceof Node&&anchor&&anchor.contains(event.relatedTarget))return;let url=anchorUrl(anchor);if(url)prefetch(url)};
+d.addEventListener("pointerover",intent);d.addEventListener("focusin",intent);d.addEventListener("pointerdown",event=>{if(event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey)intent(event)});d.addEventListener("visibilitychange",()=>{if(d.visibilityState==="hidden")clearPrefetch()});d.addEventListener("click",event=>{if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!(event.target instanceof Element))return;let url=anchorUrl(event.target.closest("a[href]"));if(!url)return;event.preventDefault();save();go(url,true,null)});
+addEventListener("popstate",event=>{let url=new URL(location.href),position=state(event.state);if(!position||!validUrl(url,plan)){hard(url,true);return}go(url,false,position)});addEventListener("pagehide",()=>{g++;if(controller)controller.abort();clearPrefetch()},{once:true})''';
 
 String _replaceOnce(String source, String from, String to) {
   final first = source.indexOf(from);
