@@ -1,4 +1,4 @@
-## Unreleased
+## 0.14.0
 
 * Expanded profile-bound DOM-first navigation to package-owned `SeoStepper`
   routes. Fresh documents initialize idempotently from their delivered step,
@@ -46,8 +46,6 @@
   exposes only the active branch. Shelf applies the same active-field
   projection; without JavaScript all authored branches and the final POST
   remain visible and usable.
-
-## 0.14.0
 
 * Added `SeoConfigurator`, a curated cross-platform choice, quantity and option
   slice. Its semantic builder and native Flutter widget share one bounded pure

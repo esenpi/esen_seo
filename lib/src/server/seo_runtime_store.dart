@@ -273,20 +273,19 @@ final class SeoDomFirstRuntimeArtifact {
         _functionConstructor.hasMatch(javascript)) {
       throw StateError('Runtime "${reference.id}" contains forbidden code.');
     }
-    final verifiedManifest =
-        bundle
-            ? SeoDomFirstRuntimeManifest(
-                schemaVersion: manifest.schemaVersion,
-                contractRevision: manifest.contractRevision,
-                id: manifest.id,
-                kind: manifest.kind,
-                dartVersion: manifest.dartVersion,
-                sha256: manifest.sha256,
-                bytes: manifest.bytes,
-                gzipBytes: manifest.gzipBytes,
-                memberKinds: List<String>.unmodifiable(manifest.memberKinds),
-              )
-            : manifest;
+    final verifiedManifest = bundle
+        ? SeoDomFirstRuntimeManifest(
+            schemaVersion: manifest.schemaVersion,
+            contractRevision: manifest.contractRevision,
+            id: manifest.id,
+            kind: manifest.kind,
+            dartVersion: manifest.dartVersion,
+            sha256: manifest.sha256,
+            bytes: manifest.bytes,
+            gzipBytes: manifest.gzipBytes,
+            memberKinds: List<String>.unmodifiable(manifest.memberKinds),
+          )
+        : manifest;
     return SeoDomFirstRuntimeArtifact._(
       reference: reference,
       manifest: verifiedManifest,
