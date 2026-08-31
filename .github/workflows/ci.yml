@@ -76,6 +76,7 @@ jobs:
           test/dom_first_action_flow_web_test.dart
           test/dom_first_theme_toggle_web_test.dart
           test/dom_first_navigation_web_test.dart
+          test/dom_first_stepper_navigation_web_test.dart
 
   analyzer-minimum:
     name: analyzer 6.11 compatibility

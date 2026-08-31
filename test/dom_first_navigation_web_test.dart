@@ -181,7 +181,7 @@ void main() {
       ),
       'true',
     );
-    expect(web.document.activeElement?.textContent, contains('Target page'));
+    expect(web.document.activeElement?.id, 'target-carousel-slide-2');
     expect(
       web.document.documentElement?.getAttribute('data-mock-fetch-count'),
       '1',
