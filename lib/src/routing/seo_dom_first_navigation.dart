@@ -5,10 +5,12 @@ import 'dart:convert';
 
 export '../renderer/seo_container.dart' show seoDomFirstNavigationHeadAttribute;
 
+import '../renderer/seo_dom_first_runtime_handoff.dart';
 import 'seo_route.dart';
 import 'seo_route_delivery.dart';
 
 const int seoDomFirstNavigationManifestSchema = 1;
+const int seoDomFirstRuntimeHandoffManifestSchema = 2;
 const int seoDomFirstNavigationMaxRoutes = 256;
 const int seoDomFirstNavigationMaxPatternLength = 256;
 const int seoDomFirstNavigationMaxManifestBytes = 32768;
@@ -17,20 +19,49 @@ const String seoDomFirstNavigationManifestAttribute =
 
 /// One ordered route-pattern entry in a DOM-first navigation manifest.
 final class SeoDomFirstNavigationEntry {
-  const SeoDomFirstNavigationEntry({required this.pattern, this.profile});
+  const SeoDomFirstNavigationEntry({
+    required this.pattern,
+    this.profile,
+    this.runtime,
+  });
 
   final String pattern;
   final String? profile;
+
+  /// Package runtime expected for this route, or `null` for a static route.
+  final SeoDomFirstNavigationRuntimeEntry? runtime;
+}
+
+/// One package-owned runtime bound to a route in a handoff manifest.
+final class SeoDomFirstNavigationRuntimeEntry {
+  const SeoDomFirstNavigationRuntimeEntry({
+    required this.kind,
+    required this.sha256,
+    required this.bytes,
+  });
+
+  /// Closed package runtime identity.
+  final String kind;
+
+  /// Lowercase SHA-256 of the exact executable UTF-8 source.
+  final String sha256;
+
+  /// Exact UTF-8 source length.
+  final int bytes;
 }
 
 /// The package-owned route information embedded in one navigable document.
 final class SeoDomFirstNavigationPlan {
   const SeoDomFirstNavigationPlan._({
+    required this.schemaVersion,
     required this.basePath,
     required this.profile,
     required this.entries,
     required this.manifestJson,
   });
+
+  /// Manifest schema selected by the current route profile.
+  final int schemaVersion;
 
   /// Decoded deployment prefix, `/` for an origin-root deployment.
   final String basePath;
@@ -57,6 +88,9 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
 }) {
   final profile = seoDomFirstNavigationProfile(currentRoute);
   if (profile == null) return null;
+  final runtimeHandoff = currentRoute.domFirstFeatures.contains(
+    SeoDomFirstFeature.runtimeHandoff,
+  );
   if (routes.length > seoDomFirstNavigationMaxRoutes) {
     throw ArgumentError.value(
       routes.length,
@@ -109,15 +143,30 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
       SeoDomFirstNavigationEntry(
         pattern: route.path,
         profile: seoDomFirstNavigationProfile(route),
+        runtime: runtimeHandoff ? _handoffRuntime(route) : null,
       ),
     );
   }
+  final schemaVersion = runtimeHandoff
+      ? seoDomFirstRuntimeHandoffManifestSchema
+      : seoDomFirstNavigationManifestSchema;
   final encoded = jsonEncode({
-    'schema': seoDomFirstNavigationManifestSchema,
+    'schema': schemaVersion,
     'base': basePath,
     'profile': profile,
     'routes': [
-      for (final entry in entries) [entry.pattern, entry.profile],
+      for (final entry in entries)
+        if (runtimeHandoff)
+          [
+            entry.pattern,
+            entry.profile,
+            switch (entry.runtime) {
+              final runtime? => [runtime.kind, runtime.sha256, runtime.bytes],
+              null => null,
+            },
+          ]
+        else
+          [entry.pattern, entry.profile],
     ],
   });
   final bytes = utf8.encode(encoded).length;
@@ -130,6 +179,7 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
     );
   }
   return SeoDomFirstNavigationPlan._(
+    schemaVersion: schemaVersion,
     basePath: basePath,
     profile: profile,
     entries: List.unmodifiable(entries),
@@ -157,12 +207,36 @@ String? seoDomFirstNavigationFeatureProfile(
       !features.contains(SeoDomFirstFeature.navigation)) {
     throw StateError('DOM-first prefetch requires navigation');
   }
+  if (features.contains(SeoDomFirstFeature.runtimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw StateError('DOM-first runtime handoff requires navigation');
+  }
   if (!features.contains(SeoDomFirstFeature.navigation)) return null;
   if (!isSeoDomFirstNavigationFeatureProfile(features)) {
     throw StateError('Invalid DOM-first navigation feature profile');
   }
-  final names = features.map((feature) => feature.name).toList()..sort();
+  final names = features
+      .where(
+        (feature) =>
+            feature != SeoDomFirstFeature.collection ||
+            !features.contains(SeoDomFirstFeature.runtimeHandoff),
+      )
+      .map((feature) => feature.name)
+      .toList()
+    ..sort();
   return names.join('.');
+}
+
+SeoDomFirstNavigationRuntimeEntry? _handoffRuntime(SeoRoute route) {
+  if (!route.domFirstFeatures.contains(SeoDomFirstFeature.runtimeHandoff) ||
+      !route.domFirstFeatures.contains(SeoDomFirstFeature.collection)) {
+    return null;
+  }
+  return SeoDomFirstNavigationRuntimeEntry(
+    kind: seoDomFirstCollectionRuntimeKind,
+    sha256: seoDomFirstCollectionHandoffRuntimeSha256,
+    bytes: seoDomFirstCollectionHandoffRuntimeBytes,
+  );
 }
 
 String _decodedNormalizedPath(String raw) {

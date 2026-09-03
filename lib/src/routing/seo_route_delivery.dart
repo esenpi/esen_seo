@@ -16,11 +16,19 @@ enum SeoRouteDelivery {
 enum SeoDomFirstFeature {
   /// Navigate between compatible registered content routes without a reload.
   ///
-  /// The pilot is intentionally compatible only with [themeToggle], [motion]
-  /// and the package-owned [tabs], [carousel] and [stepper] runtimes. Other
-  /// stateful components and every application runtime keep native page
+  /// The default pilot is intentionally compatible only with [themeToggle],
+  /// [motion] and the package-owned [tabs], [carousel] and [stepper] runtimes.
+  /// The separate [runtimeHandoff] profile admits only [collection] instead.
+  /// Other stateful components and every application runtime keep native page
   /// navigation until they define an explicit reinitialization contract.
   navigation,
+
+  /// Load one route-bound package runtime during compatible navigation.
+  ///
+  /// The first pilot supports only [collection], without [prefetch] or an
+  /// application-authored runtime. Every candidate is bound by SHA-256 in the
+  /// package-generated navigation manifest before the browser may execute it.
+  runtimeHandoff,
 
   /// Prefetch an intended compatible navigation target before activation.
   ///
@@ -76,12 +84,26 @@ const Set<SeoDomFirstFeature> seoDomFirstNavigationCompatibleFeatures = {
   SeoDomFirstFeature.motion,
 };
 
+/// Features admitted by the first verified runtime-handoff profile.
+const Set<SeoDomFirstFeature> seoDomFirstRuntimeHandoffCompatibleFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.runtimeHandoff,
+  SeoDomFirstFeature.collection,
+  SeoDomFirstFeature.themeToggle,
+  SeoDomFirstFeature.motion,
+};
+
 /// Whether [features] is one complete profile admitted by client navigation.
 bool isSeoDomFirstNavigationFeatureProfile(
   Set<SeoDomFirstFeature> features,
 ) {
-  if (!features.contains(SeoDomFirstFeature.navigation) ||
-      features.difference(seoDomFirstNavigationCompatibleFeatures).isNotEmpty) {
+  if (!features.contains(SeoDomFirstFeature.navigation)) return false;
+  if (features.contains(SeoDomFirstFeature.runtimeHandoff)) {
+    return features
+        .difference(seoDomFirstRuntimeHandoffCompatibleFeatures)
+        .isEmpty;
+  }
+  if (features.difference(seoDomFirstNavigationCompatibleFeatures).isNotEmpty) {
     return false;
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&

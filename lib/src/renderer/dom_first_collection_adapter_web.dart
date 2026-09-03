@@ -728,9 +728,38 @@ final class _CollectionApplyBoundary {
 
   void listenToHistory(void Function(SeoCollectionState) restore) {
     if (plan.urlCodec == null) return;
-    web.window.addEventListener(
-      'popstate',
-      ((web.Event _) => restore(stateFromUrl())).toJS,
+    final documentRoot = document.documentElement;
+    final routeLocation =
+        '${web.window.location.origin}${web.window.location.pathname}';
+    late final JSFunction historyListener;
+    late final JSFunction navigationListener;
+
+    void removeListeners() {
+      web.window.removeEventListener('popstate', historyListener);
+      documentRoot?.removeEventListener(
+        'esen-seo:navigation',
+        navigationListener,
+      );
+    }
+
+    historyListener = ((web.Event _) {
+      if (!plan.root.isConnected) {
+        removeListeners();
+        return;
+      }
+      final currentLocation =
+          '${web.window.location.origin}${web.window.location.pathname}';
+      if (currentLocation != routeLocation) return;
+      restore(stateFromUrl());
+    }).toJS;
+    navigationListener = ((web.Event _) {
+      if (!plan.root.isConnected) removeListeners();
+    }).toJS;
+
+    web.window.addEventListener('popstate', historyListener);
+    documentRoot?.addEventListener(
+      'esen-seo:navigation',
+      navigationListener,
     );
   }
 

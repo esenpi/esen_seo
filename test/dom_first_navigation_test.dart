@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_prefetch_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_navigation_handoff_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_runtime.g.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_runtime_handoff.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_stepper_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_tabs_runtime.g.dart';
@@ -67,6 +69,19 @@ const _prefetchCarouselNavigation = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.prefetch,
   SeoDomFirstFeature.carousel,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _handoffNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.runtimeHandoff,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const _handoffCollectionNavigation = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.runtimeHandoff,
+  SeoDomFirstFeature.collection,
   SeoDomFirstFeature.themeToggle,
 };
 
@@ -265,6 +280,154 @@ void main() {
         seoDomFirstNavigationProfile(route),
         'motion.navigation.themeToggle',
       );
+
+      final handoff = _route(
+        '/handoff',
+        features: _handoffNavigation,
+      );
+      final collectionHandoff = _route(
+        '/handoff/collection',
+        features: _handoffCollectionNavigation,
+      );
+      expect(
+        seoDomFirstNavigationProfile(handoff),
+        'navigation.runtimeHandoff.themeToggle',
+      );
+      expect(
+        seoDomFirstNavigationProfile(collectionHandoff),
+        seoDomFirstNavigationProfile(handoff),
+      );
+
+      for (final features in const <Set<SeoDomFirstFeature>>[
+        {SeoDomFirstFeature.runtimeHandoff},
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.prefetch,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.tabs,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.carousel,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.stepper,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.configurator,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.editorialWorkflow,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.approvalChecklist,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.actionForm,
+        },
+        {
+          SeoDomFirstFeature.navigation,
+          SeoDomFirstFeature.runtimeHandoff,
+          SeoDomFirstFeature.actionFlow,
+        },
+      ]) {
+        expect(
+          () => _route('/invalid-${features.length}', features: features),
+          throwsArgumentError,
+          reason: '$features',
+        );
+      }
+      expect(
+        () => SeoRoute(
+          path: '/application-handoff',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: _handoffNavigation,
+          applicationRuntime:
+              const SeoDomFirstApplicationRuntime.collection('articles'),
+          meta: (_) => const SeoMeta(),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => seoDomFirstNavigationFeatureProfile(
+          const {SeoDomFirstFeature.runtimeHandoff},
+        ),
+        throwsStateError,
+      );
+      expect(
+        () => seoDomFirstFeatureScriptHtml(
+          const {SeoDomFirstFeature.runtimeHandoff},
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('binds one optional Collection runtime in manifest schema two', () {
+      final home = _route('/handoff', features: _handoffNavigation);
+      final collection = _route(
+        '/handoff/articles',
+        features: _handoffCollectionNavigation,
+      );
+      final legacy = _route('/legacy');
+      final routes = [home, collection, legacy];
+
+      final homePlan = _plan(routes, home);
+      final collectionPlan = _plan(routes, collection);
+      final decoded = jsonDecode(homePlan.manifestJson) as Map<String, dynamic>;
+
+      expect(homePlan.schemaVersion, seoDomFirstRuntimeHandoffManifestSchema);
+      expect(collectionPlan.manifestJson, homePlan.manifestJson);
+      expect(homePlan.profile, 'navigation.runtimeHandoff.themeToggle');
+      expect(homePlan.entries[0].runtime, isNull);
+      expect(homePlan.entries[1].runtime?.kind, 'collection');
+      expect(
+        homePlan.entries[1].runtime?.sha256,
+        seoDomFirstCollectionHandoffRuntimeSha256,
+      );
+      expect(
+        homePlan.entries[1].runtime?.bytes,
+        seoDomFirstCollectionHandoffRuntimeBytes,
+      );
+      expect(decoded['schema'], seoDomFirstRuntimeHandoffManifestSchema);
+      expect(decoded['routes'], [
+        ['/handoff', 'navigation.runtimeHandoff.themeToggle', null],
+        [
+          '/handoff/articles',
+          'navigation.runtimeHandoff.themeToggle',
+          [
+            'collection',
+            seoDomFirstCollectionHandoffRuntimeSha256,
+            seoDomFirstCollectionHandoffRuntimeBytes,
+          ],
+        ],
+        ['/legacy', 'navigation.themeToggle', null],
+      ]);
+
+      final legacyPlan = _plan(routes, legacy);
+      expect(legacyPlan.schemaVersion, seoDomFirstNavigationManifestSchema);
+      expect(
+        (jsonDecode(legacyPlan.manifestJson) as Map<String, dynamic>)['routes'],
+        [
+          ['/handoff', 'navigation.runtimeHandoff.themeToggle'],
+          ['/handoff/articles', 'navigation.runtimeHandoff.themeToggle'],
+          ['/legacy', 'navigation.themeToggle'],
+        ],
+      );
     });
 
     test('preserves route order, profiles and a decoded site prefix', () {
@@ -461,6 +624,20 @@ void main() {
       );
       final prefetchNavigationHtml =
           seoDomFirstFeatureScriptHtml(_prefetchNavigation);
+      final handoffNavigationHtml =
+          seoDomFirstFeatureScriptHtml(_handoffNavigation);
+      final handoffCollectionHtml = seoDomFirstFeatureScriptHtml(
+        _handoffCollectionNavigation,
+        nonce: 'current-nonce',
+      );
+      final handoffBytes = utf8.encode(seoDomFirstNavigationHandoffRuntime);
+      final collectionHandoffBytes =
+          utf8.encode(seoDomFirstCollectionHandoffRuntime);
+      final handoffCombinedBytes = utf8.encode(
+        '$seoDomFirstNavigationHandoffRuntime'
+        '$seoDomFirstCollectionHandoffRuntime'
+        '$seoDomFirstThemeToggleRuntime',
+      );
 
       expect(gzipBytes, lessThanOrEqualTo(25 * 1024));
       expect(
@@ -537,6 +714,46 @@ void main() {
         prefetchNavigationHtml,
         isNot(contains(seoDomFirstNavigationRuntime)),
       );
+      expect(
+        levelNineGzip.encode(handoffBytes).length,
+        lessThanOrEqualTo(8 * 1024),
+      );
+      expect(
+        levelNineGzip.encode(collectionHandoffBytes).length,
+        lessThanOrEqualTo(25 * 1024),
+      );
+      expect(
+        levelNineGzip.encode(handoffCombinedBytes).length,
+        lessThanOrEqualTo(31 * 1024),
+      );
+      expect(
+        handoffNavigationHtml,
+        allOf(
+          contains(seoDomFirstNavigationHandoffRuntime),
+          isNot(contains(seoDomFirstCollectionHandoffRuntime)),
+          isNot(contains(seoDomFirstNavigationRuntime)),
+        ),
+      );
+      expect(
+        handoffCollectionHtml.indexOf(
+          seoDomFirstLoadableRuntimeAttribute,
+        ),
+        lessThan(
+          handoffCollectionHtml.indexOf(seoDomFirstScriptAttribute),
+        ),
+      );
+      expect(
+        handoffCollectionHtml,
+        allOf(
+          contains('$seoDomFirstLoadableRuntimeAttribute="collection"'),
+          contains(
+            '$seoDomFirstRuntimeSha256Attribute="'
+            '$seoDomFirstCollectionHandoffRuntimeSha256"',
+          ),
+          contains(seoDomFirstCollectionHandoffRuntime),
+          contains('nonce="current-nonce"'),
+        ),
+      );
       expect(navigationOnly, isNot(contains('localStorage.getItem')));
       expect(themeOnly, isNot(contains(seoDomFirstNavigationRuntime)));
       expect(
@@ -571,6 +788,30 @@ void main() {
       expect(seoDomFirstNavigationRuntime, isNot(contains('document.write')));
       expect(seoDomFirstNavigationRuntime, isNot(contains('eval(')));
       expect(
+        seoDomFirstNavigationHandoffRuntime,
+        allOf(
+          allOf(
+            contains('subtle.digest("SHA-256"'),
+            contains('currentScript'),
+            contains('createElement("script")'),
+            contains('textContent=runtime.source'),
+            isNot(contains('innerHTML')),
+            isNot(contains('outerHTML')),
+          ),
+          allOf(
+            isNot(contains('document.write')),
+            isNot(contains('eval(')),
+            isNot(contains('Function(')),
+            isNot(contains('import(')),
+            isNot(contains('.src=')),
+          ),
+        ),
+      );
+      expect(
+        seoDomFirstCollectionHandoffRuntime.toLowerCase(),
+        isNot(contains('</script')),
+      );
+      expect(
         seoDomFirstNavigationPrefetchRuntime,
         allOf(
           isNot(contains('innerHTML')),
@@ -593,6 +834,69 @@ void main() {
         lessThan(
           seoDomFirstNavigationRuntime.indexOf('c.replaceWith(nc)'),
         ),
+      );
+    });
+
+    test('renders stable handoff CSS and a route-bound runtime script', () {
+      final home = _route('/handoff', features: _handoffNavigation);
+      final collection = _route(
+        '/handoff/articles',
+        features: _handoffCollectionNavigation,
+      );
+      final routes = [home, collection];
+      final homeHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Home')],
+        features: _handoffNavigation,
+        navigationPlan: _plan(routes, home),
+        interactionNonce: 'trusted',
+      ).toHtmlDocument();
+      final collectionHtml = SeoPage.domFirstFromNodes(
+        body: [
+          SeoNode(tag: 'h1', text: 'Articles'),
+          ...buildSeoCollectionNodes(
+            items: [
+              (
+                title: 'Alpha',
+                searchText: 'Alpha guide',
+                categories: const ['Guide'],
+                sortKey: 1,
+                nodes: [SeoNode(tag: 'article', text: 'Alpha guide')],
+              ),
+              (
+                title: 'Beta',
+                searchText: 'Beta guide',
+                categories: const ['Guide'],
+                sortKey: 2,
+                nodes: [SeoNode(tag: 'article', text: 'Beta guide')],
+              ),
+            ],
+            interactionId: 'articles',
+            interactionLabel: 'Articles',
+          ),
+        ],
+        features: _handoffCollectionNavigation,
+        navigationPlan: _plan(routes, collection),
+        interactionNonce: 'trusted',
+      ).toHtmlDocument();
+
+      expect(homeHtml, contains('esen-seo-collection-toolbar'));
+      final loadableTag = RegExp(
+        '<script $seoDomFirstLoadableRuntimeAttribute=',
+      );
+      expect(loadableTag.allMatches(homeHtml), isEmpty);
+      expect(loadableTag.allMatches(collectionHtml), hasLength(1));
+      expect(collectionHtml, contains('Alpha guide'));
+      expect(collectionHtml, contains('Beta guide'));
+      expect(collectionHtml, isNot(contains('flutter_bootstrap.js')));
+      expect(collectionHtml, isNot(contains('main.dart.js')));
+      expect(collectionHtml, contains(seoDomFirstRuntimeReadyAttribute));
+      expect(
+        collectionHtml.indexOf(seoDomFirstLoadableRuntimeAttribute),
+        lessThan(collectionHtml.indexOf(seoDomFirstScriptAttribute)),
+      );
+      expect(
+        RegExp('nonce="trusted"').allMatches(collectionHtml).length,
+        greaterThanOrEqualTo(3),
       );
     });
 
@@ -721,6 +1025,61 @@ void main() {
       expect(html, isNot(contains('flutter_bootstrap.js')));
     });
 
+    test('SSR keeps one schema-two handoff plan across a subpath', () async {
+      final home = _route('/handoff', features: _handoffNavigation);
+      final collection = _route(
+        '/handoff/articles',
+        features: _handoffCollectionNavigation,
+      );
+      final routes = [home, collection];
+      final expectedPlan = _plan(
+        routes,
+        home,
+        siteBase: 'https://x.dev/repo',
+      );
+      final handler = const Pipeline()
+          .addMiddleware(
+            seoBotMiddleware(
+              routes: routes,
+              siteBase: 'https://x.dev/repo',
+            ),
+          )
+          .addHandler((_) => Response.ok('app'));
+
+      final homeResponse = await _get(
+        handler,
+        'https://x.dev/repo/handoff',
+      );
+      final collectionResponse = await _get(
+        handler,
+        'https://x.dev/repo/handoff/articles',
+      );
+      final homeHtml = await homeResponse.readAsString();
+      final collectionHtml = await collectionResponse.readAsString();
+
+      expect(homeResponse.statusCode, 200);
+      expect(collectionResponse.statusCode, 200);
+      expect(homeHtml, contains(expectedPlan.manifestJson));
+      expect(collectionHtml, contains(expectedPlan.manifestJson));
+      expect(homeHtml, contains('"base":"/repo"'));
+      expect(homeHtml, contains(seoDomFirstNavigationHandoffRuntime));
+      expect(collectionHtml, contains(seoDomFirstNavigationHandoffRuntime));
+      expect(homeHtml, contains('esen-seo-collection-toolbar'));
+      expect(collectionHtml, contains('esen-seo-collection-toolbar'));
+      expect(
+        RegExp('<script $seoDomFirstLoadableRuntimeAttribute=')
+            .allMatches(homeHtml),
+        isEmpty,
+      );
+      expect(
+        RegExp('<script $seoDomFirstLoadableRuntimeAttribute=')
+            .allMatches(collectionHtml),
+        hasLength(1),
+      );
+      expect(homeHtml, isNot(contains('flutter_bootstrap.js')));
+      expect(collectionHtml, isNot(contains('flutter_bootstrap.js')));
+    });
+
     test('prerender writes navigation only to compatible routes', () async {
       final buildDir = await Directory.systemTemp.createTemp(
         'esen_dom_first_navigation',
@@ -760,6 +1119,57 @@ void main() {
         flutterHtml,
         isNot(contains(seoDomFirstNavigationManifestAttribute)),
       );
+    });
+
+    test('prerender binds the loadable runtime only to Collection routes',
+        () async {
+      final buildDir = await Directory.systemTemp.createTemp(
+        'esen_dom_first_handoff',
+      );
+      addTearDown(() => buildDir.delete(recursive: true));
+      File('${buildDir.path}/index.html').writeAsStringSync(_template);
+      final home = _route('/handoff', features: _handoffNavigation);
+      final collection = _route(
+        '/handoff/articles',
+        features: _handoffCollectionNavigation,
+      );
+      final routes = [home, collection];
+      final expectedPlan = _plan(
+        routes,
+        collection,
+        siteBase: 'https://x.dev/repo',
+      );
+
+      await prerenderSite(
+        routes: routes,
+        siteBase: 'https://x.dev/repo',
+        buildDir: buildDir.path,
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+
+      final homeHtml =
+          File('${buildDir.path}/handoff/index.html').readAsStringSync();
+      final collectionHtml = File(
+        '${buildDir.path}/handoff/articles/index.html',
+      ).readAsStringSync();
+
+      expect(homeHtml, contains(expectedPlan.manifestJson));
+      expect(collectionHtml, contains(expectedPlan.manifestJson));
+      expect(
+        RegExp('<script $seoDomFirstLoadableRuntimeAttribute=')
+            .allMatches(homeHtml),
+        isEmpty,
+      );
+      expect(
+        RegExp('<script $seoDomFirstLoadableRuntimeAttribute=')
+            .allMatches(collectionHtml),
+        hasLength(1),
+      );
+      expect(homeHtml, isNot(contains('flutter_bootstrap.js')));
+      expect(collectionHtml, isNot(contains('flutter_bootstrap.js')));
     });
   });
 }

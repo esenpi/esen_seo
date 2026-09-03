@@ -4,6 +4,8 @@ import 'dart:io';
 const _generated = 'lib/src/renderer/seo_dom_first_navigation_runtime.g.dart';
 const _generatedPrefetch =
     'lib/src/renderer/seo_dom_first_navigation_prefetch_runtime.g.dart';
+const _generatedHandoff =
+    'lib/src/renderer/seo_dom_first_navigation_handoff_runtime.g.dart';
 
 Future<void> main(List<String> arguments) async {
   final write = arguments.contains('--write');
@@ -49,9 +51,11 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
 })();''';
   final javascript = _compileRuntime(source);
   final prefetchJavascript = _compileRuntime(_withPrefetch(source));
+  final handoffJavascript = _compileRuntime(_withHandoff(source));
 
   if (!_isSafeInlineRuntime(javascript) ||
-      !_isSafeInlineRuntime(prefetchJavascript)) {
+      !_isSafeInlineRuntime(prefetchJavascript) ||
+      !_isSafeInlineRuntime(handoffJavascript)) {
     stderr.writeln('Refusing a runtime containing unsafe inline code.');
     exitCode = 1;
     return;
@@ -64,6 +68,10 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
     _generatedPrefetch: _generatedSource(
       prefetchJavascript,
       'seoDomFirstNavigationPrefetchRuntime',
+    ),
+    _generatedHandoff: _generatedSource(
+      handoffJavascript,
+      'seoDomFirstNavigationHandoffRuntime',
     ),
   };
   final temp = await Directory.systemTemp.createTemp('esen-navigation-');
@@ -96,7 +104,8 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
     if (write) {
       stdout.writeln(
         'Wrote $_generated (${javascript.length} JS bytes) and '
-        '$_generatedPrefetch (${prefetchJavascript.length} JS bytes).',
+        '$_generatedPrefetch (${prefetchJavascript.length} JS bytes) and '
+        '$_generatedHandoff (${handoffJavascript.length} JS bytes).',
       );
     } else {
       stdout.writeln('DOM-first navigation runtimes are current.');
@@ -191,6 +200,86 @@ String _withPrefetch(String source) {
   source = _replaceOnce(source, _navigationGo, _prefetchNavigationGo);
   return _replaceOnce(source, _navigationEvents, _prefetchNavigationEvents);
 }
+
+String _withHandoff(String source) {
+  source = _replaceOnce(
+    source,
+    'let d=document,w=window,MAX=1048576,MAN=32768,HEAD=64,ELEMENTS=10000,ATTRS=32,',
+    'let d=document,w=window,MAX=1048576,MAN=32768,HEAD=64,ELEMENTS=10000,'
+        'ATTRS=32,RUNTIME=131072,LOAD="data-esen-seo-dom-first-loadable-runtime",'
+        'HASH="data-esen-seo-runtime-sha256",READY="data-esen-seo-runtime-ready",',
+  );
+  source = _replaceOnce(source, 'j.schema!==1', 'j.schema!==2');
+  source = _replaceOnce(
+    source,
+    r'''for(let r of j.routes){if(!Array.isArray(r)||r.length!=2||!plain(r[0])||norm(r[0])==null||(r[1]!==null&&!plain(r[1])))return null}''',
+    r'''for(let r of j.routes){let x=Array.isArray(r)&&r[2];if(!Array.isArray(r)||r.length!=3||!plain(r[0])||norm(r[0])==null||(r[1]!==null&&!plain(r[1]))||(x!==null&&(!Array.isArray(x)||x.length!=3||x[0]!=="collection"||typeof x[1]!=="string"||!/^[a-f0-9]{64}$/.test(x[1])||!Number.isInteger(x[2])||x[2]<1||x[2]>RUNTIME)))return null}''',
+  );
+  source = _replaceOnce(
+    source,
+    r'''profileFor=(url,plan)=>{if(!pagePath(url.pathname))return null;let actual=routePath(url.pathname,plan.base);if(!actual)return null;for(let r of plan.routes)if(matches(actual,r[0]))return r[1];return null},validUrl=''',
+    r'''routeFor=(url,plan)=>{if(!pagePath(url.pathname))return null;let actual=routePath(url.pathname,plan.base);if(!actual)return null;for(let r of plan.routes)if(matches(actual,r[0]))return r;return null},profileFor=(url,plan)=>{let r=routeFor(url,plan);return r&&r[1]},runtimeFor=(url,plan)=>{let r=routeFor(url,plan);return r&&r[2]},validUrl=''',
+  );
+  source = _replaceOnce(
+    source,
+    r'''samePlan=(a,b)=>a.base===b.base&&a.profile===b.profile&&a.routes.length===b.routes.length&&a.routes.every((r,i)=>r[0]===b.routes[i][0]&&r[1]===b.routes[i][1]),''',
+    r'''sameRuntime=(a,b)=>a===null?b===null:Array.isArray(a)&&Array.isArray(b)&&a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2],samePlan=(a,b)=>a.base===b.base&&a.profile===b.profile&&a.routes.length===b.routes.length&&a.routes.every((r,i)=>r[0]===b.routes[i][0]&&r[1]===b.routes[i][1]&&sameRuntime(r[2],b.routes[i][2])),''',
+  );
+  source = _replaceOnce(source, _navigationValidate, _handoffValidate);
+  source = _replaceOnce(
+    source,
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile);if(!current)return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null;',
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile);if(!current||(current.runtime&&current.runtime.node.getAttribute(READY)!=="true"))return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null,runtimeNonce=(d.currentScript&&d.currentScript.nonce)||"",currentPage=location.origin+location.pathname;',
+  );
+  source = _replaceOnce(source, _navigationApply, _handoffApply);
+  source = _replaceOnce(source, _navigationGo, _handoffNavigationGo);
+  source = _replaceOnce(source, _navigationEvents, _handoffNavigationEvents);
+  return source;
+}
+
+const _navigationValidate = r'''validate=(doc,url,expected)=>{
+ let plan=parseManifest(doc);if(!plan||plan.profile!==expected||!validUrl(url,plan)||doc.head.querySelectorAll("base").length)return null;
+ let contents=doc.querySelectorAll('#esen-seo-content[data-esen-seo-dom-first="true"]'),runtimes=doc.querySelectorAll('script[data-esen-seo-dom-first-runtime]'),heads=Array.from(doc.head.querySelectorAll('[data-esen-seo-navigation-head]'));
+ let root=contents[0],rootNames=root&&Array.from(root.attributes).map(a=>a.name).sort().join(",");if(contents.length!=1||root.parentElement!==doc.body||root.localName!=="div"||rootNames!=="data-esen-seo-dom-first,id"||root.dataset.esenSeoDomFirst!=="true"||root.hasAttribute("inert")||/^\s*true\s*$/i.test(root.getAttribute("aria-hidden"))||!validContent(root)||runtimes.length!=1||runtimes[0].parentElement!==doc.body||heads.length>HEAD||heads.some(n=>n.parentElement!==doc.head||!validHead(n)))return null;
+ let lang=(doc.documentElement.getAttribute("lang")||"").trim();if(lang&&!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang))return null;
+ return{plan,content:contents[0],heads,lang}
+};''';
+
+const _handoffValidate =
+    r'''loadable=(doc,url,plan)=>{let expected=runtimeFor(url,plan),nodes=doc.querySelectorAll("script["+LOAD+"]");if(expected===null)return nodes.length?false:null;if(!expected||nodes.length!==1)return false;let node=nodes[0],names=Array.from(node.attributes).map(a=>a.name),allowed=new Set([LOAD,HASH,READY,"nonce"]),source=node.textContent||"",ready=node.getAttribute(READY);if(node.parentElement!==doc.body||names.some(n=>!allowed.has(n))||node.getAttribute(LOAD)!==expected[0]||node.getAttribute(HASH)!==expected[1]||(ready!==null&&ready!=="true")||new TextEncoder().encode(source).byteLength!==expected[2])return false;return{node,source,kind:expected[0],hash:expected[1]}},validate=(doc,url,expected)=>{
+ let plan=parseManifest(doc);if(!plan||plan.profile!==expected||!validUrl(url,plan)||doc.head.querySelectorAll("base").length)return null;
+ let contents=doc.querySelectorAll('#esen-seo-content[data-esen-seo-dom-first="true"]'),runtimes=doc.querySelectorAll('script[data-esen-seo-dom-first-runtime]'),heads=Array.from(doc.head.querySelectorAll('[data-esen-seo-navigation-head]')),runtime=loadable(doc,url,plan);
+ let root=contents[0],rootNames=root&&Array.from(root.attributes).map(a=>a.name).sort().join(",");if(runtime===false||contents.length!=1||root.parentElement!==doc.body||root.localName!=="div"||rootNames!=="data-esen-seo-dom-first,id"||root.dataset.esenSeoDomFirst!=="true"||root.hasAttribute("inert")||/^\s*true\s*$/i.test(root.getAttribute("aria-hidden"))||!validContent(root)||runtimes.length!=1||runtimes[0].parentElement!==doc.body||heads.length>HEAD||heads.some(n=>n.parentElement!==doc.head||!validHead(n)))return null;
+ let lang=(doc.documentElement.getAttribute("lang")||"").trim();if(lang&&!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang))return null;
+ return{plan,content:contents[0],heads,lang,runtime}
+};''';
+
+const _navigationApply = r'''apply=(target,url,push,position)=>{
+let newContent=d.importNode(target.content,true),newManifest=d.importNode(target.plan.node,true),fragment=d.createDocumentFragment();for(let node of target.heads)fragment.append(d.importNode(node,true));
+let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFocus.removeAttribute("data-esen-navigation-focus");oldFocus.removeAttribute("tabindex")}
+ if(push)history.pushState({[stateKey]:1,x:0,y:0},"",url.href);
+ for(let node of d.head.querySelectorAll('[data-esen-seo-navigation-head]'))node.remove();d.head.insertBefore(fragment,manifest);manifest.replaceWith(newManifest);c.replaceWith(newContent);manifest=newManifest;c=newContent;plan=target.plan;if(target.lang)d.documentElement.lang=target.lang;else d.documentElement.removeAttribute("lang");
+ d.documentElement.dispatchEvent(new Event(eventName));focusAndScroll(url,position)
+}''';
+
+const _handoffApply =
+    r'''runRuntime=runtime=>{for(let node of d.querySelectorAll("script["+LOAD+"]"))node.remove();if(!runtime)return true;let node=d.createElement("script");node.setAttribute(LOAD,runtime.kind);node.setAttribute(HASH,runtime.hash);if(runtimeNonce)node.nonce=runtimeNonce;node.textContent=runtime.source;d.body.append(node);return node.getAttribute(READY)==="true"},apply=(target,url,push,position)=>{
+let newContent=d.importNode(target.content,true),newManifest=d.importNode(target.plan.node,true),fragment=d.createDocumentFragment();for(let node of target.heads)fragment.append(d.importNode(node,true));
+let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFocus.removeAttribute("data-esen-navigation-focus");oldFocus.removeAttribute("tabindex")}
+ if(push)history.pushState({[stateKey]:1,x:0,y:0},"",url.href);
+ for(let node of d.head.querySelectorAll('[data-esen-seo-navigation-head]'))node.remove();d.head.insertBefore(fragment,manifest);manifest.replaceWith(newManifest);c.replaceWith(newContent);manifest=newManifest;c=newContent;plan=target.plan;currentPage=url.origin+url.pathname;if(target.lang)d.documentElement.lang=target.lang;else d.documentElement.removeAttribute("lang");
+ d.documentElement.dispatchEvent(new Event(eventName));if(!runRuntime(target.runtime))return false;focusAndScroll(url,position);return true
+}''';
+
+const _handoffNavigationGo =
+    r'''},verifyRuntime=async runtime=>{if(!runtime)return true;let subtle=globalThis.crypto&&globalThis.crypto.subtle;if(!subtle)return false;try{let value=await subtle.digest("SHA-256",new TextEncoder().encode(runtime.source)),actual=Array.from(new Uint8Array(value),b=>b.toString(16).padStart(2,"0")).join("");return actual===runtime.hash}catch(_){return false}},go=async(url,push,position)=>{let token=++g;if(controller)controller.abort();controller=new AbortController;pending=c;pending.setAttribute("aria-busy","true");d.documentElement.dataset.esenNavigationPending="1";try{
+ let response=await fetch(url.href,{headers:{Accept:"text/html"},credentials:"same-origin",redirect:"follow",signal:controller.signal});if(token!==g)return;let length=response.headers.get("content-length"),type=(response.headers.get("content-type")||"").toLowerCase(),finalUrl=new URL(response.url||url.href);if(!finalUrl.hash)finalUrl.hash=url.hash;if(!response.ok||!type.startsWith("text/html")||(length!==null&&(!/^\d+$/.test(length)||Number(length)>MAX))||!validUrl(finalUrl,plan))throw 0;let reader=response.body&&response.body.getReader();if(!reader)throw 0;let decoder=new TextDecoder("utf-8",{fatal:true}),text="",total=0;try{for(;;){let chunk=await reader.read();if(token!==g){reader.cancel();return}if(chunk.done)break;total+=chunk.value.byteLength;if(total>MAX){reader.cancel();throw 0}text+=decoder.decode(chunk.value,{stream:true})}text+=decoder.decode()}catch(_){throw 0}let parsed=new DOMParser().parseFromString(text,"text/html"),target=validate(parsed,finalUrl,plan.profile);if(!target||!samePlan(target.plan,plan)||!await verifyRuntime(target.runtime)||token!==g)throw 0;if(!apply(target,finalUrl,push,position)){hard(finalUrl,true);return}
+ }catch(error){if(token===g&&!(controller&&controller.signal.aborted))hard(url,!push)}finally{if(token===g){if(pending&&pending.isConnected)pending.removeAttribute("aria-busy");delete d.documentElement.dataset.esenNavigationPending;controller=null;pending=null}}
+};''';
+
+const _handoffNavigationEvents =
+    r'''d.addEventListener("click",event=>{if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!(event.target instanceof Element))return;let anchor=event.target.closest("a[href]");if(!anchor||!c.contains(anchor)||anchor.hasAttribute("download")||(anchor.target&&anchor.target.toLowerCase()!=="_self")||anchor.relList.contains("external"))return;let raw=anchor.getAttribute("href");if(!raw||raw.length>4096)return;let url;try{url=new URL(raw,location.href)}catch(_){return}if(!validUrl(url,plan)||url.pathname===location.pathname&&url.search===location.search)return;event.preventDefault();save();go(url,true,null)});
+addEventListener("popstate",event=>{let url=new URL(location.href);if(url.origin+url.pathname===currentPage)return;let position=state(event.state);if(!position||!validUrl(url,plan)){hard(url,true);return}go(url,false,position)});addEventListener("pagehide",()=>{g++;if(controller)controller.abort()},{once:true})''';
 
 const _navigationGo =
     r'''},go=async(url,push,position)=>{let token=++g;if(controller)controller.abort();controller=new AbortController;pending=c;pending.setAttribute("aria-busy","true");d.documentElement.dataset.esenNavigationPending="1";try{

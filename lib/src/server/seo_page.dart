@@ -93,6 +93,14 @@ class SeoPage {
         ),
         enableInteractions = false,
         domFirstFeatures = Set.unmodifiable(features) {
+    if (features.contains(SeoDomFirstFeature.runtimeHandoff) &&
+        applicationRuntime != null) {
+      throw ArgumentError.value(
+        applicationRuntime!.reference,
+        'applicationRuntime',
+        'cannot be combined with runtimeHandoff',
+      );
+    }
     final expectedNavigationProfile =
         seoDomFirstNavigationFeatureProfile(features);
     if ((expectedNavigationProfile == null) != (navigationPlan == null) ||

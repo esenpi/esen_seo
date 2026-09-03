@@ -12,6 +12,8 @@ import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_navigation_prefetch_runtime.g.dart';
 import 'seo_dom_first_navigation_runtime.g.dart';
+import 'seo_dom_first_navigation_handoff_runtime.g.dart';
+import 'seo_dom_first_runtime_handoff.dart';
 import 'seo_dom_first_stepper_runtime.g.dart';
 import 'seo_dom_first_tabs_carousel_runtime.g.dart';
 import 'seo_dom_first_tabs_runtime.g.dart';
@@ -288,6 +290,10 @@ String seoDomFirstFeatureStyleHtml(
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
+  } else if (features.contains(SeoDomFirstFeature.runtimeHandoff)) {
+    // Handoff routes keep this stylesheet stable while the Collection runtime
+    // itself remains route-local and loadable.
+    css.write(seoDomFirstCollectionStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.configurator)) {
     css.write(seoDomFirstConfiguratorStylesheet);
@@ -326,6 +332,14 @@ String seoDomFirstFeatureScriptHtml(
       'prefetch requires navigation',
     );
   }
+  if (features.contains(SeoDomFirstFeature.runtimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'features',
+      'runtimeHandoff requires navigation',
+    );
+  }
   if (features.contains(SeoDomFirstFeature.navigation) &&
       !isSeoDomFirstNavigationFeatureProfile(features)) {
     throw ArgumentError.value(
@@ -344,9 +358,11 @@ String seoDomFirstFeatureScriptHtml(
 
   if (features.contains(SeoDomFirstFeature.navigation)) {
     addRuntime(
-      features.contains(SeoDomFirstFeature.prefetch)
-          ? seoDomFirstNavigationPrefetchRuntime
-          : seoDomFirstNavigationRuntime,
+      features.contains(SeoDomFirstFeature.runtimeHandoff)
+          ? seoDomFirstNavigationHandoffRuntime
+          : features.contains(SeoDomFirstFeature.prefetch)
+              ? seoDomFirstNavigationPrefetchRuntime
+              : seoDomFirstNavigationRuntime,
     );
   }
 
@@ -361,7 +377,8 @@ String seoDomFirstFeatureScriptHtml(
   if (features.contains(SeoDomFirstFeature.stepper)) {
     addRuntime(seoDomFirstStepperRuntime);
   }
-  if (features.contains(SeoDomFirstFeature.collection)) {
+  if (features.contains(SeoDomFirstFeature.collection) &&
+      !features.contains(SeoDomFirstFeature.runtimeHandoff)) {
     addRuntime(seoDomFirstCollectionRuntime);
   }
   if (features.contains(SeoDomFirstFeature.actionForm)) {
@@ -374,7 +391,8 @@ String seoDomFirstFeatureScriptHtml(
     addRuntime(seoDomFirstThemeToggleRuntime);
   }
   if (runtime.isEmpty) return '';
-  if (features.contains(SeoDomFirstFeature.collection)) {
+  if (features.contains(SeoDomFirstFeature.collection) &&
+      !features.contains(SeoDomFirstFeature.runtimeHandoff)) {
     runtime.write(
       ';delete document.documentElement.dataset.esenCollectionPending',
     );
@@ -389,9 +407,20 @@ String seoDomFirstFeatureScriptHtml(
       ';delete document.documentElement.dataset.esenInteractionPending',
     );
   }
-  return '<script $seoDomFirstScriptAttribute$nonceAttribute>'
+  final persistent = '<script $seoDomFirstScriptAttribute$nonceAttribute>'
       '$runtime</script>';
+  if (!features.contains(SeoDomFirstFeature.runtimeHandoff) ||
+      !features.contains(SeoDomFirstFeature.collection)) {
+    return persistent;
+  }
+  return _collectionHandoffScriptHtml(nonce: nonce) + persistent;
 }
+
+String _collectionHandoffScriptHtml({String? nonce}) =>
+    '<script $seoDomFirstLoadableRuntimeAttribute="'
+    '$seoDomFirstCollectionRuntimeKind" $seoDomFirstRuntimeSha256Attribute="'
+    '$seoDomFirstCollectionHandoffRuntimeSha256"${_nonceAttribute(nonce)}>'
+    '$seoDomFirstCollectionHandoffRuntime</script>';
 
 String _nonceAttribute(String? nonce) {
   final value = nonce?.trim();

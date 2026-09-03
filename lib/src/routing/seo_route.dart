@@ -251,7 +251,8 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       'domFirstFeatures',
       'navigation supports themeToggle and motion, but stepper cannot share '
           'one profile with tabs or carousel; prefetch supports at most one '
-          'of tabs or carousel and does not support stepper',
+          'of tabs or carousel and does not support stepper; runtimeHandoff '
+          'supports only the optional package-owned collection runtime',
     );
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&
@@ -260,6 +261,14 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       features,
       'domFirstFeatures',
       'prefetch requires navigation',
+    );
+  }
+  if (features.contains(SeoDomFirstFeature.runtimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'domFirstFeatures',
+      'runtimeHandoff requires navigation',
     );
   }
   return Set<SeoDomFirstFeature>.unmodifiable(features);

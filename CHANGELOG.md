@@ -14,6 +14,16 @@
   reported 2G connections, and never mutates the page before activation.
   Existing navigation runtimes remain byte-identical; the budgeted pilot may
   combine prefetch with theme, motion and at most one of Tabs or Carousel.
+* Added a verified runtime-handoff profile for navigation between static
+  DOM-first routes and routes using the package-owned `SeoCollection` runtime.
+  Manifest schema 2 binds the exact route-local runtime identity, byte length
+  and SHA-256; fetched code remains inert until Web Crypto verifies it and is
+  executed with the current trusted CSP nonce. State is reconstructed from the
+  destination document and URL, stale instances retire their History listener,
+  and every validation, browser or initialization failure returns to ordinary
+  document navigation. Existing navigation and prefetch output remains
+  byte-identical. Applications with an exhaustive switch over
+  `SeoDomFirstFeature` must handle the new `runtimeHandoff` value.
 
 ## 0.14.0
 

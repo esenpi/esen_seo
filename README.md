@@ -75,8 +75,9 @@ The HTML only exists on the web.
   Stepper family in one verified runtime bundle; Collection remains a
   standalone runtime under the same fixed JavaScript budget. A separate
   profile-bound navigation pilot can accelerate links between compatible
-  document routes and reinitialize package-owned Tabs, Carousel or Stepper
-  controls while retaining complete no-JavaScript pages.
+  document routes and reinitialize package-owned controls while retaining
+  complete no-JavaScript pages. Its verified handoff profile can also move
+  between static routes and a route-bound package Collection runtime.
 - **AI crawlers & instant indexing**: `llms.txt` and `llms-full.txt`
   generated from the route table, and IndexNow pings so search engines
   pick up changes in minutes instead of days.
@@ -1006,15 +1007,51 @@ the combined Tabs-and-Carousel runtime. Unsupported combinations fail when
 the route is constructed; existing navigation profiles continue to use their
 unchanged runtime.
 
-Navigation currently cannot be combined with Collection, forms, application
-runtimes or Stepper Effects. Those links deliberately retain native multi-page
-navigation until their state and reinitialization contracts are explicit.
-Modified clicks, downloads, external targets, fragments on the current page,
-malformed responses and profile changes likewise stay native or fall back to a
-full document request. Without JavaScript every route remains a complete,
-directly navigable HTML page. `siteBase` is required when any route selects
-`SeoDomFirstFeature.navigation`, including subpath deployments such as GitHub
-Pages.
+`SeoDomFirstFeature.runtimeHandoff` is a separate, non-prefetching profile for
+routes that differ only by the presence of the package-owned Collection
+runtime:
+
+```dart
+const handoffFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.runtimeHandoff,
+  SeoDomFirstFeature.themeToggle,
+};
+
+const collectionHandoffFeatures = {
+  ...handoffFeatures,
+  SeoDomFirstFeature.collection,
+};
+```
+
+Use `handoffFeatures` on the static routes in that navigation group and
+`collectionHandoffFeatures` on each route whose body contains the Collection.
+The route manifest binds each destination to either no loadable runtime or the
+exact Collection runtime identity, UTF-8 byte length and SHA-256. A fetched
+script remains inert text until Web Crypto verifies it against the trusted
+initial manifest. It is then executed once with the nonce of the already
+running package script, never a nonce supplied by the fetched document. A
+missing browser capability, changed manifest, duplicate or malformed marker,
+length or digest mismatch, stale response, blocked script or runtime that does
+not reach its ready marker falls back to a full document request. Collection
+state is rebuilt from the destination HTML and URL; it is not carried across
+documents. Every route in this profile receives the same Collection structural
+CSS, while only a Collection route carries its loadable runtime.
+Production handoff expects HTTPS so Web Crypto is available. With a nonce-based
+CSP, provide `domFirstNonce` as for the other package runtimes; otherwise an
+unavailable verifier or blocked dynamic script deliberately uses full
+navigation.
+
+Outside that explicit handoff profile, navigation cannot be combined with
+Collection. Forms, application runtimes and Stepper Effects remain incompatible
+with every navigation profile. Those links deliberately retain native
+multi-page navigation until their state and reinitialization contracts are
+explicit. Modified clicks, downloads, external targets, fragments on the
+current page, malformed responses and profile changes likewise stay native or
+fall back to a full document request. Without JavaScript every route remains a
+complete, directly navigable HTML page. `siteBase` is required when any route
+selects `SeoDomFirstFeature.navigation`, including subpath deployments such as
+GitHub Pages.
 
 ### Curated action forms
 
