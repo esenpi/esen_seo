@@ -244,6 +244,11 @@ SeoBarChart(
 - **`SeoBreadcrumbs`** — a trail as `<nav><ol><li>` with real links.
 - **`SeoFigure`** — image plus caption as `<figure>`/`<figcaption>`,
   with the dimensions that keep the layout from jumping.
+- **`SeoResponsiveImage`** — one fallback image and bounded width variants
+  become a native Flutter image and semantic `<picture>`/`srcset` markup.
+  Intrinsic dimensions reserve the same aspect ratio on both sides; typed
+  AVIF/WebP sources, `sizes`, loading and fetch-priority hints improve delivery
+  without JavaScript.
 - **`SeoTestimonial`** — a customer quote as `<blockquote>` with its
   attribution beside it, the way the HTML spec asks for.
 - **`SeoRichText`** — inline importance, emphasis, code and links from one
@@ -279,6 +284,54 @@ arbitrary `TextStyle`, gesture recognizers or `WidgetSpan`. Paint details do
 not reliably identify a URL or the difference between importance and visual
 boldness. Role-specific Flutter styles remain configurable on `SeoRichText`;
 the HTML elements can be styled with ordinary CSS.
+
+Responsive images use the fallback encoding for Flutter and expose alternate
+encodings to HTML. Every source must therefore depict the same image; arbitrary
+media queries and art direction are intentionally not part of this contract.
+For cross-platform network loading, use absolute HTTP(S) URLs. Relative URLs
+remain useful for web-only assets. Width-candidate URLs must percent-encode
+syntax separators such as whitespace, commas and quotes.
+
+```dart
+SeoResponsiveImage(
+  src: 'https://cdn.example.com/hero-1280.jpg',
+  alt: 'Product dashboard',
+  width: 1280,
+  height: 720,
+  candidates: const [
+    SeoResponsiveImageCandidate(
+      src: 'https://cdn.example.com/hero-480.jpg',
+      width: 480,
+    ),
+    SeoResponsiveImageCandidate(
+      src: 'https://cdn.example.com/hero-800.jpg',
+      width: 800,
+    ),
+  ],
+  sources: const [
+    SeoResponsiveImageSource(
+      format: SeoResponsiveImageFormat.avif,
+      candidates: [
+        SeoResponsiveImageCandidate(
+          src: 'https://cdn.example.com/hero-480.avif',
+          width: 480,
+        ),
+        SeoResponsiveImageCandidate(
+          src: 'https://cdn.example.com/hero-1280.avif',
+          width: 1280,
+        ),
+      ],
+    ),
+  ],
+  sizes: '(max-width: 48rem) 100vw, 48rem',
+  loading: SeoResponsiveImageLoading.eager,
+  fetchPriority: SeoResponsiveImageFetchPriority.high,
+)
+// Flutter: selects the smallest sufficient fallback candidate from the
+// measured width and device-pixel ratio.
+// HTML: <picture><source type="image/avif" srcset="...">
+//       <img src="..." srcset="..." sizes="..." width="1280" height="720">
+```
 
 Five of them close a different kind of hole: content Flutter never
 builds cannot be mirrored, because the mirror walks the widget tree.
@@ -1889,8 +1942,8 @@ covers the first two and helps with the third.
 
 ## Status
 
-Young package under active development, covered by 555 unit and widget
-tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
+Young package under active development, covered by more than 980 unit and
+widget tests — the pipeline (extensions, smart defaults, meta/OpenGraph,
 JSON-LD, routing, bot middleware, prerendering), the widget library, and
 a set of tests that feed hostile input through every path to HTML.
 

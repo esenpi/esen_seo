@@ -76,6 +76,9 @@ const String seoLayoutSpacingRules =
     '#$seoContainerId ul,#$seoContainerId ol{padding-left:1.5rem}\n'
     '#$seoContainerId li{margin:.25rem 0}\n'
     '#$seoContainerId img{max-width:100%;height:auto}\n'
+    '#$seoContainerId .esen-seo-responsive-image{display:block}\n'
+    '#$seoContainerId .esen-seo-responsive-image>img'
+    '{display:block;width:100%;height:auto}\n'
     '#$seoContainerId blockquote{margin:0 0 1rem;padding-left:1rem}\n';
 
 // ──────────────────────────── token model ────────────────────────────

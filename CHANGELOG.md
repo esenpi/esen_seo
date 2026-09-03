@@ -1,5 +1,12 @@
 ## Unreleased
 
+* Added `SeoResponsiveImage`, a pure responsive-image definition and native
+  Flutter widget that selects bounded fallback width variants from measured
+  layout width and device-pixel ratio. The same definition renders semantic
+  `<picture>`, typed AVIF/WebP `<source>` elements, canonical `srcset`, `sizes`,
+  intrinsic dimensions, loading and fetch-priority hints without JavaScript.
+  Invalid or duplicate optional variants are omitted without poisoning the
+  required fallback.
 * Added intent-bound prefetching as an explicit extension of profile-bound
   DOM-first navigation. It retains at most one short-lived document only after
   the complete navigation validator accepts it, coalesces an activation with

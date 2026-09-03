@@ -24,6 +24,17 @@ export 'src/components/seo_collection_transition.dart';
 export 'src/components/seo_collection_url.dart';
 export 'src/components/seo_motion.dart' show SeoMotionPreset;
 export 'src/components/seo_rich_text.dart';
+export 'src/components/seo_responsive_image.dart'
+    show
+        SeoResponsiveImageCandidate,
+        SeoResponsiveImageFetchPriority,
+        SeoResponsiveImageFormat,
+        SeoResponsiveImageLoading,
+        SeoResponsiveImageSource,
+        buildSeoResponsiveImageNodes,
+        seoResponsiveImageMaxCandidates,
+        seoResponsiveImageMaxDimension,
+        seoResponsiveImageMaxSources;
 export 'src/components/seo_stepper_transition.dart';
 export 'src/components/seo_tabs_transition.dart';
 export 'src/components/seo_theme_transition.dart';

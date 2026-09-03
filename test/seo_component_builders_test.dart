@@ -13,7 +13,7 @@ void main() {
   const renderer = HtmlRenderer();
 
   group('pure component builders', () {
-    test('all fourteen builders are available through core.dart', () {
+    test('all fifteen builders are available through core.dart', () {
       const navItems = [
         _NavItem('Products', url: '/products', children: [
           _NavItem('SEO', url: '/products/seo'),
@@ -64,6 +64,15 @@ void main() {
           data: const [(label: 'A', value: 2, colorArgb: null)],
         )),
         'rating': renderer.render(buildSeoRatingNodes(value: 4.5)),
+        'responsiveImage': renderer.render(buildSeoResponsiveImageNodes(
+          src: '/image-800.jpg',
+          alt: 'Responsive image',
+          width: 800,
+          height: 600,
+          candidates: const [
+            SeoResponsiveImageCandidate(src: '/image-400.jpg', width: 400),
+          ],
+        )),
         'richText': renderer.render(buildSeoRichTextNodes(
           spans: const [SeoRichTextSpan.strong(text: 'Important')],
         )),
@@ -89,7 +98,7 @@ void main() {
         )),
       };
 
-      expect(output, hasLength(14));
+      expect(output, hasLength(15));
       expect(output.values, everyElement(isNotEmpty));
       expect(output['navMenu'], contains('<ul><li><a href="/products">'));
       expect(output['navMenu'], isNot(contains('data-esen-component')));
@@ -101,6 +110,8 @@ void main() {
       expect(output['tabs'], isNot(contains('data-esen-component')));
       expect(output['tabs'], isNot(contains('<button')));
       expect(output['richText'], contains('<strong>Important</strong>'));
+      expect(output['responsiveImage'], contains('<picture'));
+      expect(output['responsiveImage'], contains('srcset='));
       expect(output['stepper'], contains('<ol><li><h3>Account</h3>'));
     });
 

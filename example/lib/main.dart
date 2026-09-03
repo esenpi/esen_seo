@@ -98,21 +98,19 @@ class HomePage extends StatelessWidget {
             'Smart Defaults — page never breaks',
           ]),
 
-          // Image().seo(...) → <img src="..." alt="..." width="800"
-          // height="400" loading="lazy"/>. Explizite Dimensionen helfen
-          // Crawlern beim Layout (Core Web Vitals: CLS); ohne alt würde
-          // das semanticLabel übernommen.
+          // One responsive definition drives Flutter's selected URL and the
+          // server-side <picture>/<source>/<img srcset> tree.
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              'https://picsum.photos/800/400',
-              semanticLabel: 'Demo Image',
-              errorBuilder: (context, error, stack) => const SizedBox.shrink(),
-            ).seo(
+            child: const SeoResponsiveImage(
+              src: demoImageSrc,
               alt: 'esen_seo demo image',
-              width: 800,
-              height: 400,
-              lazy: true,
+              width: 1200,
+              height: 600,
+              candidates: demoImageCandidates,
+              sizes: '(max-width: 44rem) 100vw, 44rem',
+              loading: SeoResponsiveImageLoading.eager,
+              fetchPriority: SeoResponsiveImageFetchPriority.high,
             ),
           ),
 

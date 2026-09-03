@@ -9,6 +9,18 @@ import 'application_stepper_transition.dart';
 
 const siteBase = 'https://esen.software';
 
+const demoImageSrc = 'https://picsum.photos/seed/esen_seo_demo/1200/600';
+const demoImageCandidates = <SeoResponsiveImageCandidate>[
+  SeoResponsiveImageCandidate(
+    src: 'https://picsum.photos/seed/esen_seo_demo/400/200',
+    width: 400,
+  ),
+  SeoResponsiveImageCandidate(
+    src: 'https://picsum.photos/seed/esen_seo_demo/800/400',
+    width: 800,
+  ),
+];
+
 typedef DemoTabData = ({String content, String label});
 typedef DemoCarouselData = ({String content, String label});
 typedef DemoCollectionData = ({
@@ -251,6 +263,16 @@ final seoRoutes = [
         SeoNode(tag: 'li', text: 'Bot-aware SSR Server — pure Dart'),
         SeoNode(tag: 'li', text: 'Smart Defaults — page never breaks'),
       ]),
+      ...buildSeoResponsiveImageNodes(
+        src: demoImageSrc,
+        alt: 'esen_seo demo image',
+        width: 1200,
+        height: 600,
+        candidates: demoImageCandidates,
+        sizes: '(max-width: 44rem) 100vw, 44rem',
+        loading: SeoResponsiveImageLoading.eager,
+        fetchPriority: SeoResponsiveImageFetchPriority.high,
+      ),
       SeoNode(tag: 'section', children: [
         SeoNode(tag: 'h2', text: 'About'),
         SeoNode(
