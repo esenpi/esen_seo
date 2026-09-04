@@ -1,5 +1,14 @@
 ## Unreleased
 
+* Added explicit typed application-runtime handoff profiles and manifest
+  schema 4, with Configurator as the second admitted standalone family. Static
+  and active routes bind the same validated kind and artifact id, receive
+  stable profile-specific structural CSS and reuse one immutable verified
+  runtime snapshot. Browser navigation verifies the exact source before
+  replacement, selects only a package-owned kind-specific readiness suffix and
+  rebuilds Configurator state from each destination document. The existing
+  implicit Collection schema-3 profile and all earlier navigation runtime
+  files remain byte-identical.
 * Added `SeoResponsiveImage`, a pure responsive-image definition and native
   Flutter widget that selects bounded fallback width variants from measured
   layout width and device-pixel ratio. The same definition renders semantic

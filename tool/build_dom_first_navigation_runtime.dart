@@ -8,6 +8,8 @@ const _generatedHandoff =
     'lib/src/renderer/seo_dom_first_navigation_handoff_runtime.g.dart';
 const _generatedApplicationHandoff = 'lib/src/renderer/'
     'seo_dom_first_navigation_application_handoff_runtime.g.dart';
+const _generatedApplicationProfile = 'lib/src/renderer/'
+    'seo_dom_first_navigation_application_profile_runtime.g.dart';
 
 Future<void> main(List<String> arguments) async {
   final write = arguments.contains('--write');
@@ -56,11 +58,14 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
   final handoffJavascript = _compileRuntime(_withHandoff(source));
   final applicationHandoffJavascript =
       _compileRuntime(_withApplicationHandoff(source));
+  final applicationProfileJavascript =
+      _compileRuntime(_withApplicationProfileHandoff(source));
 
   if (!_isSafeInlineRuntime(javascript) ||
       !_isSafeInlineRuntime(prefetchJavascript) ||
       !_isSafeInlineRuntime(handoffJavascript) ||
-      !_isSafeInlineRuntime(applicationHandoffJavascript)) {
+      !_isSafeInlineRuntime(applicationHandoffJavascript) ||
+      !_isSafeInlineRuntime(applicationProfileJavascript)) {
     stderr.writeln('Refusing a runtime containing unsafe inline code.');
     exitCode = 1;
     return;
@@ -81,6 +86,10 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
     _generatedApplicationHandoff: _generatedSource(
       applicationHandoffJavascript,
       'seoDomFirstNavigationApplicationHandoffRuntime',
+    ),
+    _generatedApplicationProfile: _generatedSource(
+      applicationProfileJavascript,
+      'seoDomFirstNavigationApplicationProfileRuntime',
     ),
   };
   final temp = await Directory.systemTemp.createTemp('esen-navigation-');
@@ -116,7 +125,9 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
         '$_generatedPrefetch (${prefetchJavascript.length} JS bytes) and '
         '$_generatedHandoff (${handoffJavascript.length} JS bytes) and '
         '$_generatedApplicationHandoff '
-        '(${applicationHandoffJavascript.length} JS bytes).',
+        '(${applicationHandoffJavascript.length} JS bytes) and '
+        '$_generatedApplicationProfile '
+        '(${applicationProfileJavascript.length} JS bytes).',
       );
     } else {
       stdout.writeln('DOM-first navigation runtimes are current.');
@@ -295,6 +306,46 @@ String _withApplicationHandoff(String source) {
   );
   source = _replaceOnce(source, _navigationGo, _handoffNavigationGo);
   source = _replaceOnce(source, _navigationEvents, _handoffNavigationEvents);
+  return source;
+}
+
+String _withApplicationProfileHandoff(String source) {
+  source = _withApplicationHandoff(source);
+  source = _replaceOnce(source, 'j.schema!==3', 'j.schema!==4');
+  source = _replaceOnce(
+    source,
+    r'''x[1]!=="collection"||typeof x[2]''',
+    r'''(x[1]!=="collection"&&x[1]!=="configurator")||typeof x[2]''',
+  );
+  source = _replaceOnce(
+    source,
+    'EPILOGUE="\\n;delete document.documentElement.dataset.'
+        'esenCollectionPending;document.currentScript&&document.currentScript.'
+        'setAttribute(\\"data-esen-seo-runtime-ready\\",\\"true\\")",',
+    'epilogue=kind=>kind==="collection"?"\\n;delete document.'
+        'documentElement.dataset.esenCollectionPending;document.currentScript'
+        '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
+        '\\",\\"true\\")":kind==="configurator"?"\\n;delete document.'
+        'documentElement.dataset.esenInteractionPending;document.currentScript'
+        '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
+        '\\",\\"true\\")":null,',
+  );
+  source = _replaceOnce(
+    source,
+    'ready=node.getAttribute(READY);if',
+    'ready=node.getAttribute(READY),ending;if',
+  );
+  source = _replaceOnce(
+    source,
+    '||!raw.endsWith(EPILOGUE))return false;let source=raw.slice(0,-EPILOGUE.length);',
+    '||!(ending=epilogue(expected[1]))||!raw.endsWith(ending))return false;'
+        'let source=raw.slice(0,-ending.length);',
+  );
+  source = _replaceOnce(
+    source,
+    'node.textContent=runtime.source+EPILOGUE;',
+    'node.textContent=runtime.source+epilogue(runtime.kind);',
+  );
   return source;
 }
 

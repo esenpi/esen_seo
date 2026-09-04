@@ -19,9 +19,9 @@ enum SeoDomFirstFeature {
   /// The default pilot is intentionally compatible only with [themeToggle],
   /// [motion] and the package-owned [tabs], [carousel] and [stepper] runtimes.
   /// The separate [runtimeHandoff] profile admits only [collection] instead;
-  /// [applicationRuntimeHandoff] admits one standalone application-authored
-  /// Collection runtime. Other stateful components keep native page navigation
-  /// until they define an explicit reinitialization contract.
+  /// [applicationRuntimeHandoff] admits a closed verified application profile.
+  /// Other stateful components keep native page navigation until they define
+  /// an explicit reinitialization contract.
   navigation,
 
   /// Load one route-bound package runtime during compatible navigation.
@@ -31,10 +31,11 @@ enum SeoDomFirstFeature {
   /// package-generated navigation manifest before the browser may execute it.
   runtimeHandoff,
 
-  /// Load one verified application-authored Collection runtime during navigation.
+  /// Load one verified application-authored runtime during navigation.
   ///
-  /// This separate pilot requires [navigation] and a standalone application
-  /// Collection runtime. It does not widen [runtimeHandoff], which remains
+  /// This separate profile requires [navigation]. The legacy form admits one
+  /// Collection runtime; an explicit typed route profile also admits the
+  /// Configurator. It does not widen [runtimeHandoff], which remains
   /// package-owned.
   applicationRuntimeHandoff,
 
@@ -101,7 +102,7 @@ const Set<SeoDomFirstFeature> seoDomFirstRuntimeHandoffCompatibleFeatures = {
   SeoDomFirstFeature.motion,
 };
 
-/// Features admitted by the application Collection runtime-handoff pilot.
+/// Features admitted by a verified application runtime-handoff profile.
 const Set<SeoDomFirstFeature>
     seoDomFirstApplicationRuntimeHandoffCompatibleFeatures = {
   SeoDomFirstFeature.navigation,

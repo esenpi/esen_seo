@@ -13,6 +13,7 @@ import 'seo_route_delivery.dart';
 const int seoDomFirstNavigationManifestSchema = 1;
 const int seoDomFirstRuntimeHandoffManifestSchema = 2;
 const int seoDomFirstApplicationRuntimeHandoffManifestSchema = 3;
+const int seoDomFirstTypedApplicationRuntimeHandoffManifestSchema = 4;
 const int seoDomFirstNavigationMaxRoutes = 256;
 const int seoDomFirstNavigationMaxPatternLength = 256;
 const int seoDomFirstNavigationMaxManifestBytes = 32768;
@@ -74,6 +75,7 @@ final class SeoDomFirstNavigationPlan {
     required this.profile,
     required this.entries,
     required this.currentRuntime,
+    required this.profileRuntime,
     required this.manifestJson,
   });
 
@@ -91,6 +93,13 @@ final class SeoDomFirstNavigationPlan {
 
   /// Runtime descriptor selected by the route for which this plan was built.
   final SeoDomFirstNavigationRuntimeEntry? currentRuntime;
+
+  /// Verified runtime identity shared by this explicit handoff profile.
+  ///
+  /// The value is also available on static routes, whose [currentRuntime] is
+  /// null. Legacy schema-3 profiles derive the same descriptor from their one
+  /// admitted Collection route.
+  final SeoDomFirstNavigationRuntimeEntry? profileRuntime;
 
   /// Script-safe JSON consumed by the package browser runtime.
   final String manifestJson;
@@ -116,6 +125,8 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
   final applicationRuntimeHandoff = currentRoute.domFirstFeatures.contains(
     SeoDomFirstFeature.applicationRuntimeHandoff,
   );
+  final typedApplicationRuntimeHandoff = applicationRuntimeHandoff &&
+      currentRoute.applicationRuntimeHandoffProfile != null;
   if (routes.length > seoDomFirstNavigationMaxRoutes) {
     throw ArgumentError.value(
       routes.length,
@@ -133,10 +144,11 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
     );
   }
   if (applicationRuntimeHandoff) {
-    _validateApplicationHandoffRuntimes(
+    _validateApplicationHandoffProfile(
       routes,
       applicationRuntimes,
       profile,
+      typed: typedApplicationRuntimeHandoff,
     );
   }
   final origin = Uri.tryParse(siteBase.trim());
@@ -186,7 +198,9 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
     );
   }
   final schemaVersion = applicationRuntimeHandoff
-      ? seoDomFirstApplicationRuntimeHandoffManifestSchema
+      ? typedApplicationRuntimeHandoff
+          ? seoDomFirstTypedApplicationRuntimeHandoffManifestSchema
+          : seoDomFirstApplicationRuntimeHandoffManifestSchema
       : runtimeHandoff
           ? seoDomFirstRuntimeHandoffManifestSchema
           : seoDomFirstNavigationManifestSchema;
@@ -241,6 +255,14 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
     profile: profile,
     entries: List.unmodifiable(entries),
     currentRuntime: entries[currentIndex].runtime,
+    profileRuntime: applicationRuntimeHandoff
+        ? _applicationHandoffProfileRuntime(
+            routes,
+            applicationRuntimes,
+            profile,
+            typed: typedApplicationRuntimeHandoff,
+          )
+        : null,
     manifestJson: manifestJson,
   );
 }
@@ -258,7 +280,12 @@ String? seoDomFirstNavigationProfile(SeoRoute route) {
       (route.applicationRuntime != null && !applicationHandoff)) {
     throw StateError('Invalid DOM-first navigation route');
   }
-  return seoDomFirstNavigationFeatureProfile(route.domFirstFeatures);
+  final featureProfile =
+      seoDomFirstNavigationFeatureProfile(route.domFirstFeatures)!;
+  final applicationProfile = route.applicationRuntimeHandoffProfile;
+  if (applicationProfile == null) return featureProfile;
+  return '$featureProfile.application.${applicationProfile.kind}.'
+      '${applicationProfile.id}';
 }
 
 /// Returns the stable profile represented by a compatible [features] set.
@@ -329,35 +356,64 @@ SeoDomFirstNavigationRuntimeEntry? _applicationHandoffRuntime(
   return runtime;
 }
 
-void _validateApplicationHandoffRuntimes(
+void _validateApplicationHandoffProfile(
   List<SeoRoute> routes,
   Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
       runtimes,
-  String profile,
-) {
+  String profile, {
+  required bool typed,
+}) {
   final references = <SeoDomFirstApplicationRuntime>{};
+  final profileReferences = <SeoDomFirstApplicationRuntime>{};
   for (final route in routes) {
     if (!route.domFirstFeatures
             .contains(SeoDomFirstFeature.applicationRuntimeHandoff) ||
         seoDomFirstNavigationProfile(route) != profile) {
       continue;
     }
+    final profileReference = route.applicationRuntimeHandoffProfile;
+    if (profileReference != null) profileReferences.add(profileReference);
     final reference = route.applicationRuntime;
     if (reference != null) references.add(reference);
+  }
+  if (typed && profileReferences.length != 1) {
+    throw ArgumentError.value(
+      profileReferences,
+      'routes',
+      'an explicit applicationRuntimeHandoff profile must bind one runtime '
+          'reference on every compatible route',
+    );
   }
   if (references.length > 1) {
     throw ArgumentError.value(
       references,
       'routes',
-      'applicationRuntimeHandoff supports one distinct collection runtime',
+      'applicationRuntimeHandoff supports one distinct runtime per profile',
     );
   }
-  for (final reference in references) {
-    if (reference is! SeoDomFirstCollectionApplicationRuntime) {
+  if (typed &&
+      references.any((reference) => !profileReferences.contains(reference))) {
+    throw ArgumentError.value(
+      references,
+      'routes',
+      'active runtimes must equal the explicit handoff profile reference',
+    );
+  }
+  final admitted = {...references, ...profileReferences};
+  for (final reference in admitted) {
+    final allowed = typed
+        ? reference is SeoDomFirstCollectionApplicationRuntime ||
+            reference is SeoDomFirstConfiguratorApplicationRuntime
+        : reference is SeoDomFirstCollectionApplicationRuntime;
+    if (!allowed) {
       throw ArgumentError.value(
         reference,
         'routes',
-        'applicationRuntimeHandoff supports only collection runtimes',
+        typed
+            ? 'typed applicationRuntimeHandoff supports only collection or '
+                'configurator runtimes'
+            : 'implicit applicationRuntimeHandoff supports only collection '
+                'runtimes',
       );
     }
     final runtime = runtimes[reference];
@@ -373,10 +429,31 @@ void _validateApplicationHandoffRuntimes(
       throw ArgumentError.value(
         runtime,
         'applicationRuntimes',
-        'must contain the matching verified collection runtime descriptor',
+        'must contain the matching verified application runtime descriptor',
       );
     }
   }
+}
+
+SeoDomFirstNavigationRuntimeEntry? _applicationHandoffProfileRuntime(
+  List<SeoRoute> routes,
+  Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
+      runtimes,
+  String profile, {
+  required bool typed,
+}) {
+  SeoDomFirstApplicationRuntime? reference;
+  for (final route in routes) {
+    if (seoDomFirstNavigationProfile(route) != profile) continue;
+    final candidate = typed
+        ? route.applicationRuntimeHandoffProfile
+        : route.applicationRuntime;
+    if (candidate != null) {
+      reference = candidate;
+      break;
+    }
+  }
+  return reference == null ? null : runtimes[reference];
 }
 
 String _decodedNormalizedPath(String raw) {

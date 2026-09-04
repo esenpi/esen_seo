@@ -145,8 +145,10 @@ Middleware seoBotMiddleware({
     routes != null || resolve != null,
     'seoBotMiddleware needs `routes` and/or `resolve`.',
   );
-  final needsApplicationRuntime =
-      routes?.any((route) => route.applicationRuntime != null) ?? false;
+  final needsApplicationRuntime = routes?.any((route) =>
+          route.applicationRuntime != null ||
+          route.applicationRuntimeHandoffProfile != null) ??
+      false;
   if (needsApplicationRuntime && domFirstRuntimeStore == null) {
     throw ArgumentError.notNull('domFirstRuntimeStore');
   }
@@ -598,7 +600,10 @@ Set<SeoDomFirstApplicationRuntime> _applicationHandoffReferences(
             (route) => route.domFirstFeatures
                 .contains(SeoDomFirstFeature.applicationRuntimeHandoff),
           )
-          .map((route) => route.applicationRuntime)
+          .expand((route) => [
+                route.applicationRuntime,
+                route.applicationRuntimeHandoffProfile,
+              ])
           .whereType<SeoDomFirstApplicationRuntime>(),
     );
 
@@ -617,11 +622,18 @@ Future<_ApplicationHandoffSnapshot> _loadApplicationHandoffSnapshot({
       <SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>{};
   for (final reference in references) {
     final artifact = await loadSeoDomFirstRuntime(store!, reference);
-    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    final typedProfile = routes.any(
+      (candidate) => candidate.applicationRuntimeHandoffProfile == reference,
+    );
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+      artifact,
+      typedProfile: typedProfile,
+    );
     payload.validateProfileBudget(
       includeThemeToggle: routes.any(
         (candidate) =>
-            candidate.applicationRuntime == reference &&
+            (candidate.applicationRuntime == reference ||
+                candidate.applicationRuntimeHandoffProfile == reference) &&
             candidate.domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
       ),
     );

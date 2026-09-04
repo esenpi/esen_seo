@@ -1089,6 +1089,55 @@ profile may reuse one runtime reference across any number of routes. A second
 runtime id in that profile is rejected; bundles, prefetch and every other
 application runtime kind must use ordinary document navigation.
 
+That Collection-only form remains the schema-3 compatibility profile. To bind
+the profile itself to a typed application artifact, set
+`applicationRuntimeHandoffProfile` on every route in the group. Static routes
+set only the profile; a route that executes the artifact sets the same
+reference as `applicationRuntime`:
+
+```dart
+const pricingRuntime =
+    SeoDomFirstApplicationRuntime.configurator('pricing-configurator');
+
+const pricingHandoffFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.applicationRuntimeHandoff,
+  SeoDomFirstFeature.themeToggle,
+};
+
+final seoRoutes = [
+  SeoRoute(
+    path: '/overview',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: pricingHandoffFeatures,
+    applicationRuntimeHandoffProfile: pricingRuntime,
+    meta: (_) => const SeoMeta(title: 'Overview'),
+    body: (_) => overviewNodes,
+  ),
+  SeoRoute(
+    path: '/pricing',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: pricingHandoffFeatures,
+    applicationRuntimeHandoffProfile: pricingRuntime,
+    applicationRuntime: pricingRuntime,
+    meta: (_) => const SeoMeta(title: 'Pricing'),
+    body: (_) => pricingConfiguratorNodes,
+  ),
+];
+```
+
+The explicit schema-4 profile admits standalone Collection and Configurator
+artifacts. Its kind and validated id become part of the navigation profile, so
+another artifact cannot enter through an otherwise identical feature set.
+Every route receives the structural CSS for that typed profile, while only an
+active route embeds its verified source. The browser validates the complete
+route plan, contract revision, UTF-8 length and SHA-256 before replacement,
+then appends the package-owned readiness suffix for that exact kind. Each
+Configurator destination starts from its delivered HTML and creates fresh
+state through the existing package adapter and apply boundary. Prefetch,
+bundles, package-owned interactive runtimes and other application runtime kinds
+remain separate profiles and use ordinary document navigation.
+
 Outside the two explicit handoff profiles, navigation cannot be combined with
 Collection. Forms, other application runtimes and Stepper Effects remain
 incompatible with every navigation profile. Those links deliberately retain

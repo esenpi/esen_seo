@@ -4,6 +4,7 @@ library;
 import '../components/seo_components.dart';
 import '../components/seo_theme_transition.dart';
 import '../routing/seo_route_delivery.dart';
+import '../routing/seo_application_runtime.dart';
 import 'html_renderer.dart';
 import 'seo_container.dart';
 import 'seo_dom_first_carousel_runtime.g.dart';
@@ -11,6 +12,7 @@ import 'seo_dom_first_action_form_runtime.g.dart';
 import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
 import 'seo_dom_first_navigation_application_handoff_runtime.g.dart';
+import 'seo_dom_first_navigation_application_profile_runtime.g.dart';
 import 'seo_dom_first_navigation_prefetch_runtime.g.dart';
 import 'seo_dom_first_navigation_runtime.g.dart';
 import 'seo_dom_first_navigation_handoff_runtime.g.dart';
@@ -278,6 +280,7 @@ String seoDomFirstFeatureBootstrapScriptHtml(
 String seoDomFirstFeatureStyleHtml(
   Set<SeoDomFirstFeature> features, {
   String? nonce,
+  SeoDomFirstApplicationRuntimeKind? applicationRuntimeHandoffKind,
 }) {
   final css = StringBuffer();
   if (features.contains(SeoDomFirstFeature.tabs)) {
@@ -292,12 +295,16 @@ String seoDomFirstFeatureStyleHtml(
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
   } else if (features.contains(SeoDomFirstFeature.runtimeHandoff) ||
-      features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+      (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+          applicationRuntimeHandoffKind !=
+              SeoDomFirstApplicationRuntimeKind.configurator)) {
     // Handoff routes keep this stylesheet stable while the Collection runtime
     // itself remains route-local and loadable.
     css.write(seoDomFirstCollectionStylesheet);
   }
-  if (features.contains(SeoDomFirstFeature.configurator)) {
+  if (features.contains(SeoDomFirstFeature.configurator) ||
+      applicationRuntimeHandoffKind ==
+          SeoDomFirstApplicationRuntimeKind.configurator) {
     css.write(seoDomFirstConfiguratorStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.editorialWorkflow)) {
@@ -325,6 +332,7 @@ String seoDomFirstFeatureStyleHtml(
 String seoDomFirstFeatureScriptHtml(
   Set<SeoDomFirstFeature> features, {
   String? nonce,
+  int? applicationRuntimeHandoffSchema,
 }) {
   if (features.contains(SeoDomFirstFeature.prefetch) &&
       !features.contains(SeoDomFirstFeature.navigation)) {
@@ -358,6 +366,16 @@ String seoDomFirstFeatureScriptHtml(
       'invalid DOM-first navigation feature profile',
     );
   }
+  if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+      applicationRuntimeHandoffSchema != null &&
+      applicationRuntimeHandoffSchema != 3 &&
+      applicationRuntimeHandoffSchema != 4) {
+    throw ArgumentError.value(
+      applicationRuntimeHandoffSchema,
+      'applicationRuntimeHandoffSchema',
+      'must be manifest schema 3 or 4',
+    );
+  }
   final nonceAttribute = _nonceAttribute(nonce);
   final runtime = StringBuffer();
 
@@ -369,7 +387,9 @@ String seoDomFirstFeatureScriptHtml(
   if (features.contains(SeoDomFirstFeature.navigation)) {
     addRuntime(
       features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)
-          ? seoDomFirstNavigationApplicationHandoffRuntime
+          ? applicationRuntimeHandoffSchema == 4
+              ? seoDomFirstNavigationApplicationProfileRuntime
+              : seoDomFirstNavigationApplicationHandoffRuntime
           : features.contains(SeoDomFirstFeature.runtimeHandoff)
               ? seoDomFirstNavigationHandoffRuntime
               : features.contains(SeoDomFirstFeature.prefetch)

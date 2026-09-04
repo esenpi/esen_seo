@@ -292,7 +292,10 @@ Future<Map<SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>>
   SeoDomFirstRuntimeStore? store,
 ) async {
   final references = routes
-      .map((route) => route.applicationRuntime)
+      .expand((route) => [
+            route.applicationRuntime,
+            route.applicationRuntimeHandoffProfile,
+          ])
       .whereType<SeoDomFirstApplicationRuntime>()
       .toSet();
   if (references.isEmpty) return const {};
@@ -318,7 +321,8 @@ Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
         .contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
       continue;
     }
-    final reference = route.applicationRuntime;
+    final reference =
+        route.applicationRuntimeHandoffProfile ?? route.applicationRuntime;
     if (reference == null || entries.containsKey(reference)) continue;
     final artifact = artifacts[reference];
     if (artifact == null) {
@@ -326,11 +330,18 @@ Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
         'Application handoff runtime "${reference.id}" was not loaded.',
       );
     }
-    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    final typedProfile = routes.any(
+      (candidate) => candidate.applicationRuntimeHandoffProfile == reference,
+    );
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+      artifact,
+      typedProfile: typedProfile,
+    );
     payload.validateProfileBudget(
       includeThemeToggle: routes.any(
         (candidate) =>
-            candidate.applicationRuntime == reference &&
+            (candidate.applicationRuntime == reference ||
+                candidate.applicationRuntimeHandoffProfile == reference) &&
             candidate.domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
       ),
     );

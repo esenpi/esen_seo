@@ -76,6 +76,7 @@ class SeoRoute {
     this.delivery = SeoRouteDelivery.flutter,
     Set<SeoDomFirstFeature> domFirstFeatures = const {},
     SeoDomFirstApplicationRuntime? applicationRuntime,
+    SeoDomFirstApplicationRuntime? applicationRuntimeHandoffProfile,
   })  : path = _validatedSeoRoutePath(path),
         isDynamic = false,
         resolve = _staticResolver(meta, body),
@@ -87,6 +88,14 @@ class SeoRoute {
           delivery,
           domFirstFeatures,
           applicationRuntime,
+          applicationRuntimeHandoffProfile,
+        ),
+        applicationRuntimeHandoffProfile =
+            _validatedApplicationRuntimeHandoffProfile(
+          delivery,
+          domFirstFeatures,
+          applicationRuntime,
+          applicationRuntimeHandoffProfile,
         );
 
   /// The database form: one [resolve] read produces metadata **and**
@@ -119,6 +128,7 @@ class SeoRoute {
     this.delivery = SeoRouteDelivery.flutter,
     Set<SeoDomFirstFeature> domFirstFeatures = const {},
     SeoDomFirstApplicationRuntime? applicationRuntime,
+    SeoDomFirstApplicationRuntime? applicationRuntimeHandoffProfile,
   })  : path = _validatedSeoRoutePath(path),
         meta = null,
         body = null,
@@ -131,6 +141,14 @@ class SeoRoute {
           delivery,
           domFirstFeatures,
           applicationRuntime,
+          applicationRuntimeHandoffProfile,
+        ),
+        applicationRuntimeHandoffProfile =
+            _validatedApplicationRuntimeHandoffProfile(
+          delivery,
+          domFirstFeatures,
+          applicationRuntime,
+          applicationRuntimeHandoffProfile,
         );
 
   /// The URL path pattern, e.g. `/` or `/blog/:slug`.
@@ -164,6 +182,13 @@ class SeoRoute {
   /// Only the typed identity is stored here. Server delivery must resolve and
   /// verify its separate build artifact before writing any JavaScript.
   final SeoDomFirstApplicationRuntime? applicationRuntime;
+
+  /// Typed identity shared by every route in a generalized handoff profile.
+  ///
+  /// Static routes set only this value. A route that executes an application
+  /// runtime sets both this and [applicationRuntime] to the same reference.
+  /// Omitting it retains the original Collection-only schema-3 profile.
+  final SeoDomFirstApplicationRuntime? applicationRuntimeHandoffProfile;
 
   /// Whether the semantic document permanently owns the web route.
   bool get isDomFirst => delivery == SeoRouteDelivery.domFirst;
@@ -253,8 +278,8 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
           'one profile with tabs or carousel; prefetch supports at most one '
           'of tabs or carousel and does not support stepper; runtimeHandoff '
           'supports only the optional package-owned collection runtime; '
-          'applicationRuntimeHandoff supports only one standalone '
-          'application collection runtime',
+          'applicationRuntimeHandoff supports one standalone implicit '
+          'collection or explicit typed collection/configurator profile',
     );
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&
@@ -288,6 +313,7 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
   SeoRouteDelivery delivery,
   Set<SeoDomFirstFeature> features,
   SeoDomFirstApplicationRuntime? runtime,
+  SeoDomFirstApplicationRuntime? handoffProfile,
 ) {
   if (runtime == null) return null;
   if (delivery != SeoRouteDelivery.domFirst) {
@@ -315,12 +341,20 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
     );
   }
   if (applicationHandoff &&
+      handoffProfile == null &&
       runtime is! SeoDomFirstCollectionApplicationRuntime) {
     throw ArgumentError.value(
       runtime,
       'applicationRuntime',
-      'applicationRuntimeHandoff supports only a standalone collection '
-          'runtime',
+      'an implicit applicationRuntimeHandoff supports only a standalone '
+          'collection runtime',
+    );
+  }
+  if (handoffProfile != null && runtime != handoffProfile) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'must equal applicationRuntimeHandoffProfile on an active route',
     );
   }
   for (final member in runtime.memberKinds) {
@@ -335,6 +369,53 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
     }
   }
   return runtime;
+}
+
+SeoDomFirstApplicationRuntime? _validatedApplicationRuntimeHandoffProfile(
+  SeoRouteDelivery delivery,
+  Set<SeoDomFirstFeature> features,
+  SeoDomFirstApplicationRuntime? runtime,
+  SeoDomFirstApplicationRuntime? profile,
+) {
+  if (profile == null) return null;
+  if (delivery != SeoRouteDelivery.domFirst) {
+    throw ArgumentError.value(
+      profile,
+      'applicationRuntimeHandoffProfile',
+      'requires delivery: SeoRouteDelivery.domFirst',
+    );
+  }
+  if (!features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+    throw ArgumentError.value(
+      profile,
+      'applicationRuntimeHandoffProfile',
+      'requires SeoDomFirstFeature.applicationRuntimeHandoff',
+    );
+  }
+  if (!isValidSeoApplicationRuntimeId(profile.id)) {
+    throw ArgumentError.value(
+      profile.id,
+      'applicationRuntimeHandoffProfile',
+      'must start with a lowercase letter and contain at most 64 lowercase '
+          'letters, digits, underscores or dashes',
+    );
+  }
+  if (profile is! SeoDomFirstCollectionApplicationRuntime &&
+      profile is! SeoDomFirstConfiguratorApplicationRuntime) {
+    throw ArgumentError.value(
+      profile,
+      'applicationRuntimeHandoffProfile',
+      'supports only a standalone collection or configurator runtime',
+    );
+  }
+  if (runtime != null && runtime != profile) {
+    throw ArgumentError.value(
+      profile,
+      'applicationRuntimeHandoffProfile',
+      'must equal applicationRuntime on an active route',
+    );
+  }
+  return profile;
 }
 
 SeoDomFirstFeature _applicationRuntimeFeature(

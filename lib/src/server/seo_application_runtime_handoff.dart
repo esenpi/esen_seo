@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 import '../renderer/seo_dom_first_navigation_application_handoff_runtime.g.dart';
+import '../renderer/seo_dom_first_navigation_application_profile_runtime.g.dart';
 import '../renderer/seo_dom_first_runtime_handoff.dart';
 import '../renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import '../routing/seo_application_runtime.dart';
@@ -16,21 +17,32 @@ final class SeoDomFirstApplicationHandoffPayload {
     required this.artifact,
     required this.javascript,
     required this.navigationEntry,
+    required this.typedProfile,
   });
 
-  /// Creates the closed Collection payload used by manifest and page delivery.
+  /// Creates the closed payload used by manifest and page delivery.
   factory SeoDomFirstApplicationHandoffPayload.fromArtifact(
-    SeoDomFirstRuntimeArtifact artifact,
-  ) {
+    SeoDomFirstRuntimeArtifact artifact, {
+    bool typedProfile = false,
+  }) {
     final reference = artifact.reference;
-    if (reference is! SeoDomFirstCollectionApplicationRuntime) {
+    final admitted = typedProfile
+        ? reference is SeoDomFirstCollectionApplicationRuntime ||
+            reference is SeoDomFirstConfiguratorApplicationRuntime
+        : reference is SeoDomFirstCollectionApplicationRuntime;
+    if (!admitted) {
       throw StateError(
-        'Application runtime handoff supports only a standalone collection '
-        'runtime.',
+        typedProfile
+            ? 'Typed application runtime handoff supports only a standalone '
+                'collection or configurator runtime.'
+            : 'Application runtime handoff supports only a standalone '
+                'collection runtime.',
       );
     }
-    final javascript =
-        seoDomFirstApplicationHandoffEnvelope(artifact.javascript);
+    final javascript = seoDomFirstApplicationHandoffEnvelope(
+      artifact.javascript,
+      kind: reference.kind,
+    );
     final encoded = utf8.encode(javascript);
     if (encoded.isEmpty ||
         encoded.length > seoDomFirstApplicationHandoffEnvelopeMaxBytes) {
@@ -57,6 +69,7 @@ final class SeoDomFirstApplicationHandoffPayload {
         applicationId: reference.id,
         contractRevision: artifact.manifest.contractRevision,
       ),
+      typedProfile: typedProfile,
     );
   }
 
@@ -72,19 +85,23 @@ final class SeoDomFirstApplicationHandoffPayload {
   /// Descriptor embedded in the trusted navigation plan.
   final SeoDomFirstNavigationRuntimeEntry navigationEntry;
 
+  /// Whether this payload belongs to the schema-4 typed profile.
+  final bool typedProfile;
+
   /// Verifies the fixed loader and complete executable profile budgets.
   void validateProfileBudget({required bool includeThemeToggle}) {
     final codec = GZipCodec(level: 9);
-    final loaderBytes = utf8.encode(
-      seoDomFirstNavigationApplicationHandoffRuntime,
-    );
+    final loader = typedProfile
+        ? seoDomFirstNavigationApplicationProfileRuntime
+        : seoDomFirstNavigationApplicationHandoffRuntime;
+    final loaderBytes = utf8.encode(loader);
     if (codec.encode(loaderBytes).length > 8 * 1024) {
       throw StateError(
         'Application runtime handoff loader exceeds its gzip size budget.',
       );
     }
     final combined = utf8.encode(
-      '$javascript$seoDomFirstNavigationApplicationHandoffRuntime'
+      '$javascript$loader'
       '${includeThemeToggle ? seoDomFirstThemeToggleRuntime : ''}',
     );
     if (codec.encode(combined).length > 31 * 1024) {

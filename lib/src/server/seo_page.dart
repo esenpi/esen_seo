@@ -105,20 +105,25 @@ class SeoPage {
     }
     if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
         applicationRuntime != null &&
-        applicationRuntime!.reference
-            is! SeoDomFirstCollectionApplicationRuntime) {
+        !_admittedApplicationHandoffRuntime(
+          applicationRuntime!.reference,
+          typedProfile: navigationPlan?.schemaVersion ==
+              seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+        )) {
       throw ArgumentError.value(
         applicationRuntime!.reference,
         'applicationRuntime',
-        'applicationRuntimeHandoff supports only a standalone collection '
-            'runtime',
+        'is not admitted by this applicationRuntimeHandoff profile',
       );
     }
     final expectedNavigationProfile =
         seoDomFirstNavigationFeatureProfile(features);
     if ((expectedNavigationProfile == null) != (navigationPlan == null) ||
         (navigationPlan != null &&
-            navigationPlan!.profile != expectedNavigationProfile)) {
+            !_matchesNavigationProfile(
+              navigationPlan!,
+              expectedNavigationProfile!,
+            ))) {
       throw ArgumentError.value(
         navigationPlan,
         'navigationPlan',
@@ -130,7 +135,11 @@ class SeoPage {
       final artifact = applicationRuntime;
       final payload = artifact == null
           ? null
-          : SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+          : SeoDomFirstApplicationHandoffPayload.fromArtifact(
+              artifact,
+              typedProfile: navigationPlan?.schemaVersion ==
+                  seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+            );
       final actualRuntime = payload?.navigationEntry;
       if (!_sameApplicationRuntime(expectedRuntime, actualRuntime)) {
         throw ArgumentError.value(
@@ -197,6 +206,9 @@ class SeoPage {
   String toHtmlDocument() {
     final language = HtmlRenderer.escapeAttribute(lang);
     final navigation = navigationPlan;
+    final handoffKind = SeoDomFirstApplicationRuntimeKind.tryParse(
+      navigation?.profileRuntime?.kind ?? '',
+    );
     final effectiveFeatures = {
       ...domFirstFeatures,
       for (final member
@@ -239,6 +251,7 @@ class SeoPage {
       seoDomFirstFeatureStyleHtml(
         effectiveFeatures,
         nonce: interactionNonce,
+        applicationRuntimeHandoffKind: handoffKind,
       ),
     );
     final runtime = StringBuffer();
@@ -254,6 +267,8 @@ class SeoPage {
         applicationArtifact,
         nonce: interactionNonce,
         handoff: true,
+        typedHandoff: navigation?.schemaVersion ==
+            seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
         includeThemeToggle:
             domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
       ));
@@ -262,6 +277,7 @@ class SeoPage {
       seoDomFirstFeatureScriptHtml(
         domFirstFeatures,
         nonce: interactionNonce,
+        applicationRuntimeHandoffSchema: navigation?.schemaVersion,
       ),
     );
     if (!applicationHandoff && applicationArtifact != null) {
@@ -320,10 +336,14 @@ String _applicationRuntimeScriptHtml(
   SeoDomFirstRuntimeArtifact artifact, {
   String? nonce,
   bool handoff = false,
+  bool typedHandoff = false,
   bool includeThemeToggle = false,
 }) {
   if (handoff) {
-    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+      artifact,
+      typedProfile: typedHandoff,
+    );
     payload.validateProfileBudget(
       includeThemeToggle: includeThemeToggle,
     );
@@ -354,6 +374,30 @@ String _applicationRuntimeScriptHtml(
       '${hasInteractionLayout ? ';delete document.documentElement.dataset.esenInteractionPending' : ''}'
       '</script>';
 }
+
+bool _matchesNavigationProfile(
+  SeoDomFirstNavigationPlan plan,
+  String featureProfile,
+) {
+  if (plan.schemaVersion ==
+      seoDomFirstTypedApplicationRuntimeHandoffManifestSchema) {
+    final runtime = plan.profileRuntime;
+    return runtime != null &&
+        plan.profile ==
+            '$featureProfile.application.${runtime.kind}.'
+                '${runtime.applicationId}';
+  }
+  return plan.profile == featureProfile;
+}
+
+bool _admittedApplicationHandoffRuntime(
+  SeoDomFirstApplicationRuntime runtime, {
+  required bool typedProfile,
+}) =>
+    typedProfile
+        ? runtime is SeoDomFirstCollectionApplicationRuntime ||
+            runtime is SeoDomFirstConfiguratorApplicationRuntime
+        : runtime is SeoDomFirstCollectionApplicationRuntime;
 
 String _nonceAttribute(String? nonce) {
   final value = nonce?.trim();

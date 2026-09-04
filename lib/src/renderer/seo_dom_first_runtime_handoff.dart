@@ -22,6 +22,12 @@ const String seoDomFirstApplicationHandoffEpilogue =
     'document.currentScript&&document.currentScript.setAttribute('
     '"$seoDomFirstRuntimeReadyAttribute","true")';
 
+/// Package-owned Configurator suffix joined only after source verification.
+const String seoDomFirstConfiguratorApplicationHandoffEpilogue =
+    '\n;delete document.documentElement.dataset.esenInteractionPending;'
+    'document.currentScript&&document.currentScript.setAttribute('
+    '"$seoDomFirstRuntimeReadyAttribute","true")';
+
 /// The complete classic-script body admitted by the first runtime handoff.
 final String seoDomFirstCollectionHandoffRuntime =
     '$seoDomFirstCollectionRuntime;'
@@ -36,5 +42,19 @@ final String seoDomFirstCollectionHandoffRuntimeSha256 =
     sha256.convert(utf8.encode(seoDomFirstCollectionHandoffRuntime)).toString();
 
 /// Wraps one verified application artifact in the fixed handoff-ready envelope.
-String seoDomFirstApplicationHandoffEnvelope(String javascript) =>
-    '$javascript$seoDomFirstApplicationHandoffEpilogue';
+String seoDomFirstApplicationHandoffEnvelope(
+  String javascript, {
+  String kind = seoDomFirstCollectionRuntimeKind,
+}) =>
+    '$javascript${seoDomFirstApplicationHandoffEpilogueFor(kind)}';
+
+/// Returns the closed package suffix for an admitted application handoff kind.
+String seoDomFirstApplicationHandoffEpilogueFor(String kind) => switch (kind) {
+      seoDomFirstCollectionRuntimeKind => seoDomFirstApplicationHandoffEpilogue,
+      'configurator' => seoDomFirstConfiguratorApplicationHandoffEpilogue,
+      _ => throw ArgumentError.value(
+          kind,
+          'kind',
+          'must be collection or configurator',
+        ),
+    };
