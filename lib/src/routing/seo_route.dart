@@ -252,7 +252,9 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       'navigation supports themeToggle and motion, but stepper cannot share '
           'one profile with tabs or carousel; prefetch supports at most one '
           'of tabs or carousel and does not support stepper; runtimeHandoff '
-          'supports only the optional package-owned collection runtime',
+          'supports only the optional package-owned collection runtime; '
+          'applicationRuntimeHandoff supports only one standalone '
+          'application collection runtime',
     );
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&
@@ -271,6 +273,14 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
       'runtimeHandoff requires navigation',
     );
   }
+  if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'domFirstFeatures',
+      'applicationRuntimeHandoff requires navigation',
+    );
+  }
   return Set<SeoDomFirstFeature>.unmodifiable(features);
 }
 
@@ -287,7 +297,9 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
       'requires delivery: SeoRouteDelivery.domFirst',
     );
   }
-  if (features.contains(SeoDomFirstFeature.navigation)) {
+  final applicationHandoff =
+      features.contains(SeoDomFirstFeature.applicationRuntimeHandoff);
+  if (features.contains(SeoDomFirstFeature.navigation) && !applicationHandoff) {
     throw ArgumentError.value(
       runtime,
       'applicationRuntime',
@@ -300,6 +312,15 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntime(
       'applicationRuntime',
       'must start with a lowercase letter and contain at most 64 lowercase '
           'letters, digits, underscores or dashes',
+    );
+  }
+  if (applicationHandoff &&
+      runtime is! SeoDomFirstCollectionApplicationRuntime) {
+    throw ArgumentError.value(
+      runtime,
+      'applicationRuntime',
+      'applicationRuntimeHandoff supports only a standalone collection '
+          'runtime',
     );
   }
   for (final member in runtime.memberKinds) {

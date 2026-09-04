@@ -6,14 +6,17 @@ import 'dart:convert';
 export '../renderer/seo_container.dart' show seoDomFirstNavigationHeadAttribute;
 
 import '../renderer/seo_dom_first_runtime_handoff.dart';
+import 'seo_application_runtime.dart';
 import 'seo_route.dart';
 import 'seo_route_delivery.dart';
 
 const int seoDomFirstNavigationManifestSchema = 1;
 const int seoDomFirstRuntimeHandoffManifestSchema = 2;
+const int seoDomFirstApplicationRuntimeHandoffManifestSchema = 3;
 const int seoDomFirstNavigationMaxRoutes = 256;
 const int seoDomFirstNavigationMaxPatternLength = 256;
 const int seoDomFirstNavigationMaxManifestBytes = 32768;
+const int seoDomFirstApplicationHandoffRuntimeMaxBytes = 512 * 1024;
 const String seoDomFirstNavigationManifestAttribute =
     'data-esen-seo-navigation-manifest';
 
@@ -28,26 +31,39 @@ final class SeoDomFirstNavigationEntry {
   final String pattern;
   final String? profile;
 
-  /// Package runtime expected for this route, or `null` for a static route.
+  /// Loadable runtime expected for this route, or `null` for a static route.
   final SeoDomFirstNavigationRuntimeEntry? runtime;
 }
 
-/// One package-owned runtime bound to a route in a handoff manifest.
+/// One runtime bound to a route in a handoff manifest.
 final class SeoDomFirstNavigationRuntimeEntry {
   const SeoDomFirstNavigationRuntimeEntry({
     required this.kind,
     required this.sha256,
     required this.bytes,
+    this.applicationId,
+    this.contractRevision,
   });
 
-  /// Closed package runtime identity.
+  /// Closed package or application runtime kind.
   final String kind;
 
-  /// Lowercase SHA-256 of the exact executable UTF-8 source.
+  /// Lowercase SHA-256 of the bound package body or application source.
+  ///
+  /// Application handoff hashes the verified artifact before the fixed
+  /// package-owned readiness epilogue is appended.
   final String sha256;
 
-  /// Exact UTF-8 source length.
+  /// Exact UTF-8 length of the bytes covered by [sha256].
   final int bytes;
+
+  /// Typed application artifact id, or `null` for a package-owned runtime.
+  final String? applicationId;
+
+  /// Application adapter contract, or `null` for a package-owned runtime.
+  final int? contractRevision;
+
+  bool get isApplication => applicationId != null;
 }
 
 /// The package-owned route information embedded in one navigable document.
@@ -57,6 +73,7 @@ final class SeoDomFirstNavigationPlan {
     required this.basePath,
     required this.profile,
     required this.entries,
+    required this.currentRuntime,
     required this.manifestJson,
   });
 
@@ -72,6 +89,9 @@ final class SeoDomFirstNavigationPlan {
   /// Route patterns in their server declaration order.
   final List<SeoDomFirstNavigationEntry> entries;
 
+  /// Runtime descriptor selected by the route for which this plan was built.
+  final SeoDomFirstNavigationRuntimeEntry? currentRuntime;
+
   /// Script-safe JSON consumed by the package browser runtime.
   final String manifestJson;
 }
@@ -85,11 +105,16 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
   required List<SeoRoute> routes,
   required SeoRoute currentRoute,
   required String siteBase,
+  Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
+      applicationRuntimes = const {},
 }) {
   final profile = seoDomFirstNavigationProfile(currentRoute);
   if (profile == null) return null;
   final runtimeHandoff = currentRoute.domFirstFeatures.contains(
     SeoDomFirstFeature.runtimeHandoff,
+  );
+  final applicationRuntimeHandoff = currentRoute.domFirstFeatures.contains(
+    SeoDomFirstFeature.applicationRuntimeHandoff,
   );
   if (routes.length > seoDomFirstNavigationMaxRoutes) {
     throw ArgumentError.value(
@@ -98,11 +123,20 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
       'navigation supports at most $seoDomFirstNavigationMaxRoutes routes',
     );
   }
-  if (!routes.any((route) => identical(route, currentRoute))) {
+  final currentIndex =
+      routes.indexWhere((route) => identical(route, currentRoute));
+  if (currentIndex < 0) {
     throw ArgumentError.value(
       currentRoute,
       'currentRoute',
       'must be the route instance contained in routes',
+    );
+  }
+  if (applicationRuntimeHandoff) {
+    _validateApplicationHandoffRuntimes(
+      routes,
+      applicationRuntimes,
+      profile,
     );
   }
   final origin = Uri.tryParse(siteBase.trim());
@@ -143,20 +177,42 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
       SeoDomFirstNavigationEntry(
         pattern: route.path,
         profile: seoDomFirstNavigationProfile(route),
-        runtime: runtimeHandoff ? _handoffRuntime(route) : null,
+        runtime: runtimeHandoff
+            ? _packageHandoffRuntime(route)
+            : applicationRuntimeHandoff
+                ? _applicationHandoffRuntime(route, applicationRuntimes)
+                : null,
       ),
     );
   }
-  final schemaVersion = runtimeHandoff
-      ? seoDomFirstRuntimeHandoffManifestSchema
-      : seoDomFirstNavigationManifestSchema;
+  final schemaVersion = applicationRuntimeHandoff
+      ? seoDomFirstApplicationRuntimeHandoffManifestSchema
+      : runtimeHandoff
+          ? seoDomFirstRuntimeHandoffManifestSchema
+          : seoDomFirstNavigationManifestSchema;
   final encoded = jsonEncode({
     'schema': schemaVersion,
     'base': basePath,
     'profile': profile,
     'routes': [
       for (final entry in entries)
-        if (runtimeHandoff)
+        if (applicationRuntimeHandoff)
+          [
+            entry.pattern,
+            entry.profile,
+            switch (entry.runtime) {
+              final runtime? => [
+                  'application',
+                  runtime.kind,
+                  runtime.applicationId,
+                  runtime.contractRevision,
+                  runtime.sha256,
+                  runtime.bytes,
+                ],
+              null => null,
+            },
+          ]
+        else if (runtimeHandoff)
           [
             entry.pattern,
             entry.profile,
@@ -169,7 +225,8 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
           [entry.pattern, entry.profile],
     ],
   });
-  final bytes = utf8.encode(encoded).length;
+  final manifestJson = _scriptSafeJson(encoded);
+  final bytes = utf8.encode(manifestJson).length;
   if (bytes > seoDomFirstNavigationMaxManifestBytes) {
     throw ArgumentError.value(
       bytes,
@@ -183,7 +240,8 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
     basePath: basePath,
     profile: profile,
     entries: List.unmodifiable(entries),
-    manifestJson: _scriptSafeJson(encoded),
+    currentRuntime: entries[currentIndex].runtime,
+    manifestJson: manifestJson,
   );
 }
 
@@ -193,7 +251,11 @@ String? seoDomFirstNavigationProfile(SeoRoute route) {
   if (!route.domFirstFeatures.contains(SeoDomFirstFeature.navigation)) {
     return null;
   }
-  if (!route.isDomFirst || route.applicationRuntime != null) {
+  final applicationHandoff = route.domFirstFeatures.contains(
+    SeoDomFirstFeature.applicationRuntimeHandoff,
+  );
+  if (!route.isDomFirst ||
+      (route.applicationRuntime != null && !applicationHandoff)) {
     throw StateError('Invalid DOM-first navigation route');
   }
   return seoDomFirstNavigationFeatureProfile(route.domFirstFeatures);
@@ -211,6 +273,12 @@ String? seoDomFirstNavigationFeatureProfile(
       !features.contains(SeoDomFirstFeature.navigation)) {
     throw StateError('DOM-first runtime handoff requires navigation');
   }
+  if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw StateError(
+      'DOM-first application runtime handoff requires navigation',
+    );
+  }
   if (!features.contains(SeoDomFirstFeature.navigation)) return null;
   if (!isSeoDomFirstNavigationFeatureProfile(features)) {
     throw StateError('Invalid DOM-first navigation feature profile');
@@ -227,7 +295,7 @@ String? seoDomFirstNavigationFeatureProfile(
   return names.join('.');
 }
 
-SeoDomFirstNavigationRuntimeEntry? _handoffRuntime(SeoRoute route) {
+SeoDomFirstNavigationRuntimeEntry? _packageHandoffRuntime(SeoRoute route) {
   if (!route.domFirstFeatures.contains(SeoDomFirstFeature.runtimeHandoff) ||
       !route.domFirstFeatures.contains(SeoDomFirstFeature.collection)) {
     return null;
@@ -237,6 +305,78 @@ SeoDomFirstNavigationRuntimeEntry? _handoffRuntime(SeoRoute route) {
     sha256: seoDomFirstCollectionHandoffRuntimeSha256,
     bytes: seoDomFirstCollectionHandoffRuntimeBytes,
   );
+}
+
+SeoDomFirstNavigationRuntimeEntry? _applicationHandoffRuntime(
+  SeoRoute route,
+  Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
+      runtimes,
+) {
+  if (!route.domFirstFeatures
+      .contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+    return null;
+  }
+  final reference = route.applicationRuntime;
+  if (reference == null) return null;
+  final runtime = runtimes[reference];
+  if (runtime == null) {
+    throw ArgumentError.value(
+      reference,
+      'applicationRuntimes',
+      'is missing from the verified application handoff snapshot',
+    );
+  }
+  return runtime;
+}
+
+void _validateApplicationHandoffRuntimes(
+  List<SeoRoute> routes,
+  Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
+      runtimes,
+  String profile,
+) {
+  final references = <SeoDomFirstApplicationRuntime>{};
+  for (final route in routes) {
+    if (!route.domFirstFeatures
+            .contains(SeoDomFirstFeature.applicationRuntimeHandoff) ||
+        seoDomFirstNavigationProfile(route) != profile) {
+      continue;
+    }
+    final reference = route.applicationRuntime;
+    if (reference != null) references.add(reference);
+  }
+  if (references.length > 1) {
+    throw ArgumentError.value(
+      references,
+      'routes',
+      'applicationRuntimeHandoff supports one distinct collection runtime',
+    );
+  }
+  for (final reference in references) {
+    if (reference is! SeoDomFirstCollectionApplicationRuntime) {
+      throw ArgumentError.value(
+        reference,
+        'routes',
+        'applicationRuntimeHandoff supports only collection runtimes',
+      );
+    }
+    final runtime = runtimes[reference];
+    if (runtime == null ||
+        !runtime.isApplication ||
+        runtime.applicationId != reference.id ||
+        runtime.kind != reference.kind ||
+        runtime.contractRevision == null ||
+        runtime.contractRevision! < 1 ||
+        !_sha256.hasMatch(runtime.sha256) ||
+        runtime.bytes < 1 ||
+        runtime.bytes > seoDomFirstApplicationHandoffRuntimeMaxBytes) {
+      throw ArgumentError.value(
+        runtime,
+        'applicationRuntimes',
+        'must contain the matching verified collection runtime descriptor',
+      );
+    }
+  }
 }
 
 String _decodedNormalizedPath(String raw) {
@@ -313,6 +453,8 @@ bool _unsafeManifestText(String value) => value.codeUnits.any(
           (unit >= 0x202a && unit <= 0x202e) ||
           (unit >= 0x2066 && unit <= 0x2069),
     );
+
+final RegExp _sha256 = RegExp(r'^[a-f0-9]{64}$');
 
 String _scriptSafeJson(String value) => value
     .replaceAll('&', r'\u0026')

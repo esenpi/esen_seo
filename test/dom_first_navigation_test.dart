@@ -574,6 +574,17 @@ void main() {
 
       expect(() => _plan(routes, routes.first), throwsArgumentError);
     });
+
+    test('applies the manifest budget after script-safe JSON escaping', () {
+      final routes = <SeoRoute>[];
+      for (var index = 0; index < 100; index++) {
+        routes.add(
+          _route('/$index-${List.filled(200, '<').join()}'),
+        );
+      }
+
+      expect(() => _plan(routes, routes.first), throwsArgumentError);
+    });
   });
 
   group('navigation document', () {

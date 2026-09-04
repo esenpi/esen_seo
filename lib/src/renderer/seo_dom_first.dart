@@ -10,6 +10,7 @@ import 'seo_dom_first_carousel_runtime.g.dart';
 import 'seo_dom_first_action_form_runtime.g.dart';
 import 'seo_dom_first_action_flow_runtime.g.dart';
 import 'seo_dom_first_collection_runtime.g.dart';
+import 'seo_dom_first_navigation_application_handoff_runtime.g.dart';
 import 'seo_dom_first_navigation_prefetch_runtime.g.dart';
 import 'seo_dom_first_navigation_runtime.g.dart';
 import 'seo_dom_first_navigation_handoff_runtime.g.dart';
@@ -290,7 +291,8 @@ String seoDomFirstFeatureStyleHtml(
   }
   if (features.contains(SeoDomFirstFeature.collection)) {
     css.write(seoDomFirstCollectionStylesheet);
-  } else if (features.contains(SeoDomFirstFeature.runtimeHandoff)) {
+  } else if (features.contains(SeoDomFirstFeature.runtimeHandoff) ||
+      features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
     // Handoff routes keep this stylesheet stable while the Collection runtime
     // itself remains route-local and loadable.
     css.write(seoDomFirstCollectionStylesheet);
@@ -340,6 +342,14 @@ String seoDomFirstFeatureScriptHtml(
       'runtimeHandoff requires navigation',
     );
   }
+  if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+      !features.contains(SeoDomFirstFeature.navigation)) {
+    throw ArgumentError.value(
+      features,
+      'features',
+      'applicationRuntimeHandoff requires navigation',
+    );
+  }
   if (features.contains(SeoDomFirstFeature.navigation) &&
       !isSeoDomFirstNavigationFeatureProfile(features)) {
     throw ArgumentError.value(
@@ -358,11 +368,13 @@ String seoDomFirstFeatureScriptHtml(
 
   if (features.contains(SeoDomFirstFeature.navigation)) {
     addRuntime(
-      features.contains(SeoDomFirstFeature.runtimeHandoff)
-          ? seoDomFirstNavigationHandoffRuntime
-          : features.contains(SeoDomFirstFeature.prefetch)
-              ? seoDomFirstNavigationPrefetchRuntime
-              : seoDomFirstNavigationRuntime,
+      features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)
+          ? seoDomFirstNavigationApplicationHandoffRuntime
+          : features.contains(SeoDomFirstFeature.runtimeHandoff)
+              ? seoDomFirstNavigationHandoffRuntime
+              : features.contains(SeoDomFirstFeature.prefetch)
+                  ? seoDomFirstNavigationPrefetchRuntime
+                  : seoDomFirstNavigationRuntime,
     );
   }
 

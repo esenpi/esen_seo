@@ -18,9 +18,10 @@ enum SeoDomFirstFeature {
   ///
   /// The default pilot is intentionally compatible only with [themeToggle],
   /// [motion] and the package-owned [tabs], [carousel] and [stepper] runtimes.
-  /// The separate [runtimeHandoff] profile admits only [collection] instead.
-  /// Other stateful components and every application runtime keep native page
-  /// navigation until they define an explicit reinitialization contract.
+  /// The separate [runtimeHandoff] profile admits only [collection] instead;
+  /// [applicationRuntimeHandoff] admits one standalone application-authored
+  /// Collection runtime. Other stateful components keep native page navigation
+  /// until they define an explicit reinitialization contract.
   navigation,
 
   /// Load one route-bound package runtime during compatible navigation.
@@ -29,6 +30,13 @@ enum SeoDomFirstFeature {
   /// application-authored runtime. Every candidate is bound by SHA-256 in the
   /// package-generated navigation manifest before the browser may execute it.
   runtimeHandoff,
+
+  /// Load one verified application-authored Collection runtime during navigation.
+  ///
+  /// This separate pilot requires [navigation] and a standalone application
+  /// Collection runtime. It does not widen [runtimeHandoff], which remains
+  /// package-owned.
+  applicationRuntimeHandoff,
 
   /// Prefetch an intended compatible navigation target before activation.
   ///
@@ -93,6 +101,15 @@ const Set<SeoDomFirstFeature> seoDomFirstRuntimeHandoffCompatibleFeatures = {
   SeoDomFirstFeature.motion,
 };
 
+/// Features admitted by the application Collection runtime-handoff pilot.
+const Set<SeoDomFirstFeature>
+    seoDomFirstApplicationRuntimeHandoffCompatibleFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.applicationRuntimeHandoff,
+  SeoDomFirstFeature.themeToggle,
+  SeoDomFirstFeature.motion,
+};
+
 /// Whether [features] is one complete profile admitted by client navigation.
 bool isSeoDomFirstNavigationFeatureProfile(
   Set<SeoDomFirstFeature> features,
@@ -101,6 +118,11 @@ bool isSeoDomFirstNavigationFeatureProfile(
   if (features.contains(SeoDomFirstFeature.runtimeHandoff)) {
     return features
         .difference(seoDomFirstRuntimeHandoffCompatibleFeatures)
+        .isEmpty;
+  }
+  if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+    return features
+        .difference(seoDomFirstApplicationRuntimeHandoffCompatibleFeatures)
         .isEmpty;
   }
   if (features.difference(seoDomFirstNavigationCompatibleFeatures).isNotEmpty) {

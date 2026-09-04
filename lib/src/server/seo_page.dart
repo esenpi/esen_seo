@@ -2,12 +2,14 @@ import '../meta/seo_meta.dart';
 import '../renderer/html_renderer.dart';
 import '../renderer/seo_container.dart';
 import '../renderer/seo_dom_first.dart';
+import '../renderer/seo_dom_first_runtime_handoff.dart';
 import '../renderer/seo_interactions.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
 import '../routing/seo_application_runtime.dart';
 import '../routing/seo_dom_first_navigation.dart';
 import '../routing/seo_route_delivery.dart';
+import 'seo_application_runtime_handoff.dart';
 import 'seo_runtime_store.dart';
 
 /// Marks a verified application-authored runtime in a DOM-first document.
@@ -101,6 +103,17 @@ class SeoPage {
         'cannot be combined with runtimeHandoff',
       );
     }
+    if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
+        applicationRuntime != null &&
+        applicationRuntime!.reference
+            is! SeoDomFirstCollectionApplicationRuntime) {
+      throw ArgumentError.value(
+        applicationRuntime!.reference,
+        'applicationRuntime',
+        'applicationRuntimeHandoff supports only a standalone collection '
+            'runtime',
+      );
+    }
     final expectedNavigationProfile =
         seoDomFirstNavigationFeatureProfile(features);
     if ((expectedNavigationProfile == null) != (navigationPlan == null) ||
@@ -111,6 +124,21 @@ class SeoPage {
         'navigationPlan',
         'must exactly match the selected DOM-first navigation profile',
       );
+    }
+    if (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+      final expectedRuntime = navigationPlan?.currentRuntime;
+      final artifact = applicationRuntime;
+      final payload = artifact == null
+          ? null
+          : SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+      final actualRuntime = payload?.navigationEntry;
+      if (!_sameApplicationRuntime(expectedRuntime, actualRuntime)) {
+        throw ArgumentError.value(
+          artifact?.reference,
+          'applicationRuntime',
+          'must exactly match the current navigation-plan runtime',
+        );
+      }
     }
     for (final runtimeFeature
         in applicationRuntime?.reference.memberKinds ?? const []) {
@@ -214,8 +242,21 @@ class SeoPage {
       ),
     );
     final runtime = StringBuffer();
+    final applicationHandoff = domFirstFeatures.contains(
+      SeoDomFirstFeature.applicationRuntimeHandoff,
+    );
+    final applicationArtifact = applicationRuntime;
     if (enableInteractions) {
       runtime.write(seoInteractionScriptHtml(nonce: interactionNonce));
+    }
+    if (applicationHandoff && applicationArtifact != null) {
+      runtime.write(_applicationRuntimeScriptHtml(
+        applicationArtifact,
+        nonce: interactionNonce,
+        handoff: true,
+        includeThemeToggle:
+            domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
+      ));
     }
     runtime.write(
       seoDomFirstFeatureScriptHtml(
@@ -223,9 +264,9 @@ class SeoPage {
         nonce: interactionNonce,
       ),
     );
-    if (applicationRuntime case final artifact?) {
+    if (!applicationHandoff && applicationArtifact != null) {
       runtime.write(_applicationRuntimeScriptHtml(
-        artifact,
+        applicationArtifact,
         nonce: interactionNonce,
       ));
     }
@@ -242,6 +283,19 @@ class SeoPage {
         '</html>';
   }
 }
+
+bool _sameApplicationRuntime(
+  SeoDomFirstNavigationRuntimeEntry? expected,
+  SeoDomFirstNavigationRuntimeEntry? actual,
+) =>
+    expected == null
+        ? actual == null
+        : actual != null &&
+            expected.kind == actual.kind &&
+            expected.applicationId == actual.applicationId &&
+            expected.contractRevision == actual.contractRevision &&
+            expected.sha256 == actual.sha256 &&
+            expected.bytes == actual.bytes;
 
 SeoDomFirstFeature _applicationRuntimeFeature(
   SeoDomFirstApplicationRuntimeKind kind,
@@ -265,7 +319,29 @@ SeoDomFirstFeature _applicationRuntimeFeature(
 String _applicationRuntimeScriptHtml(
   SeoDomFirstRuntimeArtifact artifact, {
   String? nonce,
+  bool handoff = false,
+  bool includeThemeToggle = false,
 }) {
+  if (handoff) {
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    payload.validateProfileBudget(
+      includeThemeToggle: includeThemeToggle,
+    );
+    final reference = artifact.reference;
+    final id = HtmlRenderer.escapeAttribute(reference.id);
+    final kind = HtmlRenderer.escapeAttribute(reference.kind);
+    final contract = artifact.manifest.contractRevision;
+    final hash = HtmlRenderer.escapeAttribute(
+      payload.navigationEntry.sha256,
+    );
+    return '<script $seoDomFirstLoadableRuntimeAttribute="'
+        '$seoDomFirstApplicationRuntimeOwner" '
+        '$seoDomFirstApplicationScriptAttribute="$id" '
+        '$seoDomFirstRuntimeKindAttribute="$kind" '
+        '$seoDomFirstRuntimeContractAttribute="$contract" '
+        '$seoDomFirstRuntimeSha256Attribute="$hash"'
+        '${_nonceAttribute(nonce)}>${payload.javascript}</script>';
+  }
   final id = HtmlRenderer.escapeAttribute(artifact.reference.id);
   final hash = HtmlRenderer.escapeAttribute(artifact.manifest.sha256);
   final nonceAttribute = _nonceAttribute(nonce);

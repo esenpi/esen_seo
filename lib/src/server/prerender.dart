@@ -14,6 +14,7 @@ import '../routing/seo_route.dart';
 import '../routing/seo_route_delivery.dart';
 import 'llms_txt.dart';
 import 'seo_page.dart';
+import 'seo_application_runtime_handoff.dart';
 import 'seo_runtime_store.dart';
 import 'sitemap.dart';
 
@@ -104,6 +105,10 @@ Future<List<String>> prerenderSite({
     routes,
     domFirstRuntimeStore,
   );
+  final applicationHandoffRuntimes = _applicationHandoffRuntimeEntries(
+    routes,
+    applicationRuntimes,
+  );
   final navigationPlans = <SeoRoute, SeoDomFirstNavigationPlan>{
     for (final route in routes)
       if (route.domFirstFeatures.contains(SeoDomFirstFeature.navigation))
@@ -111,6 +116,7 @@ Future<List<String>> prerenderSite({
           routes: routes,
           currentRoute: route,
           siteBase: siteBase,
+          applicationRuntimes: applicationHandoffRuntimes,
         )!,
   };
   final templateFile = File('$buildDir/index.html');
@@ -298,6 +304,39 @@ Future<Map<SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>>
     artifacts[reference] = await loadSeoDomFirstRuntime(store, reference);
   }
   return Map.unmodifiable(artifacts);
+}
+
+Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
+    _applicationHandoffRuntimeEntries(
+  List<SeoRoute> routes,
+  Map<SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact> artifacts,
+) {
+  final entries =
+      <SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>{};
+  for (final route in routes) {
+    if (!route.domFirstFeatures
+        .contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+      continue;
+    }
+    final reference = route.applicationRuntime;
+    if (reference == null || entries.containsKey(reference)) continue;
+    final artifact = artifacts[reference];
+    if (artifact == null) {
+      throw StateError(
+        'Application handoff runtime "${reference.id}" was not loaded.',
+      );
+    }
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    payload.validateProfileBudget(
+      includeThemeToggle: routes.any(
+        (candidate) =>
+            candidate.applicationRuntime == reference &&
+            candidate.domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
+      ),
+    );
+    entries[reference] = payload.navigationEntry;
+  }
+  return Map.unmodifiable(entries);
 }
 
 /// The IndexNow key doubles as a file name — keep it to the character

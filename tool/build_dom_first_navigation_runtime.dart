@@ -6,6 +6,8 @@ const _generatedPrefetch =
     'lib/src/renderer/seo_dom_first_navigation_prefetch_runtime.g.dart';
 const _generatedHandoff =
     'lib/src/renderer/seo_dom_first_navigation_handoff_runtime.g.dart';
+const _generatedApplicationHandoff = 'lib/src/renderer/'
+    'seo_dom_first_navigation_application_handoff_runtime.g.dart';
 
 Future<void> main(List<String> arguments) async {
   final write = arguments.contains('--write');
@@ -52,10 +54,13 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
   final javascript = _compileRuntime(source);
   final prefetchJavascript = _compileRuntime(_withPrefetch(source));
   final handoffJavascript = _compileRuntime(_withHandoff(source));
+  final applicationHandoffJavascript =
+      _compileRuntime(_withApplicationHandoff(source));
 
   if (!_isSafeInlineRuntime(javascript) ||
       !_isSafeInlineRuntime(prefetchJavascript) ||
-      !_isSafeInlineRuntime(handoffJavascript)) {
+      !_isSafeInlineRuntime(handoffJavascript) ||
+      !_isSafeInlineRuntime(applicationHandoffJavascript)) {
     stderr.writeln('Refusing a runtime containing unsafe inline code.');
     exitCode = 1;
     return;
@@ -72,6 +77,10 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
     _generatedHandoff: _generatedSource(
       handoffJavascript,
       'seoDomFirstNavigationHandoffRuntime',
+    ),
+    _generatedApplicationHandoff: _generatedSource(
+      applicationHandoffJavascript,
+      'seoDomFirstNavigationApplicationHandoffRuntime',
     ),
   };
   final temp = await Directory.systemTemp.createTemp('esen-navigation-');
@@ -105,7 +114,9 @@ addEventListener("popstate",event=>{let url=new URL(location.href),position=stat
       stdout.writeln(
         'Wrote $_generated (${javascript.length} JS bytes) and '
         '$_generatedPrefetch (${prefetchJavascript.length} JS bytes) and '
-        '$_generatedHandoff (${handoffJavascript.length} JS bytes).',
+        '$_generatedHandoff (${handoffJavascript.length} JS bytes) and '
+        '$_generatedApplicationHandoff '
+        '(${applicationHandoffJavascript.length} JS bytes).',
       );
     } else {
       stdout.writeln('DOM-first navigation runtimes are current.');
@@ -237,6 +248,56 @@ String _withHandoff(String source) {
   return source;
 }
 
+String _withApplicationHandoff(String source) {
+  source = _replaceOnce(
+    source,
+    'let d=document,w=window,MAX=1048576,MAN=32768,HEAD=64,ELEMENTS=10000,ATTRS=32,',
+    'let d=document,w=window,MAX=1048576,MAN=32768,HEAD=64,ELEMENTS=10000,'
+        'ATTRS=32,RUNTIME=524288,LOAD="data-esen-seo-dom-first-loadable-runtime",'
+        'HASH="data-esen-seo-runtime-sha256",READY="data-esen-seo-runtime-ready",'
+        'APP="data-esen-seo-dom-first-application-runtime",'
+        'KIND="data-esen-seo-runtime-kind",'
+        'CONTRACT="data-esen-seo-runtime-contract",'
+        'EPILOGUE="\\n;delete document.documentElement.dataset.'
+        'esenCollectionPending;document.currentScript&&document.currentScript.'
+        'setAttribute(\\"data-esen-seo-runtime-ready\\",\\"true\\")",',
+  );
+  source = _replaceOnce(source, 'j.schema!==1', 'j.schema!==3');
+  source = _replaceOnce(
+    source,
+    r'''for(let r of j.routes){if(!Array.isArray(r)||r.length!=2||!plain(r[0])||norm(r[0])==null||(r[1]!==null&&!plain(r[1])))return null}''',
+    r'''for(let r of j.routes){let x=Array.isArray(r)&&r[2];if(!Array.isArray(r)||r.length!=3||!plain(r[0])||norm(r[0])==null||(r[1]!==null&&!plain(r[1]))||(x!==null&&(!Array.isArray(x)||x.length!=6||x[0]!=="application"||x[1]!=="collection"||typeof x[2]!=="string"||!/^[a-z][a-z0-9_-]{0,63}$/.test(x[2])||!Number.isInteger(x[3])||x[3]<1||x[3]>2147483647||typeof x[4]!=="string"||!/^[a-f0-9]{64}$/.test(x[4])||!Number.isInteger(x[5])||x[5]<1||x[5]>RUNTIME)))return null}''',
+  );
+  source = _replaceOnce(
+    source,
+    r'''profileFor=(url,plan)=>{if(!pagePath(url.pathname))return null;let actual=routePath(url.pathname,plan.base);if(!actual)return null;for(let r of plan.routes)if(matches(actual,r[0]))return r[1];return null},validUrl=''',
+    r'''routeFor=(url,plan)=>{if(!pagePath(url.pathname))return null;let actual=routePath(url.pathname,plan.base);if(!actual)return null;for(let r of plan.routes)if(matches(actual,r[0]))return r;return null},profileFor=(url,plan)=>{let r=routeFor(url,plan);return r&&r[1]},runtimeFor=(url,plan)=>{let r=routeFor(url,plan);return r&&r[2]},validUrl=''',
+  );
+  source = _replaceOnce(
+    source,
+    r'''samePlan=(a,b)=>a.base===b.base&&a.profile===b.profile&&a.routes.length===b.routes.length&&a.routes.every((r,i)=>r[0]===b.routes[i][0]&&r[1]===b.routes[i][1]),''',
+    r'''sameRuntime=(a,b)=>a===null?b===null:Array.isArray(a)&&Array.isArray(b)&&a.length===6&&b.length===6&&a.every((v,i)=>v===b[i]),samePlan=(a,b)=>a.base===b.base&&a.profile===b.profile&&a.routes.length===b.routes.length&&a.routes.every((r,i)=>r[0]===b.routes[i][0]&&r[1]===b.routes[i][1]&&sameRuntime(r[2],b.routes[i][2])),''',
+  );
+  source = _replaceOnce(
+    source,
+    _navigationValidate,
+    _applicationHandoffValidate,
+  );
+  source = _replaceOnce(
+    source,
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile);if(!current)return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null;',
+    'let initialPlan=parseManifest(d),current=initialPlan&&validate(d,new URL(location.href),initialPlan.profile,true);if(!current||(current.runtime&&current.runtime.node.getAttribute(READY)!=="true"))return;let plan=current.plan,c=current.content,manifest=current.plan.node,g=0,controller=null,pending=null,runtimeNonce=(d.currentScript&&d.currentScript.nonce)||"",currentPage=location.origin+location.pathname;',
+  );
+  source = _replaceOnce(
+    source,
+    _navigationApply,
+    _applicationHandoffApply,
+  );
+  source = _replaceOnce(source, _navigationGo, _handoffNavigationGo);
+  source = _replaceOnce(source, _navigationEvents, _handoffNavigationEvents);
+  return source;
+}
+
 const _navigationValidate = r'''validate=(doc,url,expected)=>{
  let plan=parseManifest(doc);if(!plan||plan.profile!==expected||!validUrl(url,plan)||doc.head.querySelectorAll("base").length)return null;
  let contents=doc.querySelectorAll('#esen-seo-content[data-esen-seo-dom-first="true"]'),runtimes=doc.querySelectorAll('script[data-esen-seo-dom-first-runtime]'),heads=Array.from(doc.head.querySelectorAll('[data-esen-seo-navigation-head]'));
@@ -254,6 +315,15 @@ const _handoffValidate =
  return{plan,content:contents[0],heads,lang,runtime}
 };''';
 
+const _applicationHandoffValidate =
+    r'''loadable=(doc,url,plan)=>{let expected=runtimeFor(url,plan),nodes=doc.querySelectorAll("script["+LOAD+"]"),apps=doc.querySelectorAll("script["+APP+"]");if(expected===null)return nodes.length||apps.length?false:null;if(!expected||nodes.length!==1||apps.length!==1||nodes[0]!==apps[0])return false;let node=nodes[0],names=Array.from(node.attributes).map(a=>a.name),allowed=new Set([LOAD,APP,KIND,CONTRACT,HASH,READY,"nonce"]),raw=node.textContent||"",ready=node.getAttribute(READY);if(node.parentElement!==doc.body||names.some(n=>!allowed.has(n))||node.getAttribute(LOAD)!==expected[0]||node.getAttribute(KIND)!==expected[1]||node.getAttribute(APP)!==expected[2]||node.getAttribute(CONTRACT)!==String(expected[3])||node.getAttribute(HASH)!==expected[4]||(ready!==null&&ready!=="true")||!raw.endsWith(EPILOGUE))return false;let source=raw.slice(0,-EPILOGUE.length);if(new TextEncoder().encode(source).byteLength!==expected[5])return false;return{node,source,owner:expected[0],kind:expected[1],id:expected[2],contract:expected[3],hash:expected[4]}},validate=(doc,url,expected,initial)=>{
+ let plan=parseManifest(doc);if(!plan||plan.profile!==expected||!validUrl(url,plan)||doc.head.querySelectorAll("base").length)return null;
+ let contents=doc.querySelectorAll('#esen-seo-content[data-esen-seo-dom-first="true"]'),runtimes=doc.querySelectorAll('script[data-esen-seo-dom-first-runtime]'),heads=Array.from(doc.head.querySelectorAll('[data-esen-seo-navigation-head]')),runtime=loadable(doc,url,plan);
+ let root=contents[0],rootNames=root&&Array.from(root.attributes).map(a=>a.name).sort().join(","),enhanced=initial&&runtime&&runtime.node.getAttribute(READY)==="true";if(runtime===false||contents.length!=1||root.parentElement!==doc.body||root.localName!=="div"||rootNames!=="data-esen-seo-dom-first,id"||root.dataset.esenSeoDomFirst!=="true"||root.hasAttribute("inert")||/^\s*true\s*$/i.test(root.getAttribute("aria-hidden"))||!enhanced&&!validContent(root)||runtimes.length!==1||runtimes[0].parentElement!==doc.body||heads.length>HEAD||heads.some(n=>n.parentElement!==doc.head||!validHead(n)))return null;
+ let lang=(doc.documentElement.getAttribute("lang")||"").trim();if(lang&&!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang))return null;
+ return{plan,content:contents[0],heads,lang,runtime}
+};''';
+
 const _navigationApply = r'''apply=(target,url,push,position)=>{
 let newContent=d.importNode(target.content,true),newManifest=d.importNode(target.plan.node,true),fragment=d.createDocumentFragment();for(let node of target.heads)fragment.append(d.importNode(node,true));
 let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFocus.removeAttribute("data-esen-navigation-focus");oldFocus.removeAttribute("tabindex")}
@@ -264,6 +334,15 @@ let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFoc
 
 const _handoffApply =
     r'''runRuntime=runtime=>{for(let node of d.querySelectorAll("script["+LOAD+"]"))node.remove();if(!runtime)return true;let node=d.createElement("script");node.setAttribute(LOAD,runtime.kind);node.setAttribute(HASH,runtime.hash);if(runtimeNonce)node.nonce=runtimeNonce;node.textContent=runtime.source;d.body.append(node);return node.getAttribute(READY)==="true"},apply=(target,url,push,position)=>{
+let newContent=d.importNode(target.content,true),newManifest=d.importNode(target.plan.node,true),fragment=d.createDocumentFragment();for(let node of target.heads)fragment.append(d.importNode(node,true));
+let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFocus.removeAttribute("data-esen-navigation-focus");oldFocus.removeAttribute("tabindex")}
+ if(push)history.pushState({[stateKey]:1,x:0,y:0},"",url.href);
+ for(let node of d.head.querySelectorAll('[data-esen-seo-navigation-head]'))node.remove();d.head.insertBefore(fragment,manifest);manifest.replaceWith(newManifest);c.replaceWith(newContent);manifest=newManifest;c=newContent;plan=target.plan;currentPage=url.origin+url.pathname;if(target.lang)d.documentElement.lang=target.lang;else d.documentElement.removeAttribute("lang");
+ d.documentElement.dispatchEvent(new Event(eventName));if(!runRuntime(target.runtime))return false;focusAndScroll(url,position);return true
+}''';
+
+const _applicationHandoffApply =
+    r'''runRuntime=runtime=>{for(let node of d.querySelectorAll("script["+LOAD+"]"))node.remove();if(!runtime)return true;let node=d.createElement("script");node.setAttribute(LOAD,runtime.owner);node.setAttribute(APP,runtime.id);node.setAttribute(KIND,runtime.kind);node.setAttribute(CONTRACT,String(runtime.contract));node.setAttribute(HASH,runtime.hash);if(runtimeNonce)node.nonce=runtimeNonce;node.textContent=runtime.source+EPILOGUE;d.body.append(node);return node.getAttribute(READY)==="true"},apply=(target,url,push,position)=>{
 let newContent=d.importNode(target.content,true),newManifest=d.importNode(target.plan.node,true),fragment=d.createDocumentFragment();for(let node of target.heads)fragment.append(d.importNode(node,true));
 let oldFocus=d.querySelector("[data-esen-navigation-focus]");if(oldFocus){oldFocus.removeAttribute("data-esen-navigation-focus");oldFocus.removeAttribute("tabindex")}
  if(push)history.pushState({[stateKey]:1,x:0,y:0},"",url.href);

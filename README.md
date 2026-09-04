@@ -1042,11 +1042,58 @@ CSP, provide `domFirstNonce` as for the other package runtimes; otherwise an
 unavailable verifier or blocked dynamic script deliberately uses full
 navigation.
 
-Outside that explicit handoff profile, navigation cannot be combined with
-Collection. Forms, application runtimes and Stepper Effects remain incompatible
-with every navigation profile. Those links deliberately retain native
-multi-page navigation until their state and reinitialization contracts are
-explicit. Modified clicks, downloads, external targets, fragments on the
+`SeoDomFirstFeature.applicationRuntimeHandoff` is the corresponding closed
+pilot for one separately compiled application Collection runtime. Static and
+Collection routes select the same feature profile; only the latter names the
+typed runtime:
+
+```dart
+const articleCollectionRuntime =
+    SeoDomFirstApplicationRuntime.collection('article-collection');
+
+const applicationHandoffFeatures = {
+  SeoDomFirstFeature.navigation,
+  SeoDomFirstFeature.applicationRuntimeHandoff,
+  SeoDomFirstFeature.themeToggle,
+};
+
+final seoRoutes = [
+  SeoRoute(
+    path: '/articles',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: applicationHandoffFeatures,
+    applicationRuntime: articleCollectionRuntime,
+    meta: (_) => const SeoMeta(title: 'Articles'),
+    body: (_) => articleCollectionNodes,
+  ),
+  SeoRoute(
+    path: '/about',
+    delivery: SeoRouteDelivery.domFirst,
+    domFirstFeatures: applicationHandoffFeatures,
+    meta: (_) => const SeoMeta(title: 'About'),
+    body: (_) => aboutNodes,
+  ),
+];
+```
+
+Pass the same `SeoDomFirstRuntimeStore` used for standalone application
+runtimes to `seoBotMiddleware` or `prerenderSite`. Before any profile document
+is emitted, the artifact's manifest, contract revision, typed identity, source
+length, gzip size and digest are verified once. Manifest schema 3 then binds
+that exact application source to its route. Fetched source stays inert until
+Web Crypto verifies it; only then does the loader append its fixed package-owned
+ready-marker epilogue and execute it with the current package runtime's CSP
+nonce. Each destination rebuilds
+Collection state from its own complete HTML and validated URL. One compatible
+profile may reuse one runtime reference across any number of routes. A second
+runtime id in that profile is rejected; bundles, prefetch and every other
+application runtime kind must use ordinary document navigation.
+
+Outside the two explicit handoff profiles, navigation cannot be combined with
+Collection. Forms, other application runtimes and Stepper Effects remain
+incompatible with every navigation profile. Those links deliberately retain
+native multi-page navigation until their state and reinitialization contracts
+are explicit. Modified clicks, downloads, external targets, fragments on the
 current page, malformed responses and profile changes likewise stay native or
 fall back to a full document request. Without JavaScript every route remains a
 complete, directly navigable HTML page. `siteBase` is required when any route

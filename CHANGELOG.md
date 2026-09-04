@@ -24,6 +24,18 @@
   document navigation. Existing navigation and prefetch output remains
   byte-identical. Applications with an exhaustive switch over
   `SeoDomFirstFeature` must handle the new `runtimeHandoff` value.
+* Added a separate verified handoff profile for one standalone,
+  application-authored Collection runtime. Manifest schema 3 binds its typed
+  id, kind, runtime contract revision, exact application-source length and
+  SHA-256 to each destination before Web Crypto may admit the inert fetched
+  source and append the fixed package-owned ready-marker epilogue. Middleware
+  and prerender delivery use one immutable verified artifact snapshot,
+  route-local Collection state is rebuilt after every replacement,
+  and every failed validation or initialization returns to ordinary document
+  navigation. Existing navigation, prefetch, package handoff and standalone
+  application-runtime output remains unchanged. Applications with an
+  exhaustive switch over `SeoDomFirstFeature` must handle the new
+  `applicationRuntimeHandoff` value.
 
 ## 0.14.0
 

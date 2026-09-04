@@ -5,6 +5,7 @@ import 'package:shelf/shelf.dart';
 import '../meta/seo_meta.dart';
 import '../renderer/seo_node.dart';
 import '../renderer/seo_stylesheet.dart';
+import '../routing/seo_application_runtime.dart';
 import '../routing/seo_resolution.dart';
 import '../routing/seo_resolved_page.dart';
 import '../routing/seo_dom_first_navigation.dart';
@@ -13,6 +14,7 @@ import '../routing/seo_route_delivery.dart';
 import '../routing/seo_path_kind.dart';
 import 'bot_detector.dart';
 import 'llms_txt.dart';
+import 'seo_application_runtime_handoff.dart';
 import 'seo_page.dart';
 import 'seo_runtime_store.dart';
 import 'sitemap.dart';
@@ -120,8 +122,11 @@ Middleware seoBotMiddleware({
 
   /// Resolves application-authored runtimes selected by DOM-first routes.
   ///
-  /// The middleware verifies the artifact on every delivery. Routes without an
-  /// application runtime never consult this store.
+  /// Standalone runtimes are verified on every delivery. An application
+  /// handoff profile instead verifies all of its artifacts once before its
+  /// first response and keeps that immutable snapshot for the middleware
+  /// lifetime. Static routes in that profile wait for the same snapshot so a
+  /// document is never emitted from a partial route plan.
   SeoDomFirstRuntimeStore? domFirstRuntimeStore,
   Duration? infrastructureCacheTtl = seoAutoInfrastructureCacheTtl,
 
@@ -150,18 +155,29 @@ Middleware seoBotMiddleware({
               route.domFirstFeatures.contains(SeoDomFirstFeature.navigation))
           .toList() ??
       const <SeoRoute>[];
+  final applicationHandoffReferences =
+      _applicationHandoffReferences(routes ?? const <SeoRoute>[]);
   if (navigationRoutes.isNotEmpty && siteBase == null) {
     throw ArgumentError.notNull('siteBase');
   }
   final navigationPlans = <SeoRoute, SeoDomFirstNavigationPlan>{
     if (routes != null && siteBase != null)
       for (final route in navigationRoutes)
-        route: buildSeoDomFirstNavigationPlan(
-          routes: routes,
-          currentRoute: route,
-          siteBase: siteBase,
-        )!,
+        if (!route.domFirstFeatures
+            .contains(SeoDomFirstFeature.applicationRuntimeHandoff))
+          route: buildSeoDomFirstNavigationPlan(
+            routes: routes,
+            currentRoute: route,
+            siteBase: siteBase,
+          )!,
   };
+  late final Future<_ApplicationHandoffSnapshot> applicationHandoffSnapshot =
+      _loadApplicationHandoffSnapshot(
+    routes: routes!,
+    siteBase: siteBase!,
+    store: domFirstRuntimeStore,
+    references: applicationHandoffReferences,
+  );
   // Not just `isDynamic`: a CLASSIC route may carry an async
   // `enumeratePaths` too, and the synchronous pass cannot await it
   // either. Deciding on "is dynamic" alone made /sitemap.xml throw for a
@@ -393,12 +409,24 @@ Middleware seoBotMiddleware({
                 :final headers,
               ):
               final runtimeReference = match.route.applicationRuntime;
+              final applicationHandoff = match.route.domFirstFeatures
+                  .contains(SeoDomFirstFeature.applicationRuntimeHandoff);
+              final handoffSnapshot =
+                  applicationHandoff ? await applicationHandoffSnapshot : null;
               final applicationRuntime = runtimeReference == null
                   ? null
-                  : await loadSeoDomFirstRuntime(
-                      domFirstRuntimeStore!,
-                      runtimeReference,
-                    );
+                  : applicationHandoff
+                      ? handoffSnapshot!.artifacts[runtimeReference]
+                      : await loadSeoDomFirstRuntime(
+                          domFirstRuntimeStore!,
+                          runtimeReference,
+                        );
+              if (runtimeReference != null && applicationRuntime == null) {
+                throw StateError(
+                  'Application handoff runtime "${runtimeReference.id}" '
+                  'is missing from its verified snapshot.',
+                );
+              }
               final pageBody = statusCode >= 400 && body.isEmpty
                   ? _statusBody(statusCode)
                   : body;
@@ -411,7 +439,9 @@ Middleware seoBotMiddleware({
                   lang: resolution.lang ?? match.route.lang,
                   stylesheet: domFirstStylesheet,
                   features: match.route.domFirstFeatures,
-                  navigationPlan: navigationPlans[match.route],
+                  navigationPlan: applicationHandoff
+                      ? handoffSnapshot!.plans[match.route]
+                      : navigationPlans[match.route],
                   applicationRuntime: applicationRuntime,
                   interactionNonce: domFirstNonce?.call(request),
                 ),
@@ -557,6 +587,73 @@ Middleware seoBotMiddleware({
       return _appResponse(inner, request);
     };
   };
+}
+
+Set<SeoDomFirstApplicationRuntime> _applicationHandoffReferences(
+  List<SeoRoute> routes,
+) =>
+    Set<SeoDomFirstApplicationRuntime>.unmodifiable(
+      routes
+          .where(
+            (route) => route.domFirstFeatures
+                .contains(SeoDomFirstFeature.applicationRuntimeHandoff),
+          )
+          .map((route) => route.applicationRuntime)
+          .whereType<SeoDomFirstApplicationRuntime>(),
+    );
+
+Future<_ApplicationHandoffSnapshot> _loadApplicationHandoffSnapshot({
+  required List<SeoRoute> routes,
+  required String siteBase,
+  required SeoDomFirstRuntimeStore? store,
+  required Set<SeoDomFirstApplicationRuntime> references,
+}) async {
+  if (references.isNotEmpty && store == null) {
+    throw ArgumentError.notNull('domFirstRuntimeStore');
+  }
+  final artifacts =
+      <SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>{};
+  final entries =
+      <SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>{};
+  for (final reference in references) {
+    final artifact = await loadSeoDomFirstRuntime(store!, reference);
+    final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+    payload.validateProfileBudget(
+      includeThemeToggle: routes.any(
+        (candidate) =>
+            candidate.applicationRuntime == reference &&
+            candidate.domFirstFeatures.contains(SeoDomFirstFeature.themeToggle),
+      ),
+    );
+    artifacts[reference] = artifact;
+    entries[reference] = payload.navigationEntry;
+  }
+  final plans = <SeoRoute, SeoDomFirstNavigationPlan>{
+    for (final route in routes)
+      if (route.domFirstFeatures
+          .contains(SeoDomFirstFeature.applicationRuntimeHandoff))
+        route: buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: route,
+          siteBase: siteBase,
+          applicationRuntimes: entries,
+        )!,
+  };
+  return _ApplicationHandoffSnapshot(
+    artifacts: Map.unmodifiable(artifacts),
+    plans: Map.unmodifiable(plans),
+  );
+}
+
+final class _ApplicationHandoffSnapshot {
+  const _ApplicationHandoffSnapshot({
+    required this.artifacts,
+    required this.plans,
+  });
+
+  final Map<SeoDomFirstApplicationRuntime, SeoDomFirstRuntimeArtifact>
+      artifacts;
+  final Map<SeoRoute, SeoDomFirstNavigationPlan> plans;
 }
 
 /// Maps a request path into the route table's space when the deployment lives
