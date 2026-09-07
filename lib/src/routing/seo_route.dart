@@ -279,7 +279,8 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
           'of tabs or carousel and does not support stepper; runtimeHandoff '
           'supports only the optional package-owned collection runtime; '
           'applicationRuntimeHandoff supports one standalone implicit '
-          'collection or explicit typed collection/configurator profile',
+          'collection or explicit typed collection/configurator/'
+          'editorial-workflow profile',
     );
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&
@@ -401,11 +402,13 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntimeHandoffProfile(
     );
   }
   if (profile is! SeoDomFirstCollectionApplicationRuntime &&
-      profile is! SeoDomFirstConfiguratorApplicationRuntime) {
+      profile is! SeoDomFirstConfiguratorApplicationRuntime &&
+      profile is! SeoDomFirstEditorialWorkflowApplicationRuntime) {
     throw ArgumentError.value(
       profile,
       'applicationRuntimeHandoffProfile',
-      'supports only a standalone collection or configurator runtime',
+      'supports only a standalone collection, configurator or '
+          'editorial-workflow runtime',
     );
   }
   if (runtime != null && runtime != profile) {

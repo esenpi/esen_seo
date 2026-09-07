@@ -22,6 +22,10 @@ const _otherConfiguratorReference =
     SeoDomFirstApplicationRuntime.configurator('other-configurator');
 const _configuratorJavascript =
     '(function(){var configuratorHandoff=true;})();';
+const _workflowReference =
+    SeoDomFirstApplicationRuntime.editorialWorkflow('article-workflow');
+const _workflowJavascript =
+    '(function(){var editorialWorkflowHandoff=true;})();';
 const _features = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.applicationRuntimeHandoff,
@@ -47,6 +51,13 @@ SeoDomFirstRuntimeArtifact _configuratorArtifact([
     SeoDomFirstRuntimeArtifact.create(
       reference: reference,
       javascript: _configuratorJavascript,
+      dartVersion: '3.6.2',
+    );
+
+SeoDomFirstRuntimeArtifact _workflowArtifact() =>
+    SeoDomFirstRuntimeArtifact.create(
+      reference: _workflowReference,
+      javascript: _workflowJavascript,
       dartVersion: '3.6.2',
     );
 
@@ -123,6 +134,153 @@ String _withoutScripts(String html) =>
 
 void main() {
   group('typed application handoff profile', () {
+    test('binds an Editorial Workflow profile to schema 4', () {
+      final artifact = _workflowArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _workflowReference),
+        _profileRoute(
+          '/editorial',
+          profile: _workflowReference,
+          runtime: _workflowReference,
+        ),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: {_workflowReference: payload.navigationEntry},
+      )!;
+      final manifest = jsonDecode(plan.manifestJson) as Map<String, dynamic>;
+
+      expect(
+        plan.schemaVersion,
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(
+        plan.profile,
+        'applicationRuntimeHandoff.navigation.themeToggle.application.'
+        'editorial-workflow.article-workflow',
+      );
+      expect(plan.currentRuntime?.kind, 'editorial-workflow');
+      expect(plan.profileRuntime?.applicationId, _workflowReference.id);
+      expect(manifest['schema'], 4);
+      expect((manifest['routes'] as List).last, [
+        '/editorial',
+        plan.profile,
+        [
+          'application',
+          'editorial-workflow',
+          _workflowReference.id,
+          seoDomFirstRuntimeContractRevision,
+          payload.navigationEntry.sha256,
+          payload.navigationEntry.bytes,
+        ],
+      ]);
+    });
+
+    test('renders only Editorial Workflow structural CSS for its profile', () {
+      final artifact = _workflowArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _workflowReference),
+        _profileRoute(
+          '/editorial',
+          profile: _workflowReference,
+          runtime: _workflowReference,
+        ),
+      ];
+      final entries = {_workflowReference: payload.navigationEntry};
+      final overviewPlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.first,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final activePlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final overviewHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Overview')],
+        features: _features,
+        navigationPlan: overviewPlan,
+      ).toHtmlDocument();
+      final activeHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Editorial')],
+        features: _features,
+        navigationPlan: activePlan,
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      for (final html in [overviewHtml, activeHtml]) {
+        expect(html, contains('.esen-seo-editorial-workflow'));
+        expect(html, isNot(contains('.esen-seo-collection-toolbar')));
+        expect(html, isNot(contains('.esen-seo-configurator-controls')));
+      }
+      expect(overviewHtml, isNot(contains(_workflowJavascript)));
+      expect(activeHtml, contains(_workflowJavascript));
+      expect(
+        activeHtml,
+        contains(seoDomFirstEditorialWorkflowApplicationHandoffEpilogue),
+      );
+      expect(
+        payload.javascript,
+        '$_workflowJavascript'
+        '$seoDomFirstEditorialWorkflowApplicationHandoffEpilogue',
+      );
+      expect(
+        payload.navigationEntry.bytes,
+        utf8.encode(_workflowJavascript).length,
+      );
+      expect(payload.navigationEntry.sha256, artifact.manifest.sha256);
+      payload.validateProfileBudget(includeThemeToggle: true);
+    });
+
+    test('snapshots one Editorial Workflow artifact across server routes',
+        () async {
+      final artifact = _workflowArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _workflowReference),
+        _profileRoute(
+          '/editorial',
+          profile: _workflowReference,
+          runtime: _workflowReference,
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(seoBotMiddleware(
+            routes: routes,
+            siteBase: 'https://x.dev',
+            domFirstRuntimeStore: store,
+          ))
+          .addHandler((_) => Response.ok('flutter'));
+
+      final overview = await handler(
+        Request('GET', Uri.parse('https://x.dev/overview')),
+      );
+      final editorial = await handler(
+        Request('GET', Uri.parse('https://x.dev/editorial')),
+      );
+      final overviewHtml = await overview.readAsString();
+      final editorialHtml = await editorial.readAsString();
+
+      expect(store.loads, 1);
+      expect(overviewHtml, isNot(contains(_workflowJavascript)));
+      expect(overviewHtml, contains(artifact.manifest.sha256));
+      expect(editorialHtml, contains(_workflowJavascript));
+      expect(editorialHtml, contains(artifact.manifest.sha256));
+    });
+
     test('binds a Configurator profile to static and active routes', () {
       final artifact = _configuratorArtifact();
       final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
@@ -199,6 +357,19 @@ void main() {
           domFirstFeatures: _features,
           applicationRuntimeHandoffProfile:
               const SeoDomFirstApplicationRuntime.tabs('profile-tabs'),
+          meta: (_) => const SeoMeta(),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => SeoRoute(
+          path: '/approval',
+          delivery: SeoRouteDelivery.domFirst,
+          domFirstFeatures: _features,
+          applicationRuntimeHandoffProfile:
+              const SeoDomFirstApplicationRuntime.approvalChecklist(
+            'approval-profile',
+          ),
           meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,

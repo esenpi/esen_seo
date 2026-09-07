@@ -28,13 +28,14 @@ final class SeoDomFirstApplicationHandoffPayload {
     final reference = artifact.reference;
     final admitted = typedProfile
         ? reference is SeoDomFirstCollectionApplicationRuntime ||
-            reference is SeoDomFirstConfiguratorApplicationRuntime
+            reference is SeoDomFirstConfiguratorApplicationRuntime ||
+            reference is SeoDomFirstEditorialWorkflowApplicationRuntime
         : reference is SeoDomFirstCollectionApplicationRuntime;
     if (!admitted) {
       throw StateError(
         typedProfile
             ? 'Typed application runtime handoff supports only a standalone '
-                'collection or configurator runtime.'
+                'collection, configurator or editorial-workflow runtime.'
             : 'Application runtime handoff supports only a standalone '
                 'collection runtime.',
       );

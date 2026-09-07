@@ -315,7 +315,12 @@ String _withApplicationProfileHandoff(String source) {
   source = _replaceOnce(
     source,
     r'''x[1]!=="collection"||typeof x[2]''',
-    r'''(x[1]!=="collection"&&x[1]!=="configurator")||typeof x[2]''',
+    r'''(x[1]!=="collection"&&x[1]!=="configurator"&&x[1]!=="editorial-workflow")||typeof x[2]''',
+  );
+  source = _replaceOnce(
+    source,
+    r'''||!/^[a-z][a-z0-9_-]{0,63}$/.test(x[2])||!Number.isInteger(x[3])''',
+    r'''||!/^[a-z][a-z0-9_-]{0,63}$/.test(x[2])||!j.profile.endsWith(".application."+x[1]+"."+x[2])||!Number.isInteger(x[3])''',
   );
   source = _replaceOnce(
     source,
@@ -326,6 +331,9 @@ String _withApplicationProfileHandoff(String source) {
         'documentElement.dataset.esenCollectionPending;document.currentScript'
         '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
         '\\",\\"true\\")":kind==="configurator"?"\\n;delete document.'
+        'documentElement.dataset.esenInteractionPending;document.currentScript'
+        '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
+        '\\",\\"true\\")":kind==="editorial-workflow"?"\\n;delete document.'
         'documentElement.dataset.esenInteractionPending;document.currentScript'
         '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
         '\\",\\"true\\")":null,',

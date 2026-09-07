@@ -396,7 +396,8 @@ bool _admittedApplicationHandoffRuntime(
 }) =>
     typedProfile
         ? runtime is SeoDomFirstCollectionApplicationRuntime ||
-            runtime is SeoDomFirstConfiguratorApplicationRuntime
+            runtime is SeoDomFirstConfiguratorApplicationRuntime ||
+            runtime is SeoDomFirstEditorialWorkflowApplicationRuntime
         : runtime is SeoDomFirstCollectionApplicationRuntime;
 
 String _nonceAttribute(String? nonce) {

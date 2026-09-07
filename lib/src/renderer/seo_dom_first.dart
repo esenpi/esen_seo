@@ -296,8 +296,9 @@ String seoDomFirstFeatureStyleHtml(
     css.write(seoDomFirstCollectionStylesheet);
   } else if (features.contains(SeoDomFirstFeature.runtimeHandoff) ||
       (features.contains(SeoDomFirstFeature.applicationRuntimeHandoff) &&
-          applicationRuntimeHandoffKind !=
-              SeoDomFirstApplicationRuntimeKind.configurator)) {
+          (applicationRuntimeHandoffKind == null ||
+              applicationRuntimeHandoffKind ==
+                  SeoDomFirstApplicationRuntimeKind.collection))) {
     // Handoff routes keep this stylesheet stable while the Collection runtime
     // itself remains route-local and loadable.
     css.write(seoDomFirstCollectionStylesheet);
@@ -307,7 +308,9 @@ String seoDomFirstFeatureStyleHtml(
           SeoDomFirstApplicationRuntimeKind.configurator) {
     css.write(seoDomFirstConfiguratorStylesheet);
   }
-  if (features.contains(SeoDomFirstFeature.editorialWorkflow)) {
+  if (features.contains(SeoDomFirstFeature.editorialWorkflow) ||
+      applicationRuntimeHandoffKind ==
+          SeoDomFirstApplicationRuntimeKind.editorialWorkflow) {
     css.write(seoDomFirstEditorialWorkflowStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.approvalChecklist)) {

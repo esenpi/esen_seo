@@ -28,6 +28,12 @@ const String seoDomFirstConfiguratorApplicationHandoffEpilogue =
     'document.currentScript&&document.currentScript.setAttribute('
     '"$seoDomFirstRuntimeReadyAttribute","true")';
 
+/// Package-owned Editorial Workflow suffix joined after source verification.
+const String seoDomFirstEditorialWorkflowApplicationHandoffEpilogue =
+    '\n;delete document.documentElement.dataset.esenInteractionPending;'
+    'document.currentScript&&document.currentScript.setAttribute('
+    '"$seoDomFirstRuntimeReadyAttribute","true")';
+
 /// The complete classic-script body admitted by the first runtime handoff.
 final String seoDomFirstCollectionHandoffRuntime =
     '$seoDomFirstCollectionRuntime;'
@@ -52,9 +58,11 @@ String seoDomFirstApplicationHandoffEnvelope(
 String seoDomFirstApplicationHandoffEpilogueFor(String kind) => switch (kind) {
       seoDomFirstCollectionRuntimeKind => seoDomFirstApplicationHandoffEpilogue,
       'configurator' => seoDomFirstConfiguratorApplicationHandoffEpilogue,
+      'editorial-workflow' =>
+        seoDomFirstEditorialWorkflowApplicationHandoffEpilogue,
       _ => throw ArgumentError.value(
           kind,
           'kind',
-          'must be collection or configurator',
+          'must be collection, configurator or editorial-workflow',
         ),
     };

@@ -403,15 +403,16 @@ void _validateApplicationHandoffProfile(
   for (final reference in admitted) {
     final allowed = typed
         ? reference is SeoDomFirstCollectionApplicationRuntime ||
-            reference is SeoDomFirstConfiguratorApplicationRuntime
+            reference is SeoDomFirstConfiguratorApplicationRuntime ||
+            reference is SeoDomFirstEditorialWorkflowApplicationRuntime
         : reference is SeoDomFirstCollectionApplicationRuntime;
     if (!allowed) {
       throw ArgumentError.value(
         reference,
         'routes',
         typed
-            ? 'typed applicationRuntimeHandoff supports only collection or '
-                'configurator runtimes'
+            ? 'typed applicationRuntimeHandoff supports only collection, '
+                'configurator or editorial-workflow runtimes'
             : 'implicit applicationRuntimeHandoff supports only collection '
                 'runtimes',
       );

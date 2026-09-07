@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Added Editorial Workflow as the third explicit typed application-runtime
+  handoff family. Compatible static and active routes share schema 4, stable
+  workflow CSS and one verified standalone artifact while every destination
+  reconstructs stage and history from its delivered document.
 * Added explicit typed application-runtime handoff profiles and manifest
   schema 4, with Configurator as the second admitted standalone family. Static
   and active routes bind the same validated kind and artifact id, receive
