@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:esen_seo/server.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_application_handoff_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_navigation_application_profile_runtime.g.dart';
 import 'package:esen_seo/src/renderer/seo_dom_first_runtime_handoff.dart';
+import 'package:esen_seo/src/renderer/seo_dom_first_theme_toggle_runtime.g.dart';
 import 'package:esen_seo/src/server/seo_application_runtime_handoff.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shelf/shelf.dart';
@@ -91,6 +93,33 @@ Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
               SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact)
                   .navigationEntry,
         };
+
+String _incompressibleJavascript(int length) {
+  const alphabet =
+      r'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$';
+  final random = Random(7);
+  final source = StringBuffer('var seoRuntimeSource="');
+  for (var index = 0; index < length; index++) {
+    source.write(alphabet[random.nextInt(alphabet.length)]);
+  }
+  source.write('";');
+  return source.toString();
+}
+
+int _nearCeilingSourceLength() {
+  final codec = GZipCodec(level: 9);
+  var length = 24 * 1024;
+  while (codec
+          .encode(utf8.encode(_incompressibleJavascript(length + 1024)))
+          .length <=
+      seoDomFirstRuntimeMaxGzipBytes) {
+    length += 1024;
+  }
+  return length;
+}
+
+String _withoutScripts(String html) =>
+    html.replaceAll(RegExp(r'<script[^>]*>.*?</script>', dotAll: true), '');
 
 void main() {
   group('typed application handoff profile', () {
@@ -391,6 +420,384 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('rejects a typed profile on a Flutter-delivered route', () {
+      expect(
+        () => SeoRoute(
+          path: '/flutter',
+          applicationRuntimeHandoffProfile: _configuratorReference,
+          meta: (_) => const SeoMeta(),
+        ),
+        throwsA(isA<ArgumentError>()
+            .having(
+              (error) => error.name,
+              'name',
+              'applicationRuntimeHandoffProfile',
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('requires delivery'),
+            )),
+      );
+      expect(
+        () => SeoRoute.dynamic(
+          path: '/flutter-dynamic',
+          applicationRuntimeHandoffProfile: _configuratorReference,
+          resolve: (_) => const SeoDocument(),
+        ),
+        throwsA(isA<ArgumentError>()
+            .having(
+              (error) => error.name,
+              'name',
+              'applicationRuntimeHandoffProfile',
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('requires delivery'),
+            )),
+      );
+    });
+
+    test('rejects an invalid runtime id in a typed profile', () {
+      for (final id in ['', '9bad', 'Bad', 'a b', 'a' * 65]) {
+        expect(
+          () => _profileRoute(
+            '/invalid',
+            profile: SeoDomFirstApplicationRuntime.configurator(id),
+          ),
+          throwsA(isA<ArgumentError>().having(
+            (error) => error.name,
+            'name',
+            'applicationRuntimeHandoffProfile',
+          )),
+          reason: id,
+        );
+      }
+    });
+
+    test('rejects a profile whose kind contradicts an equal runtime id', () {
+      const collection = SeoDomFirstApplicationRuntime.collection('shared-id');
+      const configurator =
+          SeoDomFirstApplicationRuntime.configurator('shared-id');
+
+      expect(collection, isNot(configurator));
+      expect({collection, configurator}, hasLength(2));
+
+      for (final (profile, runtime) in [
+        (configurator, collection),
+        (collection, configurator),
+      ]) {
+        expect(
+          () => _profileRoute('/mixed', profile: profile, runtime: runtime),
+          throwsA(isA<ArgumentError>().having(
+            (error) => error.name,
+            'name',
+            'applicationRuntime',
+          )),
+          reason: profile.kind,
+        );
+      }
+    });
+
+    test('admits a Collection reference under the explicit typed profile', () {
+      final artifact = _artifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _reference),
+        _profileRoute('/articles', profile: _reference, runtime: _reference),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: {_reference: payload.navigationEntry},
+      )!;
+      final html = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Articles')],
+        features: _features,
+        navigationPlan: plan,
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      expect(
+        plan.schemaVersion,
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(
+        plan.profile,
+        'applicationRuntimeHandoff.navigation.themeToggle.application.'
+        'collection.handoff-collection',
+      );
+      expect(plan.profileRuntime?.kind, 'collection');
+      expect(html, contains(seoDomFirstCollectionStylesheet));
+      expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+      expect(html, contains(seoDomFirstNavigationApplicationProfileRuntime));
+      expect(
+        html,
+        isNot(contains(seoDomFirstNavigationApplicationHandoffRuntime)),
+      );
+      expect(html, contains(seoDomFirstApplicationHandoffEpilogue));
+    });
+
+    test('binds the exact schema-4 manifest envelope', () {
+      final artifact = _configuratorArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview'),
+        _profileRoute('/pricing', runtime: _configuratorReference),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.first,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: {_configuratorReference: payload.navigationEntry},
+      )!;
+      final manifest = jsonDecode(plan.manifestJson) as Map<String, dynamic>;
+      final descriptor =
+          ((manifest['routes'] as List).last as List).last as List;
+
+      expect(
+        manifest.keys.toList()..sort(),
+        ['base', 'profile', 'routes', 'schema'],
+      );
+      expect(
+        manifest['schema'],
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(manifest['base'], '/repo');
+      expect(manifest['profile'], plan.profile);
+      expect(
+        (manifest['routes'] as List).first,
+        ['/overview', plan.profile, null],
+      );
+      expect(descriptor, hasLength(6));
+      expect(descriptor[0], seoDomFirstApplicationRuntimeOwner);
+      expect(descriptor[1], 'configurator');
+      expect(descriptor[2], _configuratorReference.id);
+      expect(descriptor[3], seoDomFirstRuntimeContractRevision);
+      expect(descriptor[4], matches(RegExp(r'^[a-f0-9]{64}$')));
+      expect(descriptor[5], payload.navigationEntry.bytes);
+      expect(plan.manifestJson, isNot(contains('<')));
+      expect(plan.manifestJson, isNot(contains('>')));
+      expect(plan.manifestJson, isNot(contains('&')));
+    });
+
+    test('applies the schema-4 manifest budget after script-safe escaping', () {
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        _configuratorArtifact(),
+        typedProfile: true,
+      );
+      final routes = [
+        for (var index = 0; index < 30; index++)
+          _profileRoute(
+            '/$index-${List.filled(200, '<').join()}',
+            runtime: _configuratorReference,
+          ),
+      ];
+
+      expect(
+        () => buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: routes.first,
+          siteBase: 'https://x.dev',
+          applicationRuntimes: {
+            _configuratorReference: payload.navigationEntry,
+          },
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects more than the maximum number of typed profile routes', () {
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        _configuratorArtifact(),
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/pricing', runtime: _configuratorReference),
+        for (var index = 0; index < seoDomFirstNavigationMaxRoutes; index++)
+          SeoRoute(path: '/route-$index', meta: (_) => const SeoMeta()),
+      ];
+
+      expect(
+        () => buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: routes.first,
+          siteBase: 'https://x.dev',
+          applicationRuntimes: {
+            _configuratorReference: payload.navigationEntry,
+          },
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('binds one shared artifact across many typed profile routes', () {
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        _configuratorArtifact(),
+        typedProfile: true,
+      );
+      final routes = [
+        for (var index = 0; index < 5; index++) _profileRoute('/static-$index'),
+        for (var index = 0; index < 5; index++)
+          _profileRoute('/active-$index', runtime: _configuratorReference),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: {_configuratorReference: payload.navigationEntry},
+      )!;
+
+      expect(plan.entries, hasLength(10));
+      for (final entry in plan.entries.take(5)) {
+        expect(entry.runtime, isNull);
+      }
+      for (final entry in plan.entries.skip(5)) {
+        expect(entry.runtime?.applicationId, _configuratorReference.id);
+        expect(entry.runtime?.sha256, payload.navigationEntry.sha256);
+        expect(entry.runtime?.bytes, payload.navigationEntry.bytes);
+      }
+      expect(plan.currentRuntime?.sha256, payload.navigationEntry.sha256);
+      expect(plan.profileRuntime?.sha256, payload.navigationEntry.sha256);
+    });
+
+    test('keeps a typed profile document complete without JavaScript', () {
+      const meta = SeoMeta(title: 'Profile');
+      final body = [
+        SeoNode(tag: 'main', children: [
+          SeoNode(tag: 'h1', text: 'Complete without JavaScript'),
+        ]),
+      ];
+      final artifact = _configuratorArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview'),
+        _profileRoute('/pricing', runtime: _configuratorReference),
+      ];
+      final entries = {_configuratorReference: payload.navigationEntry};
+      final overview = _withoutScripts(SeoPage.domFirstFromNodes(
+        meta: meta,
+        body: body,
+        features: _features,
+        navigationPlan: buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: routes.first,
+          siteBase: 'https://x.dev',
+          applicationRuntimes: entries,
+        ),
+        interactionNonce: 'trusted-nonce',
+      ).toHtmlDocument());
+      final pricing = _withoutScripts(SeoPage.domFirstFromNodes(
+        meta: meta,
+        body: body,
+        features: _features,
+        navigationPlan: buildSeoDomFirstNavigationPlan(
+          routes: routes,
+          currentRoute: routes.last,
+          siteBase: 'https://x.dev',
+          applicationRuntimes: entries,
+        ),
+        applicationRuntime: artifact,
+        interactionNonce: 'trusted-nonce',
+      ).toHtmlDocument());
+
+      expect(overview, isNot(contains('<script')));
+      expect(pricing, isNot(contains('<script')));
+      expect(pricing, contains('Complete without JavaScript'));
+      expect(pricing, contains('$seoDomFirstAttribute="true"'));
+      expect(pricing, contains(seoDomFirstConfiguratorStylesheet));
+      expect(pricing, isNot(contains(_configuratorJavascript)));
+      expect(
+        pricing,
+        isNot(contains(seoDomFirstNavigationApplicationProfileRuntime)),
+      );
+      expect(pricing, overview);
+    });
+
+    test('keeps a near-ceiling artifact inside the combined handoff budget',
+        () {
+      final artifact = SeoDomFirstRuntimeArtifact.create(
+        reference: _configuratorReference,
+        javascript: _incompressibleJavascript(_nearCeilingSourceLength()),
+        dartVersion: '3.6.2',
+      );
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview'),
+        _profileRoute('/pricing', runtime: _configuratorReference),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: {_configuratorReference: payload.navigationEntry},
+      )!;
+      final codec = GZipCodec(level: 9);
+
+      expect(
+        artifact.manifest.gzipBytes,
+        lessThanOrEqualTo(seoDomFirstRuntimeMaxGzipBytes),
+      );
+      expect(
+        artifact.manifest.gzipBytes,
+        greaterThan(seoDomFirstRuntimeMaxGzipBytes - 2048),
+      );
+      expect(
+        codec
+            .encode(utf8.encode(seoDomFirstNavigationApplicationProfileRuntime))
+            .length,
+        lessThanOrEqualTo(8 * 1024),
+      );
+      expect(
+        codec
+            .encode(utf8.encode('${payload.javascript}'
+                '$seoDomFirstNavigationApplicationProfileRuntime'
+                '$seoDomFirstThemeToggleRuntime'))
+            .length,
+        lessThanOrEqualTo(31 * 1024),
+      );
+      payload.validateProfileBudget(includeThemeToggle: true);
+      expect(
+        SeoPage.domFirstFromNodes(
+          body: [SeoNode(tag: 'h1', text: 'Pricing')],
+          features: _features,
+          navigationPlan: plan,
+          applicationRuntime: artifact,
+        ).toHtmlDocument(),
+        contains(payload.javascript),
+      );
+    });
+
+    test('rejects an artifact above the compressed runtime ceiling', () {
+      expect(
+        () => SeoDomFirstRuntimeArtifact.create(
+          reference: _configuratorReference,
+          javascript:
+              _incompressibleJavascript(_nearCeilingSourceLength() + 1024),
+          dartVersion: '3.6.2',
+        ),
+        throwsA(isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('size budget'),
+        )),
+      );
+    });
   });
 
   group('application Collection handoff contract', () {
@@ -677,6 +1084,69 @@ void main() {
           applicationRuntime: changed,
         ),
         throwsArgumentError,
+      );
+    });
+
+    test('pins the schema-3 handoff fragments', () {
+      final artifact = _artifact();
+      final payload =
+          SeoDomFirstApplicationHandoffPayload.fromArtifact(artifact);
+      final routes = [
+        _route('/overview'),
+        _route('/articles', runtime: _reference),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: _runtimeEntries(artifact),
+      )!;
+      final html = SeoPage.domFirstFromNodes(
+        meta: const SeoMeta(title: 'Articles'),
+        body: [SeoNode(tag: 'h1', text: 'Articles')],
+        features: _features,
+        navigationPlan: plan,
+        applicationRuntime: artifact,
+        interactionNonce: 'trusted-nonce',
+      ).toHtmlDocument();
+
+      expect(
+        plan.manifestJson,
+        '{"schema":$seoDomFirstApplicationRuntimeHandoffManifestSchema,'
+        '"base":"/repo",'
+        '"profile":"applicationRuntimeHandoff.navigation.themeToggle",'
+        '"routes":['
+        '["/overview","applicationRuntimeHandoff.navigation.themeToggle",'
+        'null],'
+        '["/articles","applicationRuntimeHandoff.navigation.themeToggle",'
+        '["application","collection","${_reference.id}",'
+        '$seoDomFirstRuntimeContractRevision,'
+        '"${payload.navigationEntry.sha256}",'
+        '${payload.navigationEntry.bytes}]]]}',
+      );
+      expect(
+        html,
+        contains('<script $seoDomFirstLoadableRuntimeAttribute='
+            '"$seoDomFirstApplicationRuntimeOwner" '
+            '$seoDomFirstApplicationScriptAttribute="${_reference.id}" '
+            '$seoDomFirstRuntimeKindAttribute="collection" '
+            '$seoDomFirstRuntimeContractAttribute='
+            '"$seoDomFirstRuntimeContractRevision" '
+            '$seoDomFirstRuntimeSha256Attribute='
+            '"${payload.navigationEntry.sha256}" '
+            'nonce="trusted-nonce">${payload.javascript}</script>'),
+      );
+      expect(html, contains(seoDomFirstCollectionStylesheet));
+      expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+      expect(html, contains(seoDomFirstNavigationApplicationHandoffRuntime));
+      expect(
+        html,
+        isNot(contains(seoDomFirstNavigationApplicationProfileRuntime)),
+      );
+      expect(html, contains(seoDomFirstApplicationHandoffEpilogue));
+      expect(
+        html,
+        isNot(contains(seoDomFirstConfiguratorApplicationHandoffEpilogue)),
       );
     });
   });
