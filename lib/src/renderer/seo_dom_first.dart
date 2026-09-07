@@ -313,7 +313,9 @@ String seoDomFirstFeatureStyleHtml(
           SeoDomFirstApplicationRuntimeKind.editorialWorkflow) {
     css.write(seoDomFirstEditorialWorkflowStylesheet);
   }
-  if (features.contains(SeoDomFirstFeature.approvalChecklist)) {
+  if (features.contains(SeoDomFirstFeature.approvalChecklist) ||
+      applicationRuntimeHandoffKind ==
+          SeoDomFirstApplicationRuntimeKind.approvalChecklist) {
     css.write(seoDomFirstApprovalChecklistStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.actionForm)) {

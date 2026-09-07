@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Added Approval Checklist as the fourth explicit typed application-runtime
+  handoff family. Static and active routes share schema 4, stable checklist
+  CSS and one verified standalone artifact while every destination rebuilds
+  item count and checked flags from its delivered document.
 * Added Editorial Workflow as the third explicit typed application-runtime
   handoff family. Compatible static and active routes share schema 4, stable
   workflow CSS and one verified standalone artifact while every destination

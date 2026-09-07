@@ -589,6 +589,10 @@ void main() {
         _manifest(routesWith(_descriptor(kind: 'editorial-workflow'))),
         _runtimeTag(_applicationRuntime),
       ),
+      'plan-approval-kind': _rejectedDocument(
+        _manifest(routesWith(_descriptor(kind: 'approval-checklist'))),
+        _runtimeTag(_applicationRuntime),
+      ),
       'plan-bad-id': _rejectedDocument(
         _manifest(routesWith(_descriptor(id: 'Pricing'))),
         _runtimeTag(_applicationRuntime),
@@ -676,6 +680,7 @@ void main() {
       'schema-3',
       'plan-unknown-kind',
       'plan-other-admitted-kind',
+      'plan-approval-kind',
       'plan-bad-id',
       'plan-bad-hash',
       'plan-oversized',
@@ -1111,6 +1116,7 @@ void main() {
     for (final descriptor in [
       _descriptor(kind: 'tabs'),
       _descriptor(kind: 'editorial-workflow'),
+      _descriptor(kind: 'approval-checklist'),
       _descriptor(id: 'Pricing'),
       _descriptor(hash: _forgedHash.substring(1)),
       _descriptor(bytes: 524289),

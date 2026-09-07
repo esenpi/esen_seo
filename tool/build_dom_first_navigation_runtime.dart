@@ -315,7 +315,7 @@ String _withApplicationProfileHandoff(String source) {
   source = _replaceOnce(
     source,
     r'''x[1]!=="collection"||typeof x[2]''',
-    r'''(x[1]!=="collection"&&x[1]!=="configurator"&&x[1]!=="editorial-workflow")||typeof x[2]''',
+    r'''(x[1]!=="collection"&&x[1]!=="configurator"&&x[1]!=="editorial-workflow"&&x[1]!=="approval-checklist")||typeof x[2]''',
   );
   source = _replaceOnce(
     source,
@@ -334,6 +334,9 @@ String _withApplicationProfileHandoff(String source) {
         'documentElement.dataset.esenInteractionPending;document.currentScript'
         '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
         '\\",\\"true\\")":kind==="editorial-workflow"?"\\n;delete document.'
+        'documentElement.dataset.esenInteractionPending;document.currentScript'
+        '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
+        '\\",\\"true\\")":kind==="approval-checklist"?"\\n;delete document.'
         'documentElement.dataset.esenInteractionPending;document.currentScript'
         '&&document.currentScript.setAttribute(\\"data-esen-seo-runtime-ready'
         '\\",\\"true\\")":null,',

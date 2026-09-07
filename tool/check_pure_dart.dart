@@ -27,6 +27,9 @@ const _roots = [
   // Internal until the editorial workflow slice passes the same gates.
   'lib/src/components/seo_editorial_workflow_component.dart',
   'lib/src/components/seo_editorial_workflow_transition.dart',
+  // Internal until the approval checklist slice passes the same gates.
+  'lib/src/components/seo_approval_checklist_component.dart',
+  'lib/src/components/seo_approval_checklist_transition.dart',
 ];
 
 /// Imports that disqualify a file from being pure Dart.

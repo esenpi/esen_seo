@@ -1126,18 +1126,19 @@ final seoRoutes = [
 ];
 ```
 
-The explicit schema-4 profile admits standalone Collection, Configurator and
-Editorial Workflow artifacts. Its kind and validated id become part of the
-navigation profile, so another artifact cannot enter through an otherwise
-identical feature set. Every route receives the structural CSS for that typed
-profile, while only an active route embeds its verified source. The browser
-validates the complete route plan, contract revision, UTF-8 length and SHA-256
-before replacement, then appends the package-owned readiness suffix for that
-exact kind. Each Configurator or Editorial Workflow destination starts from
-its delivered HTML and creates fresh state through its existing package
-adapter and apply boundary. Prefetch, bundles, package-owned interactive
-runtimes and other application runtime kinds remain separate profiles and use
-ordinary document navigation.
+The explicit schema-4 profile admits standalone Collection, Configurator,
+Editorial Workflow and Approval Checklist artifacts. Its kind and validated
+id become part of the navigation profile, so another artifact cannot enter
+through an otherwise identical feature set. Every route receives the
+structural CSS for that typed profile, while only an active route embeds its
+verified source. The browser validates the complete route plan, contract
+revision, UTF-8 length and SHA-256 before replacement, then appends the
+package-owned readiness suffix for that exact kind. Each Configurator,
+Editorial Workflow or Approval Checklist destination starts from its delivered
+HTML and creates fresh state through its existing package adapter and apply
+boundary. Prefetch, bundles, package-owned interactive runtimes and other
+application runtime kinds remain separate profiles and use ordinary document
+navigation.
 
 Outside the explicitly admitted handoff profiles, navigation cannot be
 combined with Collection. Forms, other application runtimes and Stepper

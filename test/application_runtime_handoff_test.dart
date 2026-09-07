@@ -26,6 +26,10 @@ const _workflowReference =
     SeoDomFirstApplicationRuntime.editorialWorkflow('article-workflow');
 const _workflowJavascript =
     '(function(){var editorialWorkflowHandoff=true;})();';
+const _approvalReference =
+    SeoDomFirstApplicationRuntime.approvalChecklist('review-checklist');
+const _approvalJavascript =
+    '(function(){var approvalChecklistHandoff=true;})();';
 const _features = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.applicationRuntimeHandoff,
@@ -58,6 +62,13 @@ SeoDomFirstRuntimeArtifact _workflowArtifact() =>
     SeoDomFirstRuntimeArtifact.create(
       reference: _workflowReference,
       javascript: _workflowJavascript,
+      dartVersion: '3.6.2',
+    );
+
+SeoDomFirstRuntimeArtifact _approvalArtifact() =>
+    SeoDomFirstRuntimeArtifact.create(
+      reference: _approvalReference,
+      javascript: _approvalJavascript,
       dartVersion: '3.6.2',
     );
 
@@ -134,6 +145,198 @@ String _withoutScripts(String html) =>
 
 void main() {
   group('typed application handoff profile', () {
+    test('binds an Approval Checklist profile to schema 4', () {
+      final artifact = _approvalArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _approvalReference),
+        _profileRoute(
+          '/review',
+          profile: _approvalReference,
+          runtime: _approvalReference,
+        ),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: {_approvalReference: payload.navigationEntry},
+      )!;
+      final manifest = jsonDecode(plan.manifestJson) as Map<String, dynamic>;
+
+      expect(
+        plan.schemaVersion,
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(
+        plan.profile,
+        'applicationRuntimeHandoff.navigation.themeToggle.application.'
+        'approval-checklist.review-checklist',
+      );
+      expect(plan.currentRuntime?.kind, 'approval-checklist');
+      expect(plan.profileRuntime?.applicationId, _approvalReference.id);
+      expect(manifest['schema'], 4);
+      expect((manifest['routes'] as List).last, [
+        '/review',
+        plan.profile,
+        [
+          'application',
+          'approval-checklist',
+          _approvalReference.id,
+          seoDomFirstRuntimeContractRevision,
+          payload.navigationEntry.sha256,
+          payload.navigationEntry.bytes,
+        ],
+      ]);
+    });
+
+    test('renders only Approval Checklist structural CSS for its profile', () {
+      final artifact = _approvalArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _approvalReference),
+        _profileRoute(
+          '/review',
+          profile: _approvalReference,
+          runtime: _approvalReference,
+        ),
+      ];
+      final entries = {_approvalReference: payload.navigationEntry};
+      final overviewPlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.first,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final activePlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final overviewHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Overview')],
+        features: _features,
+        navigationPlan: overviewPlan,
+      ).toHtmlDocument();
+      final activeHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Review')],
+        features: _features,
+        navigationPlan: activePlan,
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      for (final html in [overviewHtml, activeHtml]) {
+        expect(html, contains('.esen-seo-approval-checklist'));
+        expect(html, isNot(contains('.esen-seo-collection-toolbar')));
+        expect(html, isNot(contains('.esen-seo-configurator-controls')));
+        expect(html, isNot(contains('.esen-seo-editorial-workflow')));
+      }
+      expect(overviewHtml, isNot(contains(_approvalJavascript)));
+      expect(activeHtml, contains(_approvalJavascript));
+      expect(
+        activeHtml,
+        contains(seoDomFirstApprovalChecklistApplicationHandoffEpilogue),
+      );
+      expect(
+        payload.javascript,
+        '$_approvalJavascript'
+        '$seoDomFirstApprovalChecklistApplicationHandoffEpilogue',
+      );
+      expect(
+        payload.navigationEntry.bytes,
+        utf8.encode(_approvalJavascript).length,
+      );
+      expect(payload.navigationEntry.sha256, artifact.manifest.sha256);
+      payload.validateProfileBudget(includeThemeToggle: true);
+    });
+
+    test('snapshots one Approval Checklist artifact across server routes',
+        () async {
+      final artifact = _approvalArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _approvalReference),
+        _profileRoute(
+          '/review',
+          profile: _approvalReference,
+          runtime: _approvalReference,
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(seoBotMiddleware(
+            routes: routes,
+            siteBase: 'https://x.dev',
+            domFirstRuntimeStore: store,
+          ))
+          .addHandler((_) => Response.ok('flutter'));
+
+      final overview = await handler(
+        Request('GET', Uri.parse('https://x.dev/overview')),
+      );
+      final review = await handler(
+        Request('GET', Uri.parse('https://x.dev/review')),
+      );
+      final overviewHtml = await overview.readAsString();
+      final reviewHtml = await review.readAsString();
+
+      expect(store.loads, 1);
+      expect(overviewHtml, isNot(contains(_approvalJavascript)));
+      expect(overviewHtml, contains(artifact.manifest.sha256));
+      expect(reviewHtml, contains(_approvalJavascript));
+      expect(reviewHtml, contains(artifact.manifest.sha256));
+    });
+
+    test('prerenders one Approval Checklist snapshot for its profile',
+        () async {
+      final build = await Directory.systemTemp.createTemp(
+        'esen_approval_handoff',
+      );
+      addTearDown(() => build.delete(recursive: true));
+      await File('${build.path}/index.html').writeAsString(
+        '<!DOCTYPE html><html><head><title>App</title></head>'
+        '<body><script src="flutter_bootstrap.js"></script></body></html>',
+      );
+      final artifact = _approvalArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _approvalReference),
+        _profileRoute(
+          '/review',
+          profile: _approvalReference,
+          runtime: _approvalReference,
+        ),
+      ];
+
+      await prerenderSite(
+        routes: routes,
+        siteBase: 'https://x.dev/repo',
+        buildDir: build.path,
+        domFirstRuntimeStore: store,
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+      final overview =
+          await File('${build.path}/overview/index.html').readAsString();
+      final review =
+          await File('${build.path}/review/index.html').readAsString();
+
+      expect(store.loads, 1);
+      expect(overview, contains('.esen-seo-approval-checklist'));
+      expect(overview, isNot(contains(_approvalJavascript)));
+      expect(overview, contains('"schema":4'));
+      expect(review, contains(_approvalJavascript));
+      expect(review, contains('"schema":4'));
+    });
+
     test('binds an Editorial Workflow profile to schema 4', () {
       final artifact = _workflowArtifact();
       final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
@@ -357,19 +560,6 @@ void main() {
           domFirstFeatures: _features,
           applicationRuntimeHandoffProfile:
               const SeoDomFirstApplicationRuntime.tabs('profile-tabs'),
-          meta: (_) => const SeoMeta(),
-        ),
-        throwsArgumentError,
-      );
-      expect(
-        () => SeoRoute(
-          path: '/approval',
-          delivery: SeoRouteDelivery.domFirst,
-          domFirstFeatures: _features,
-          applicationRuntimeHandoffProfile:
-              const SeoDomFirstApplicationRuntime.approvalChecklist(
-            'approval-profile',
-          ),
           meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,

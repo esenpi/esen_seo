@@ -280,7 +280,7 @@ Set<SeoDomFirstFeature> _validatedDomFirstFeatures(
           'supports only the optional package-owned collection runtime; '
           'applicationRuntimeHandoff supports one standalone implicit '
           'collection or explicit typed collection/configurator/'
-          'editorial-workflow profile',
+          'editorial-workflow/approval-checklist profile',
     );
   }
   if (features.contains(SeoDomFirstFeature.prefetch) &&
@@ -403,12 +403,13 @@ SeoDomFirstApplicationRuntime? _validatedApplicationRuntimeHandoffProfile(
   }
   if (profile is! SeoDomFirstCollectionApplicationRuntime &&
       profile is! SeoDomFirstConfiguratorApplicationRuntime &&
-      profile is! SeoDomFirstEditorialWorkflowApplicationRuntime) {
+      profile is! SeoDomFirstEditorialWorkflowApplicationRuntime &&
+      profile is! SeoDomFirstApprovalChecklistApplicationRuntime) {
     throw ArgumentError.value(
       profile,
       'applicationRuntimeHandoffProfile',
-      'supports only a standalone collection, configurator or '
-          'editorial-workflow runtime',
+      'supports only a standalone collection, configurator, '
+          'editorial-workflow or approval-checklist runtime',
     );
   }
   if (runtime != null && runtime != profile) {
