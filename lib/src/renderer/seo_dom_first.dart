@@ -283,7 +283,8 @@ String seoDomFirstFeatureStyleHtml(
   SeoDomFirstApplicationRuntimeKind? applicationRuntimeHandoffKind,
 }) {
   final css = StringBuffer();
-  if (features.contains(SeoDomFirstFeature.tabs)) {
+  if (features.contains(SeoDomFirstFeature.tabs) ||
+      applicationRuntimeHandoffKind == SeoDomFirstApplicationRuntimeKind.tabs) {
     css.write(seoDomFirstTabsStylesheet);
   }
   if (features.contains(SeoDomFirstFeature.carousel)) {

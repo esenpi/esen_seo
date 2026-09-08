@@ -582,6 +582,10 @@ void main() {
         _runtimeTag(_applicationRuntime),
       ),
       'plan-unknown-kind': _rejectedDocument(
+        _manifest(routesWith(_descriptor(kind: 'stepper'))),
+        _runtimeTag(_applicationRuntime),
+      ),
+      'plan-tabs-kind': _rejectedDocument(
         _manifest(routesWith(_descriptor(kind: 'tabs'))),
         _runtimeTag(_applicationRuntime),
       ),
@@ -679,6 +683,7 @@ void main() {
       'missing',
       'schema-3',
       'plan-unknown-kind',
+      'plan-tabs-kind',
       'plan-other-admitted-kind',
       'plan-approval-kind',
       'plan-bad-id',
@@ -1114,6 +1119,7 @@ void main() {
 
     expect(armedFor(_descriptor()), '1');
     for (final descriptor in [
+      _descriptor(kind: 'stepper'),
       _descriptor(kind: 'tabs'),
       _descriptor(kind: 'editorial-workflow'),
       _descriptor(kind: 'approval-checklist'),

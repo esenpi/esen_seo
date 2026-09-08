@@ -35,8 +35,8 @@ enum SeoDomFirstFeature {
   ///
   /// This separate profile requires [navigation]. The legacy form admits one
   /// Collection runtime; an explicit typed route profile also admits the
-  /// Configurator, Editorial Workflow and Approval Checklist. It does not
-  /// widen [runtimeHandoff], which remains package-owned.
+  /// Configurator, Editorial Workflow, Approval Checklist and Tabs. It does
+  /// not widen [runtimeHandoff], which remains package-owned.
   applicationRuntimeHandoff,
 
   /// Prefetch an intended compatible navigation target before activation.

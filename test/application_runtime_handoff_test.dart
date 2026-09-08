@@ -30,6 +30,8 @@ const _approvalReference =
     SeoDomFirstApplicationRuntime.approvalChecklist('review-checklist');
 const _approvalJavascript =
     '(function(){var approvalChecklistHandoff=true;})();';
+const _tabsReference = SeoDomFirstApplicationRuntime.tabs('product-tabs');
+const _tabsJavascript = '(function(){var tabsHandoff=true;})();';
 const _features = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.applicationRuntimeHandoff,
@@ -69,6 +71,12 @@ SeoDomFirstRuntimeArtifact _approvalArtifact() =>
     SeoDomFirstRuntimeArtifact.create(
       reference: _approvalReference,
       javascript: _approvalJavascript,
+      dartVersion: '3.6.2',
+    );
+
+SeoDomFirstRuntimeArtifact _tabsArtifact() => SeoDomFirstRuntimeArtifact.create(
+      reference: _tabsReference,
+      javascript: _tabsJavascript,
       dartVersion: '3.6.2',
     );
 
@@ -137,6 +145,15 @@ int _nearCeilingSourceLength() {
       seoDomFirstRuntimeMaxGzipBytes) {
     length += 1024;
   }
+  while (codec
+          .encode(utf8.encode('${_incompressibleJavascript(length)}'
+              '$seoDomFirstConfiguratorApplicationHandoffEpilogue'
+              '$seoDomFirstNavigationApplicationProfileRuntime'
+              '$seoDomFirstThemeToggleRuntime'))
+          .length >
+      31 * 1024) {
+    length--;
+  }
   return length;
 }
 
@@ -145,6 +162,196 @@ String _withoutScripts(String html) =>
 
 void main() {
   group('typed application handoff profile', () {
+    test('binds a Tabs profile to schema 4', () {
+      final artifact = _tabsArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _tabsReference),
+        _profileRoute(
+          '/product',
+          profile: _tabsReference,
+          runtime: _tabsReference,
+        ),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: {_tabsReference: payload.navigationEntry},
+      )!;
+      final manifest = jsonDecode(plan.manifestJson) as Map<String, dynamic>;
+
+      expect(
+        plan.schemaVersion,
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(
+        plan.profile,
+        'applicationRuntimeHandoff.navigation.themeToggle.application.'
+        'tabs.product-tabs',
+      );
+      expect(plan.currentRuntime?.kind, 'tabs');
+      expect(plan.profileRuntime?.applicationId, _tabsReference.id);
+      expect(manifest['schema'], 4);
+      expect((manifest['routes'] as List).last, [
+        '/product',
+        plan.profile,
+        [
+          'application',
+          'tabs',
+          _tabsReference.id,
+          seoDomFirstRuntimeContractRevision,
+          payload.navigationEntry.sha256,
+          payload.navigationEntry.bytes,
+        ],
+      ]);
+    });
+
+    test('renders only Tabs structural CSS for its profile', () {
+      final artifact = _tabsArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _tabsReference),
+        _profileRoute(
+          '/product',
+          profile: _tabsReference,
+          runtime: _tabsReference,
+        ),
+      ];
+      final entries = {_tabsReference: payload.navigationEntry};
+      final overviewPlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.first,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final activePlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final overviewHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Overview')],
+        features: _features,
+        navigationPlan: overviewPlan,
+      ).toHtmlDocument();
+      final activeHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Product')],
+        features: _features,
+        navigationPlan: activePlan,
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      for (final html in [overviewHtml, activeHtml]) {
+        expect(html, contains(seoDomFirstTabsStylesheet));
+        expect(html, isNot(contains(seoDomFirstCarouselStylesheet)));
+        expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+        expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
+        expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+        expect(html, isNot(contains(seoDomFirstEditorialWorkflowStylesheet)));
+        expect(html, isNot(contains(seoDomFirstApprovalChecklistStylesheet)));
+      }
+      expect(overviewHtml, isNot(contains(_tabsJavascript)));
+      expect(activeHtml, contains(_tabsJavascript));
+      expect(
+        activeHtml,
+        contains(seoDomFirstTabsApplicationHandoffEpilogue),
+      );
+      expect(
+        payload.javascript,
+        '$_tabsJavascript$seoDomFirstTabsApplicationHandoffEpilogue',
+      );
+      expect(
+        payload.navigationEntry.bytes,
+        utf8.encode(_tabsJavascript).length,
+      );
+      expect(payload.navigationEntry.sha256, artifact.manifest.sha256);
+      payload.validateProfileBudget(includeThemeToggle: true);
+    });
+
+    test('snapshots one Tabs artifact across server routes', () async {
+      final artifact = _tabsArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _tabsReference),
+        _profileRoute(
+          '/product',
+          profile: _tabsReference,
+          runtime: _tabsReference,
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(seoBotMiddleware(
+            routes: routes,
+            siteBase: 'https://x.dev',
+            domFirstRuntimeStore: store,
+          ))
+          .addHandler((_) => Response.ok('flutter'));
+
+      final overview = await handler(
+        Request('GET', Uri.parse('https://x.dev/overview')),
+      );
+      final product = await handler(
+        Request('GET', Uri.parse('https://x.dev/product')),
+      );
+      final overviewHtml = await overview.readAsString();
+      final productHtml = await product.readAsString();
+
+      expect(store.loads, 1);
+      expect(overviewHtml, isNot(contains(_tabsJavascript)));
+      expect(overviewHtml, contains(artifact.manifest.sha256));
+      expect(productHtml, contains(_tabsJavascript));
+      expect(productHtml, contains(artifact.manifest.sha256));
+    });
+
+    test('prerenders one Tabs snapshot for its profile', () async {
+      final build = await Directory.systemTemp.createTemp('esen_tabs_handoff');
+      addTearDown(() => build.delete(recursive: true));
+      await File('${build.path}/index.html').writeAsString(
+        '<!DOCTYPE html><html><head><title>App</title></head>'
+        '<body><script src="flutter_bootstrap.js"></script></body></html>',
+      );
+      final artifact = _tabsArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _tabsReference),
+        _profileRoute(
+          '/product',
+          profile: _tabsReference,
+          runtime: _tabsReference,
+        ),
+      ];
+
+      await prerenderSite(
+        routes: routes,
+        siteBase: 'https://x.dev/repo',
+        buildDir: build.path,
+        domFirstRuntimeStore: store,
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+      final overview =
+          await File('${build.path}/overview/index.html').readAsString();
+      final product =
+          await File('${build.path}/product/index.html').readAsString();
+
+      expect(store.loads, 1);
+      expect(overview, contains(seoDomFirstTabsStylesheet));
+      expect(overview, isNot(contains(_tabsJavascript)));
+      expect(overview, contains('"schema":4'));
+      expect(product, contains(_tabsJavascript));
+      expect(product, contains('"schema":4'));
+    });
+
     test('binds an Approval Checklist profile to schema 4', () {
       final artifact = _approvalArtifact();
       final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
@@ -555,12 +762,27 @@ void main() {
       );
       expect(
         () => SeoRoute(
-          path: '/tabs',
+          path: '/carousel',
           delivery: SeoRouteDelivery.domFirst,
           domFirstFeatures: _features,
           applicationRuntimeHandoffProfile:
-              const SeoDomFirstApplicationRuntime.tabs('profile-tabs'),
+              const SeoDomFirstApplicationRuntime.carousel(
+            'profile-carousel',
+          ),
           meta: (_) => const SeoMeta(),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => _profileRoute(
+          '/bundle',
+          profile: SeoDomFirstApplicationRuntime.bundle(
+            'profile-bundle',
+            members: const {
+              SeoDomFirstApplicationRuntimeKind.tabs,
+              SeoDomFirstApplicationRuntimeKind.carousel,
+            },
+          ),
         ),
         throwsArgumentError,
       );

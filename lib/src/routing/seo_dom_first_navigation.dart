@@ -411,7 +411,8 @@ void _validateApplicationHandoffProfile(
         ? reference is SeoDomFirstCollectionApplicationRuntime ||
             reference is SeoDomFirstConfiguratorApplicationRuntime ||
             reference is SeoDomFirstEditorialWorkflowApplicationRuntime ||
-            reference is SeoDomFirstApprovalChecklistApplicationRuntime
+            reference is SeoDomFirstApprovalChecklistApplicationRuntime ||
+            reference is SeoDomFirstTabsApplicationRuntime
         : reference is SeoDomFirstCollectionApplicationRuntime;
     if (!allowed) {
       throw ArgumentError.value(
@@ -419,8 +420,8 @@ void _validateApplicationHandoffProfile(
         'routes',
         typed
             ? 'typed applicationRuntimeHandoff supports only collection, '
-                'configurator, editorial-workflow or approval-checklist '
-                'runtimes'
+                'configurator, editorial-workflow, approval-checklist or '
+                'tabs runtimes'
             : 'implicit applicationRuntimeHandoff supports only collection '
                 'runtimes',
       );

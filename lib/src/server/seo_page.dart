@@ -398,7 +398,8 @@ bool _admittedApplicationHandoffRuntime(
         ? runtime is SeoDomFirstCollectionApplicationRuntime ||
             runtime is SeoDomFirstConfiguratorApplicationRuntime ||
             runtime is SeoDomFirstEditorialWorkflowApplicationRuntime ||
-            runtime is SeoDomFirstApprovalChecklistApplicationRuntime
+            runtime is SeoDomFirstApprovalChecklistApplicationRuntime ||
+            runtime is SeoDomFirstTabsApplicationRuntime
         : runtime is SeoDomFirstCollectionApplicationRuntime;
 
 String _nonceAttribute(String? nonce) {
