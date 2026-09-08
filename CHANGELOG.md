@@ -1,5 +1,8 @@
 ## Unreleased
 
+* Fixed mixed implicit and typed application-runtime route tables leaking a
+  foreign runtime descriptor into the current profile's manifest, which could
+  silently disable schema-3 client navigation.
 * Added Approval Checklist as the fourth explicit typed application-runtime
   handoff family. Static and active routes share schema 4, stable checklist
   CSS and one verified standalone artifact while every destination rebuilds

@@ -192,7 +192,11 @@ SeoDomFirstNavigationPlan? buildSeoDomFirstNavigationPlan({
         runtime: runtimeHandoff
             ? _packageHandoffRuntime(route)
             : applicationRuntimeHandoff
-                ? _applicationHandoffRuntime(route, applicationRuntimes)
+                ? _applicationHandoffRuntime(
+                    route,
+                    applicationRuntimes,
+                    profile,
+                  )
                 : null,
       ),
     );
@@ -338,9 +342,11 @@ SeoDomFirstNavigationRuntimeEntry? _applicationHandoffRuntime(
   SeoRoute route,
   Map<SeoDomFirstApplicationRuntime, SeoDomFirstNavigationRuntimeEntry>
       runtimes,
+  String profile,
 ) {
   if (!route.domFirstFeatures
-      .contains(SeoDomFirstFeature.applicationRuntimeHandoff)) {
+          .contains(SeoDomFirstFeature.applicationRuntimeHandoff) ||
+      seoDomFirstNavigationProfile(route) != profile) {
     return null;
   }
   final reference = route.applicationRuntime;

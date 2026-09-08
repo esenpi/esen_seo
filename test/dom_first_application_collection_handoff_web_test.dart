@@ -453,6 +453,58 @@ void main() {
       isNull,
     );
   });
+
+  test('keeps schema-3 navigation active beside a typed profile', () async {
+    _cleanDocument();
+    final originalHref = web.window.location.href;
+    addTearDown(() {
+      _restoreFetch();
+      web.window.history.replaceState(null, '', originalHref);
+      _cleanDocument();
+      web.document.documentElement?.removeAttribute('data-handoff-fetches');
+    });
+
+    web.window.history.replaceState(null, '', '/repo/overview');
+    final manifest = _manifest([
+      ['/overview', _profile, null],
+      ['/articles', _profile, _descriptor()],
+      [
+        '/pricing',
+        '$_profile.application.configurator.mixed-configurator',
+        null,
+      ],
+    ]);
+    final articlesDocument = _document(
+      title: 'Articles',
+      body: _collectionBody(
+        title: 'Articles',
+        first: 'Alpha',
+        second: 'Beta',
+        nextPath: '/repo/overview',
+      ),
+      manifest: manifest,
+      runtime: _runtimeTag(_applicationRuntime),
+    );
+
+    _mountHead('Overview', manifest);
+    final initial = _mountBody(_overviewBody());
+    _mockDocuments({'/repo/articles': articlesDocument});
+    _mountNavigationRuntime();
+
+    (initial.querySelector('a')! as web.HTMLElement).click();
+    await _waitFor(
+      () =>
+          web.window.location.pathname == '/repo/articles' &&
+          _enhancedCollection() != null,
+    );
+
+    expect(initial.isConnected, isFalse);
+    expect(web.document.title, 'Articles');
+    expect(
+      web.document.documentElement?.getAttribute('data-handoff-fetches'),
+      '1',
+    );
+  });
 }
 
 List<Object?> _descriptor({String? hash, int? bytes}) => [
