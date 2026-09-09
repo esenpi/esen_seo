@@ -63,7 +63,7 @@ packages:
       path: "../../../.."
       relative: true
     source: path
-    version: "0.14.0"
+    version: "0.15.0"
   esen_seo_runtime_bundle_benchmark_app:
     dependency: "direct main"
     description:

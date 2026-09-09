@@ -1,4 +1,4 @@
-## Unreleased
+## 0.15.0
 
 * Fixed mixed implicit and typed application-runtime route tables leaking a
   foreign runtime descriptor into the current profile's manifest, which could
