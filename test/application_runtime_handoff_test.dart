@@ -32,6 +32,9 @@ const _approvalJavascript =
     '(function(){var approvalChecklistHandoff=true;})();';
 const _tabsReference = SeoDomFirstApplicationRuntime.tabs('product-tabs');
 const _tabsJavascript = '(function(){var tabsHandoff=true;})();';
+const _carouselReference =
+    SeoDomFirstApplicationRuntime.carousel('product-carousel');
+const _carouselJavascript = '(function(){var carouselHandoff=true;})();';
 const _features = {
   SeoDomFirstFeature.navigation,
   SeoDomFirstFeature.applicationRuntimeHandoff,
@@ -77,6 +80,13 @@ SeoDomFirstRuntimeArtifact _approvalArtifact() =>
 SeoDomFirstRuntimeArtifact _tabsArtifact() => SeoDomFirstRuntimeArtifact.create(
       reference: _tabsReference,
       javascript: _tabsJavascript,
+      dartVersion: '3.6.2',
+    );
+
+SeoDomFirstRuntimeArtifact _carouselArtifact() =>
+    SeoDomFirstRuntimeArtifact.create(
+      reference: _carouselReference,
+      javascript: _carouselJavascript,
       dartVersion: '3.6.2',
     );
 
@@ -162,6 +172,198 @@ String _withoutScripts(String html) =>
 
 void main() {
   group('typed application handoff profile', () {
+    test('binds a Carousel profile to schema 4', () {
+      final artifact = _carouselArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _carouselReference),
+        _profileRoute(
+          '/gallery',
+          profile: _carouselReference,
+          runtime: _carouselReference,
+        ),
+      ];
+      final plan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev/repo',
+        applicationRuntimes: {_carouselReference: payload.navigationEntry},
+      )!;
+      final manifest = jsonDecode(plan.manifestJson) as Map<String, dynamic>;
+
+      expect(
+        plan.schemaVersion,
+        seoDomFirstTypedApplicationRuntimeHandoffManifestSchema,
+      );
+      expect(
+        plan.profile,
+        'applicationRuntimeHandoff.navigation.themeToggle.application.'
+        'carousel.product-carousel',
+      );
+      expect(plan.currentRuntime?.kind, 'carousel');
+      expect(plan.profileRuntime?.applicationId, _carouselReference.id);
+      expect(manifest['schema'], 4);
+      expect((manifest['routes'] as List).last, [
+        '/gallery',
+        plan.profile,
+        [
+          'application',
+          'carousel',
+          _carouselReference.id,
+          seoDomFirstRuntimeContractRevision,
+          payload.navigationEntry.sha256,
+          payload.navigationEntry.bytes,
+        ],
+      ]);
+    });
+
+    test('renders only Carousel structural CSS for its profile', () {
+      final artifact = _carouselArtifact();
+      final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
+        artifact,
+        typedProfile: true,
+      );
+      final routes = [
+        _profileRoute('/overview', profile: _carouselReference),
+        _profileRoute(
+          '/gallery',
+          profile: _carouselReference,
+          runtime: _carouselReference,
+        ),
+      ];
+      final entries = {_carouselReference: payload.navigationEntry};
+      final overviewPlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.first,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final activePlan = buildSeoDomFirstNavigationPlan(
+        routes: routes,
+        currentRoute: routes.last,
+        siteBase: 'https://x.dev',
+        applicationRuntimes: entries,
+      )!;
+      final overviewHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Overview')],
+        features: _features,
+        navigationPlan: overviewPlan,
+      ).toHtmlDocument();
+      final activeHtml = SeoPage.domFirstFromNodes(
+        body: [SeoNode(tag: 'h1', text: 'Gallery')],
+        features: _features,
+        navigationPlan: activePlan,
+        applicationRuntime: artifact,
+      ).toHtmlDocument();
+
+      for (final html in [overviewHtml, activeHtml]) {
+        expect(html, contains(seoDomFirstCarouselStylesheet));
+        expect(html, isNot(contains(seoDomFirstTabsStylesheet)));
+        expect(html, isNot(contains(seoDomFirstStepperStylesheet)));
+        expect(html, isNot(contains(seoDomFirstCollectionStylesheet)));
+        expect(html, isNot(contains(seoDomFirstConfiguratorStylesheet)));
+        expect(html, isNot(contains(seoDomFirstEditorialWorkflowStylesheet)));
+        expect(html, isNot(contains(seoDomFirstApprovalChecklistStylesheet)));
+      }
+      expect(overviewHtml, isNot(contains(_carouselJavascript)));
+      expect(activeHtml, contains(_carouselJavascript));
+      expect(
+        activeHtml,
+        contains(seoDomFirstCarouselApplicationHandoffEpilogue),
+      );
+      expect(
+        payload.javascript,
+        '$_carouselJavascript'
+        '$seoDomFirstCarouselApplicationHandoffEpilogue',
+      );
+      expect(
+        payload.navigationEntry.bytes,
+        utf8.encode(_carouselJavascript).length,
+      );
+      expect(payload.navigationEntry.sha256, artifact.manifest.sha256);
+      payload.validateProfileBudget(includeThemeToggle: true);
+    });
+
+    test('snapshots one Carousel artifact across server routes', () async {
+      final artifact = _carouselArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _carouselReference),
+        _profileRoute(
+          '/gallery',
+          profile: _carouselReference,
+          runtime: _carouselReference,
+        ),
+      ];
+      final handler = const Pipeline()
+          .addMiddleware(seoBotMiddleware(
+            routes: routes,
+            siteBase: 'https://x.dev',
+            domFirstRuntimeStore: store,
+          ))
+          .addHandler((_) => Response.ok('flutter'));
+
+      final overview = await handler(
+        Request('GET', Uri.parse('https://x.dev/overview')),
+      );
+      final gallery = await handler(
+        Request('GET', Uri.parse('https://x.dev/gallery')),
+      );
+      final overviewHtml = await overview.readAsString();
+      final galleryHtml = await gallery.readAsString();
+
+      expect(store.loads, 1);
+      expect(overviewHtml, isNot(contains(_carouselJavascript)));
+      expect(overviewHtml, contains(artifact.manifest.sha256));
+      expect(galleryHtml, contains(_carouselJavascript));
+      expect(galleryHtml, contains(artifact.manifest.sha256));
+    });
+
+    test('prerenders one Carousel snapshot for its profile', () async {
+      final build =
+          await Directory.systemTemp.createTemp('esen_carousel_handoff');
+      addTearDown(() => build.delete(recursive: true));
+      await File('${build.path}/index.html').writeAsString(
+        '<!DOCTYPE html><html><head><title>App</title></head>'
+        '<body><script src="flutter_bootstrap.js"></script></body></html>',
+      );
+      final artifact = _carouselArtifact();
+      final store = _MemoryStore(artifact);
+      final routes = [
+        _profileRoute('/overview', profile: _carouselReference),
+        _profileRoute(
+          '/gallery',
+          profile: _carouselReference,
+          runtime: _carouselReference,
+        ),
+      ];
+
+      await prerenderSite(
+        routes: routes,
+        siteBase: 'https://x.dev/repo',
+        buildDir: build.path,
+        domFirstRuntimeStore: store,
+        writeSitemap: false,
+        writeRobotsTxt: false,
+        writeLlmsTxt: false,
+        write404Page: false,
+      );
+      final overview =
+          await File('${build.path}/overview/index.html').readAsString();
+      final gallery =
+          await File('${build.path}/gallery/index.html').readAsString();
+
+      expect(store.loads, 1);
+      expect(overview, contains(seoDomFirstCarouselStylesheet));
+      expect(overview, isNot(contains(_carouselJavascript)));
+      expect(overview, contains('"schema":4'));
+      expect(gallery, contains(_carouselJavascript));
+      expect(gallery, contains('"schema":4'));
+    });
+
     test('binds a Tabs profile to schema 4', () {
       final artifact = _tabsArtifact();
       final payload = SeoDomFirstApplicationHandoffPayload.fromArtifact(
@@ -762,13 +964,11 @@ void main() {
       );
       expect(
         () => SeoRoute(
-          path: '/carousel',
+          path: '/stepper',
           delivery: SeoRouteDelivery.domFirst,
           domFirstFeatures: _features,
           applicationRuntimeHandoffProfile:
-              const SeoDomFirstApplicationRuntime.carousel(
-            'profile-carousel',
-          ),
+              const SeoDomFirstApplicationRuntime.stepper('profile-stepper'),
           meta: (_) => const SeoMeta(),
         ),
         throwsArgumentError,

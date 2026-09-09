@@ -46,6 +46,12 @@ const String seoDomFirstTabsApplicationHandoffEpilogue =
     'document.currentScript&&document.currentScript.setAttribute('
     '"$seoDomFirstRuntimeReadyAttribute","true")';
 
+/// Package-owned Carousel suffix joined after source verification.
+const String seoDomFirstCarouselApplicationHandoffEpilogue =
+    '\n;delete document.documentElement.dataset.esenInteractionPending;'
+    'document.currentScript&&document.currentScript.setAttribute('
+    '"$seoDomFirstRuntimeReadyAttribute","true")';
+
 /// The complete classic-script body admitted by the first runtime handoff.
 final String seoDomFirstCollectionHandoffRuntime =
     '$seoDomFirstCollectionRuntime;'
@@ -75,10 +81,11 @@ String seoDomFirstApplicationHandoffEpilogueFor(String kind) => switch (kind) {
       'approval-checklist' =>
         seoDomFirstApprovalChecklistApplicationHandoffEpilogue,
       'tabs' => seoDomFirstTabsApplicationHandoffEpilogue,
+      'carousel' => seoDomFirstCarouselApplicationHandoffEpilogue,
       _ => throw ArgumentError.value(
           kind,
           'kind',
           'must be collection, configurator, editorial-workflow, '
-              'approval-checklist or tabs',
+              'approval-checklist, tabs or carousel',
         ),
     };

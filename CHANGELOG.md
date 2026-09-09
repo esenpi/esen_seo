@@ -3,6 +3,10 @@
 * Fixed mixed implicit and typed application-runtime route tables leaking a
   foreign runtime descriptor into the current profile's manifest, which could
   silently disable schema-3 client navigation.
+* Added Carousel as the sixth explicit typed application-runtime handoff
+  family. Static and active routes share schema 4, stable Carousel CSS and one
+  verified standalone artifact while every destination reconstructs slide
+  count and initial selection from its delivered document.
 * Added Tabs as the fifth explicit typed application-runtime handoff family.
   Static and active routes share schema 4, stable Tabs CSS and one verified
   standalone artifact while every destination reconstructs panel count and

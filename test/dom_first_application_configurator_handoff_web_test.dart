@@ -589,6 +589,10 @@ void main() {
         _manifest(routesWith(_descriptor(kind: 'tabs'))),
         _runtimeTag(_applicationRuntime),
       ),
+      'plan-carousel-kind': _rejectedDocument(
+        _manifest(routesWith(_descriptor(kind: 'carousel'))),
+        _runtimeTag(_applicationRuntime),
+      ),
       'plan-other-admitted-kind': _rejectedDocument(
         _manifest(routesWith(_descriptor(kind: 'editorial-workflow'))),
         _runtimeTag(_applicationRuntime),
@@ -684,6 +688,7 @@ void main() {
       'schema-3',
       'plan-unknown-kind',
       'plan-tabs-kind',
+      'plan-carousel-kind',
       'plan-other-admitted-kind',
       'plan-approval-kind',
       'plan-bad-id',
@@ -1121,6 +1126,7 @@ void main() {
     for (final descriptor in [
       _descriptor(kind: 'stepper'),
       _descriptor(kind: 'tabs'),
+      _descriptor(kind: 'carousel'),
       _descriptor(kind: 'editorial-workflow'),
       _descriptor(kind: 'approval-checklist'),
       _descriptor(id: 'Pricing'),

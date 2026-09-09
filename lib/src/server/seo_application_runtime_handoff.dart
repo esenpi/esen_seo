@@ -31,14 +31,15 @@ final class SeoDomFirstApplicationHandoffPayload {
             reference is SeoDomFirstConfiguratorApplicationRuntime ||
             reference is SeoDomFirstEditorialWorkflowApplicationRuntime ||
             reference is SeoDomFirstApprovalChecklistApplicationRuntime ||
-            reference is SeoDomFirstTabsApplicationRuntime
+            reference is SeoDomFirstTabsApplicationRuntime ||
+            reference is SeoDomFirstCarouselApplicationRuntime
         : reference is SeoDomFirstCollectionApplicationRuntime;
     if (!admitted) {
       throw StateError(
         typedProfile
             ? 'Typed application runtime handoff supports only a standalone '
-                'collection, configurator, editorial-workflow or '
-                'approval-checklist or tabs runtime.'
+                'collection, configurator, editorial-workflow, '
+                'approval-checklist, tabs or carousel runtime.'
             : 'Application runtime handoff supports only a standalone '
                 'collection runtime.',
       );

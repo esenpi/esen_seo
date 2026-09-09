@@ -85,6 +85,7 @@ jobs:
           test/dom_first_application_editorial_workflow_handoff_web_test.dart
           test/dom_first_application_approval_checklist_handoff_web_test.dart
           test/dom_first_application_tabs_handoff_web_test.dart
+          test/dom_first_application_carousel_handoff_web_test.dart
           test/seo_responsive_image_web_test.dart
 
   analyzer-minimum:
