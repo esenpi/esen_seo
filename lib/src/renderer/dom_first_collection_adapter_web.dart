@@ -728,38 +728,28 @@ final class _CollectionApplyBoundary {
 
   void listenToHistory(void Function(SeoCollectionState) restore) {
     if (plan.urlCodec == null) return;
-    final documentRoot = document.documentElement;
-    final routeLocation =
-        '${web.window.location.origin}${web.window.location.pathname}';
-    late final JSFunction historyListener;
-    late final JSFunction navigationListener;
+    final window = web.window;
+    final routePath = window.location.pathname;
+    late final JSFunction listener;
 
-    void removeListeners() {
-      web.window.removeEventListener('popstate', historyListener);
-      documentRoot?.removeEventListener(
-        'esen-seo:navigation',
-        navigationListener,
-      );
-    }
-
-    historyListener = ((web.Event _) {
+    listener = ((web.Event event) {
       if (!plan.root.isConnected) {
-        removeListeners();
+        window.removeEventListener('popstate', listener);
+        document.documentElement?.removeEventListener(
+          'esen-seo:navigation',
+          listener,
+        );
         return;
       }
-      final currentLocation =
-          '${web.window.location.origin}${web.window.location.pathname}';
-      if (currentLocation != routeLocation) return;
+      if (event.type != 'popstate') return;
+      if (window.location.pathname != routePath) return;
       restore(stateFromUrl());
     }).toJS;
-    navigationListener = ((web.Event _) {
-      if (!plan.root.isConnected) removeListeners();
-    }).toJS;
 
-    web.window.addEventListener('popstate', historyListener);
-    documentRoot?.addEventListener(
+    window.addEventListener('popstate', listener);
+    document.documentElement?.addEventListener(
       'esen-seo:navigation',
-      navigationListener,
+      listener,
     );
   }
 
